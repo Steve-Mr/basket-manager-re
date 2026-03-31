@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:orientation="vertical" android:layout_width="wrap_content" android:layout_height="wrap_content"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <TextView android:textColor="@color/base_white" android:gravity="center" android:id="@id/dialogNewGameDefaultTextViewTitle" android:background="@color/holo_blue_light" android:layout_width="fill_parent" android:layout_height="40.0dip" android:text="@string/main_game_new_default" style="@style/textViewDefault" />
+    <EditText android:gravity="center" android:id="@id/dialogNewGameDefaultEditTextName" android:layout_width="fill_parent" android:layout_height="wrap_content" android:layout_marginLeft="@dimen/padding_double" android:layout_marginTop="@dimen/padding_fourth" android:layout_marginRight="@dimen/padding_double" android:layout_marginBottom="@dimen/padding_default" android:hint="@string/main_game_name" android:maxLength="20" android:inputType="text" style="@style/editTextDefault">
+        <requestFocus />
+    </EditText>
+    <RadioGroup android:gravity="center" android:orientation="horizontal" android:id="@id/dialogNewGameDefaultRadioGroupType" android:layout_width="fill_parent" android:layout_height="wrap_content">
+        <RadioButton android:id="@id/dialogNewGameDefaultRadioButtonLocal" android:text="@string/main_default_local" style="@style/radioButtonHorizontal" />
+        <RadioButton android:id="@id/dialogNewGameDefaultRadioButtonOnline" android:checked="true" android:text="@string/main_default_online" style="@style/radioButtonHorizontal" />
+    </RadioGroup>
+</LinearLayout>

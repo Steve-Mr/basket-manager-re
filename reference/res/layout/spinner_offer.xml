@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="wrap_content" android:layout_marginLeft="@dimen/padding_double" android:layout_alignParentLeft="true" android:layout_centerVertical="true"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <TextView android:textSize="@dimen/text_large" android:id="@id/spinnerOfferTextViewSalary" android:layout_width="fill_parent" android:text="@string/name" style="@style/textViewDefault" />
+    <TextView android:textColor="@color/base_gray_dark" android:id="@id/spinnerOfferTextViewYearsContract" android:paddingTop="@dimen/padding_none" android:layout_width="fill_parent" android:text="@string/name" style="@style/textViewDefault" />
+</LinearLayout>

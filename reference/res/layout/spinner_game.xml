@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="fill_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <View android:id="@id/spinnerGameViewTeamColor" android:background="@color/adapter_even" android:visibility="gone" android:layout_width="@dimen/flag_width" android:layout_height="@dimen/flag_height" android:layout_marginLeft="@dimen/padding_double" android:layout_alignParentLeft="true" android:layout_centerVertical="true" />
+    <LinearLayout android:orientation="vertical" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="@dimen/padding_default" android:layout_toRightOf="@id/spinnerGameViewTeamColor" android:layout_centerVertical="true">
+        <TextView android:textSize="@dimen/text_large" android:id="@id/spinnerGameTextViewName" android:text="@string/main_game_name" style="@style/textViewDefault" />
+        <TextView android:textColor="@color/base_gray_dark" android:id="@id/spinnerGameTextViewTeam" android:paddingTop="@dimen/padding_none" android:text="@string/team" style="@style/textViewDefault" />
+    </LinearLayout>
+    <LinearLayout android:gravity="right" android:orientation="vertical" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginRight="@dimen/padding_double" android:layout_alignParentRight="true" android:layout_centerVertical="true">
+        <TextView android:textColor="@color/base_gray_dark" android:id="@id/spinnerGameTextViewCurrentSeason" android:text="@string/current_season" style="@style/textViewDefault" />
+        <TextView android:textColor="@color/base_gray_dark" android:id="@id/spinnerGameTextViewCurrentMatchday" android:paddingTop="@dimen/padding_none" android:text="@string/current_matchday" style="@style/textViewDefault" />
+    </LinearLayout>
+</RelativeLayout>

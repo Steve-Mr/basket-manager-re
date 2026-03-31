@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="flag_width">20.0dip</dimen>
+    <dimen name="flag_height">45.0dip</dimen>
+    <dimen name="drawer_content_padding">200.0dip</dimen>
+    <dimen name="text_very_very_small">10.0sp</dimen>
+    <dimen name="text_very_small">12.0sp</dimen>
+    <dimen name="text_small">14.0sp</dimen>
+    <dimen name="text_medium">16.0sp</dimen>
+    <dimen name="text_large">20.0sp</dimen>
+    <dimen name="text_very_large">24.0sp</dimen>
+    <dimen name="text_very_very_large">28.0sp</dimen>
+</resources>

@@ -1,0 +1,8 @@
+*.zip
+BasketManager2015-40.apk
+reference/
+.gradle/
+build/
+app/build/
+*.iml
+.idea/

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="activity_horizontal_margin">0.0dip</dimen>
+    <dimen name="activity_vertical_margin">0.0dip</dimen>
+    <dimen name="button_height_small">30.0dip</dimen>
+    <dimen name="flag_width">15.0dip</dimen>
+    <dimen name="flag_height">40.0dip</dimen>
+    <dimen name="drawer_size">200.0dip</dimen>
+    <dimen name="drawer_content_padding">0.0dip</dimen>
+    <dimen name="padding_none">0.0dip</dimen>
+    <dimen name="padding_middle">2.0dip</dimen>
+    <dimen name="padding_default">4.0dip</dimen>
+    <dimen name="padding_double">8.0dip</dimen>
+    <dimen name="padding_triple">12.0dip</dimen>
+    <dimen name="padding_fourth">16.0dip</dimen>
+    <dimen name="padding_fifth">20.0dip</dimen>
+    <dimen name="text_very_very_small">7.0sp</dimen>
+    <dimen name="text_very_small">10.0sp</dimen>
+    <dimen name="text_small">13.0sp</dimen>
+    <dimen name="text_medium">16.0sp</dimen>
+    <dimen name="text_large">19.0sp</dimen>
+    <dimen name="text_very_large">22.0sp</dimen>
+    <dimen name="text_very_very_large">25.0sp</dimen>
+    <dimen name="icon_news">50.0dip</dimen>
+</resources>

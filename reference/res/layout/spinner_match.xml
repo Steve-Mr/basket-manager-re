@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout android:orientation="vertical" android:layout_width="fill_parent" android:layout_height="fill_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <TextView android:id="@id/spinnerMatchTextViewTeamVisitorName" android:paddingBottom="@dimen/padding_default" android:text="@string/team" android:layout_toLeftOf="@id/spinnerMatchTextViewTeamVisitorResult" android:layout_alignBaseline="@id/spinnerMatchTextViewTeamVisitorResult" android:layout_alignBottom="@id/spinnerMatchTextViewTeamVisitorResult" style="@style/textViewDefault" />
+    <TextView android:id="@id/spinnerMatchTextViewTeamVisitorResult" android:paddingBottom="@dimen/padding_default" android:text="@string/value_example" android:layout_toLeftOf="@id/spinnerMatchTextViewSeparator" android:layout_centerVertical="true" style="@style/textViewDefault" />
+    <TextView android:id="@id/spinnerMatchTextViewSeparator" android:paddingBottom="@dimen/padding_default" android:text="@string/match_in_home_of" android:layout_centerHorizontal="true" android:layout_centerVertical="true" style="@style/textViewDefault" />
+    <TextView android:id="@id/spinnerMatchTextViewTeamLocalResult" android:paddingBottom="@dimen/padding_default" android:text="@string/value_example" android:layout_toRightOf="@id/spinnerMatchTextViewSeparator" android:layout_centerVertical="true" style="@style/textViewDefault" />
+    <TextView android:id="@id/spinnerMatchTextViewTeamLocalName" android:paddingBottom="@dimen/padding_default" android:text="@string/team" android:layout_toRightOf="@id/spinnerMatchTextViewTeamLocalResult" android:layout_alignBaseline="@id/spinnerMatchTextViewTeamLocalResult" android:layout_alignBottom="@id/spinnerMatchTextViewTeamLocalResult" style="@style/textViewDefault" />
+</RelativeLayout>
