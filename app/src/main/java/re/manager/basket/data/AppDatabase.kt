@@ -23,7 +23,9 @@ import re.manager.basket.data.entity.*
 abstract class AppDatabase : RoomDatabase() {
     abstract fun teamDao(): TeamDao
     abstract fun playerDao(): PlayerDao
-    // other daos...
+    abstract fun leagueDao(): LeagueDao
+    abstract fun matchDao(): MatchDao
+    abstract fun tacticDao(): TacticDao
 
     companion object {
         @Volatile
