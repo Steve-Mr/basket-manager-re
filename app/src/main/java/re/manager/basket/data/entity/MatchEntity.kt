@@ -1,9 +1,34 @@
 package re.manager.basket.data.entity
 
 import androidx.room.Entity
+import androidx.room.ForeignKey
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "matches")
+@Entity(
+    tableName = "matches",
+    foreignKeys = [
+        ForeignKey(
+            entity = GameEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["gameId"],
+            onDelete = ForeignKey.CASCADE
+        ),
+        ForeignKey(
+            entity = TeamEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["teamLocalId"],
+            onDelete = ForeignKey.CASCADE
+        ),
+        ForeignKey(
+            entity = TeamEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["teamVisitorId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [Index("gameId"), Index("teamLocalId"), Index("teamVisitorId")]
+)
 data class MatchEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val gameId: Int,

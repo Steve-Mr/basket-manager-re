@@ -7,10 +7,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import re.manager.basket.data.entity.PlayerEntity
+import re.manager.basket.ui.viewmodel.PlayerUiState
 
 @Composable
-fun MarketScreen(freeAgents: List<PlayerEntity>, onSign: (PlayerEntity) -> Unit) {
+fun MarketScreen(freeAgents: List<PlayerUiState>, onSign: (PlayerUiState) -> Unit) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
@@ -25,7 +25,7 @@ fun MarketScreen(freeAgents: List<PlayerEntity>, onSign: (PlayerEntity) -> Unit)
                 Row(modifier = Modifier.padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                     Column {
                         Text(player.name, style = MaterialTheme.typography.titleMedium)
-                        Text("Value: ${player.getMarketValue().toInt()}")
+                        Text("Value: ${player.marketValue}")
                     }
                     Button(onClick = { onSign(player) }) {
                         Text("Sign")

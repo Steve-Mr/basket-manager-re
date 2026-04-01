@@ -11,14 +11,19 @@ class Rulete(
 ) {
     fun pickPlayer(skillIndex: Int, isLocal: Boolean, benchImportance: Int): PlayerEntity {
         // Bench importance check (original logic: 6 - benchImportance)
-        val chanceOfTitular = 6 - benchImportance
-        val list = if (Random.nextInt(0, chanceOfTitular + 1) < chanceOfTitular) {
+        val chanceOfTitular = (6 - benchImportance).coerceAtLeast(0)
+        val range = (chanceOfTitular + 1).coerceAtLeast(1)
+
+        val list = if (Random.nextInt(0, range) < chanceOfTitular) {
             if (isLocal) localTitulars else visitorTitulars
         } else {
             if (isLocal) localReserves else visitorReserves
         }
 
-        if (list.isEmpty()) return localTitulars.first() // Fallback
+        if (list.isEmpty()) {
+            return (if (isLocal) localTitulars else visitorTitulars).firstOrNull()
+                ?: (if (isLocal) localReserves else visitorReserves).first()
+        }
 
         val weights = list.map { calculateWeight(it, skillIndex) }
         val totalWeight = weights.sum()
@@ -43,7 +48,7 @@ class Rulete(
             3 -> player.skillSteal * minutes
             4 -> player.skillRebound * minutes
             5 -> player.skillPass * minutes
-            6 -> player.skillShotInterior * (minutes + 5) // Bonus for stars (simplified)
+            6 -> player.skillShotInterior * (minutes + 5)
             7 -> player.skillShotExterior * (minutes + 5)
             8 -> player.skillShotFree * (minutes + 5)
             else -> 1

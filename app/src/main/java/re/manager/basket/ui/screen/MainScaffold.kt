@@ -9,9 +9,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import re.manager.basket.ui.viewmodel.GameViewModel
 import re.manager.basket.ui.viewmodel.PlayerListViewModel
+import re.manager.basket.ui.viewmodel.PlayerUiState
 
 @Composable
 fun MainScaffold(
@@ -33,7 +33,7 @@ fun MainScaffold(
 fun MainScaffoldContent(
     selectedItemInitial: Int,
     gameState: re.manager.basket.data.entity.GameEntity?,
-    players: List<re.manager.basket.data.entity.PlayerEntity>,
+    players: List<PlayerUiState>,
     onNextDay: () -> Unit
 ) {
     var selectedItem by remember { mutableIntStateOf(selectedItemInitial) }

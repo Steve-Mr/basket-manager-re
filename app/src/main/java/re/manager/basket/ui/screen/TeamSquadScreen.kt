@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import re.manager.basket.ui.viewmodel.PlayerListViewModel
+import re.manager.basket.ui.viewmodel.PlayerUiState
 
 @Composable
 fun TeamSquadScreen(viewModel: PlayerListViewModel) {
@@ -20,7 +21,7 @@ fun TeamSquadScreen(viewModel: PlayerListViewModel) {
 }
 
 @Composable
-fun TeamSquadContent(players: List<re.manager.basket.data.entity.PlayerEntity>) {
+fun TeamSquadContent(players: List<PlayerUiState>) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
@@ -40,7 +41,7 @@ fun TeamSquadContent(players: List<re.manager.basket.data.entity.PlayerEntity>) 
                     .fillMaxWidth()
                     .clickable { /* Toggle titular status logic */ },
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                colors = if (player.yearsContract > 0) CardDefaults.cardColors() else CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                colors = if (player.hasContract) CardDefaults.cardColors() else CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(
@@ -53,7 +54,7 @@ fun TeamSquadContent(players: List<re.manager.basket.data.entity.PlayerEntity>) 
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = if (player.positionSecond > 0) "Starter" else "Bench",
+                            text = if (player.isStarter) "Starter" else "Bench",
                             color = MaterialTheme.colorScheme.secondary
                         )
                     }
@@ -63,8 +64,8 @@ fun TeamSquadContent(players: List<re.manager.basket.data.entity.PlayerEntity>) 
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(text = "Age: ${player.age}")
-                        Text(text = "Avg: ${player.getAverageSkillAll().toInt()}")
-                        Text(text = "Val: ${player.getValue().toInt()}")
+                        Text(text = "Avg: ${player.avgSkill}")
+                        Text(text = "Val: ${player.totalValue}")
                     }
                 }
             }
