@@ -23,15 +23,17 @@ jobs:
 
     - name: Decode Keystore
       env:
-        KEYSTORE_BASE64: ${{ secrets.SIGNING_KEY_STORE_BASE64 }}
+        KEYSTORE_BASE64: ${{ secrets.KEYSTORE }}
       if: env.KEYSTORE_BASE64 != ''
       run: echo $KEYSTORE_BASE64 | base64 -d > release.jks
 
-    - name: Build with Gradle
+    - name: Restore Key Properties
       env:
-        SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
-        SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
-        SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+        KEY_PROPERTIES: ${{ secrets.KEY_PROPERTIES }}
+      if: env.KEY_PROPERTIES != ''
+      run: echo "$KEY_PROPERTIES" > key.properties
+
+    - name: Build with Gradle
       run: ./gradlew assembleDebug
 
     - name: Upload APK
