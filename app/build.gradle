@@ -19,9 +19,41 @@ android {
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        config {
+            def keystorePropertiesFile = rootProject.file("key.properties")
+            def keystoreProperties = new Properties()
+            if (keystorePropertiesFile.exists()) {
+                keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+            }
+
+            def keystoreFile = file("../release.jks")
+            def storePasswordVar = System.getenv("SIGNING_STORE_PASSWORD") ?: (keystoreProperties['SIGNING_STORE_PASSWORD'] ?: (project.findProperty("SIGNING_STORE_PASSWORD") ?: ""))
+            def keyAliasVar = System.getenv("SIGNING_KEY_ALIAS") ?: (keystoreProperties['SIGNING_KEY_ALIAS'] ?: (project.findProperty("SIGNING_KEY_ALIAS") ?: ""))
+            def keyPasswordVar = System.getenv("SIGNING_KEY_PASSWORD") ?: (keystoreProperties['SIGNING_KEY_PASSWORD'] ?: (project.findProperty("SIGNING_KEY_PASSWORD") ?: ""))
+
+            if (keystoreFile.exists() && !storePasswordVar.isEmpty() && !keyAliasVar.isEmpty() && !keyPasswordVar.isEmpty()) {
+                storeFile keystoreFile
+                storePassword storePasswordVar
+                keyAlias keyAliasVar
+                keyPassword keyPasswordVar
+            } else if (keystoreFile.exists()) {
+                println "WARNING: Keystore file exists but some signing properties are missing. Skipping custom signing config."
+            }
+        }
+    }
+
     buildTypes {
+        debug {
+            if (signingConfigs.config.storeFile != null && signingConfigs.config.storeFile.exists()) {
+                signingConfig signingConfigs.config
+            }
+        }
         release {
             minifyEnabled false
+            if (signingConfigs.config.storeFile != null && signingConfigs.config.storeFile.exists()) {
+                signingConfig signingConfigs.config
+            }
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }

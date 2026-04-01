@@ -21,5 +21,23 @@ jobs:
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew || true
 
+    - name: Decode Keystore
+      env:
+        KEYSTORE_BASE64: ${{ secrets.KEYSTORE }}
+      if: env.KEYSTORE_BASE64 != ''
+      run: echo $KEYSTORE_BASE64 | base64 -d > release.jks
+
+    - name: Restore Key Properties
+      env:
+        KEY_PROPERTIES: ${{ secrets.KEY_PROPERTIES }}
+      if: env.KEY_PROPERTIES != ''
+      run: echo "$KEY_PROPERTIES" > key.properties
+
     - name: Build with Gradle
-      run: ./gradlew build || gradle build
+      run: ./gradlew assembleDebug
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: basket-manager-debug
+        path: app/build/outputs/apk/debug/app-debug.apk

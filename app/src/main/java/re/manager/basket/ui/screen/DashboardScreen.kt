@@ -13,7 +13,11 @@ import re.manager.basket.ui.viewmodel.GameViewModel
 @Composable
 fun DashboardScreen(viewModel: GameViewModel) {
     val gameState by viewModel.gameState.collectAsState()
+    DashboardContent(gameState)
+}
 
+@Composable
+fun DashboardContent(gameState: re.manager.basket.data.entity.GameEntity?) {
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
