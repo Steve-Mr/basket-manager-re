@@ -16,7 +16,11 @@ import re.manager.basket.ui.viewmodel.PlayerListViewModel
 @Composable
 fun TeamSquadScreen(viewModel: PlayerListViewModel) {
     val players by viewModel.players.collectAsState()
+    TeamSquadContent(players)
+}
 
+@Composable
+fun TeamSquadContent(players: List<re.manager.basket.data.entity.PlayerEntity>) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),

@@ -39,11 +39,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             BasketManagerTheme {
                 LaunchedEffect(Unit) {
-                    if (database.teamDao().getCount() == 0) {
-                        val importer = RosterImporter(this@MainActivity, database)
-                        importer.importFromAssets(gameId = 1)
-                    }
-                    gameViewModel.loadGame()
+                    gameViewModel.initializeAndLoadGame(this@MainActivity)
                     // Default load players for team 1 (User Team)
                     playerListViewModel.loadPlayers(1)
                 }

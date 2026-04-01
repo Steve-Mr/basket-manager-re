@@ -18,7 +18,25 @@ fun MainScaffold(
     gameViewModel: GameViewModel,
     playerListViewModel: PlayerListViewModel
 ) {
-    var selectedItem by remember { mutableIntStateOf(0) }
+    val gameState by gameViewModel.gameState.collectAsState()
+    val players by playerListViewModel.players.collectAsState()
+
+    MainScaffoldContent(
+        selectedItemInitial = 0,
+        gameState = gameState,
+        players = players,
+        onNextDay = { gameViewModel.nextDay() }
+    )
+}
+
+@Composable
+fun MainScaffoldContent(
+    selectedItemInitial: Int,
+    gameState: re.manager.basket.data.entity.GameEntity?,
+    players: List<re.manager.basket.data.entity.PlayerEntity>,
+    onNextDay: () -> Unit
+) {
+    var selectedItem by remember { mutableIntStateOf(selectedItemInitial) }
     val items = listOf("Home", "Team", "League", "Market")
     val icons = listOf(Icons.Filled.Home, Icons.Filled.Person, Icons.Filled.List, Icons.Filled.ShoppingCart)
 
@@ -37,7 +55,7 @@ fun MainScaffold(
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = { gameViewModel.nextDay() },
+                onClick = onNextDay,
                 icon = { Icon(Icons.Filled.PlayArrow, "Next Day") },
                 text = { Text("Next Day") }
             )
@@ -46,8 +64,8 @@ fun MainScaffold(
         Surface(modifier = Modifier.padding(innerPadding)) {
             Box(modifier = Modifier.fillMaxSize()) {
                 when (selectedItem) {
-                    0 -> DashboardScreen(gameViewModel)
-                    1 -> TeamSquadScreen(playerListViewModel)
+                    0 -> DashboardContent(gameState)
+                    1 -> TeamSquadContent(players)
                     2 -> Box(Modifier.fillMaxSize()) { Text("League Standings Coming Soon", Modifier.align(Alignment.Center)) }
                     3 -> Box(Modifier.fillMaxSize()) { Text("Transfer Market Coming Soon", Modifier.align(Alignment.Center)) }
                 }
