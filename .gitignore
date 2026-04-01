@@ -6,3 +6,6 @@ build/
 app/build/
 *.iml
 .idea/
+local.properties
+key.properties
+*.jks

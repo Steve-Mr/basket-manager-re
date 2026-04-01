@@ -10,9 +10,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import re.manager.basket.ui.viewmodel.GameViewModel
+import re.manager.basket.ui.viewmodel.PlayerListViewModel
 
 @Composable
-fun MainScaffold() {
+fun MainScaffold(
+    gameViewModel: GameViewModel,
+    playerListViewModel: PlayerListViewModel
+) {
     var selectedItem by remember { mutableIntStateOf(0) }
     val items = listOf("Home", "Team", "League", "Market")
     val icons = listOf(Icons.Filled.Home, Icons.Filled.Person, Icons.Filled.List, Icons.Filled.ShoppingCart)
@@ -32,7 +37,7 @@ fun MainScaffold() {
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = { /* Drive game logic */ },
+                onClick = { gameViewModel.nextDay() },
                 icon = { Icon(Icons.Filled.PlayArrow, "Next Day") },
                 text = { Text("Next Day") }
             )
@@ -41,10 +46,10 @@ fun MainScaffold() {
         Surface(modifier = Modifier.padding(innerPadding)) {
             Box(modifier = Modifier.fillMaxSize()) {
                 when (selectedItem) {
-                    0 -> Text("Matchday 1: Regular Season", Modifier.align(Alignment.Center))
-                    1 -> Text("My Team Squad", Modifier.align(Alignment.Center))
-                    2 -> Text("League Standings", Modifier.align(Alignment.Center))
-                    3 -> Text("Transfer Market", Modifier.align(Alignment.Center))
+                    0 -> DashboardScreen(gameViewModel)
+                    1 -> TeamSquadScreen(playerListViewModel)
+                    2 -> Box(Modifier.fillMaxSize()) { Text("League Standings Coming Soon", Modifier.align(Alignment.Center)) }
+                    3 -> Box(Modifier.fillMaxSize()) { Text("Transfer Market Coming Soon", Modifier.align(Alignment.Center)) }
                 }
             }
         }
