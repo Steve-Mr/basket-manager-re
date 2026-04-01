@@ -4,6 +4,8 @@ import android.content.Context
 import re.manager.basket.data.AppDatabase
 import re.manager.basket.data.entity.PlayerEntity
 import re.manager.basket.data.entity.TeamEntity
+import re.manager.basket.data.entity.TacticEntity
+import re.manager.basket.domain.generator.SeasonCalendar
 import java.io.BufferedReader
 import java.io.InputStreamReader
 
@@ -11,11 +13,28 @@ class RosterImporter(private val context: Context, private val database: AppData
 
     suspend fun importFromAssets(gameId: Int) {
         val players = mutableListOf<PlayerEntity>()
-        val teams = mutableMapOf<String, Int>()
+        val teams = mutableListOf<TeamEntity>()
 
-        // Original game has 30 teams. In a real scenario, we'd initialize these first.
-        // For the purpose of this importer, we'll map team names to IDs.
+        // 1. Initialize 30 Teams
+        val teamNames = listOf("BOS", "BRO", "NYK", "PHI", "TOR", "CHI", "CLE", "DET", "IND", "MIL",
+                              "ATL", "CHA", "MIA", "ORL", "WAS", "DAL", "HOU", "MEM", "NOR", "SAN",
+                              "DEN", "MIN", "POR", "OKC", "UTA", "GSW", "LAC", "LAL", "PHO", "SAC")
 
+        teamNames.forEachIndexed { index, name ->
+            teams.add(TeamEntity(
+                id = index + 1,
+                name = name,
+                fullName = "Team $name",
+                color = "#FFFFFF",
+                conference = if (index < 15) 1 else 2,
+                division = index / 5 + 1,
+                salaryCap = 60000000,
+                gameId = gameId
+            ))
+        }
+        database.teamDao().insertAll(teams)
+
+        // 2. Import Players from CSV
         context.assets.open("rosters.csv").use { inputStream ->
             val reader = BufferedReader(InputStreamReader(inputStream))
             val header = reader.readLine() ?: return
@@ -25,19 +44,11 @@ class RosterImporter(private val context: Context, private val database: AppData
                 val values = line.split(";")
                 if (values.size >= columns.size) {
                     val data = columns.zip(values).toMap()
+                    val teamName = data["team"] ?: "0"
+                    val teamIdx = teamNames.indexOf(teamName)
+                    val teamId = if (teamIdx != -1) teamIdx + 1 else 0
 
-                    val teamName = data["team"] ?: "Free Agent"
-                    val teamId = when(teamName) {
-                        "ATL" -> 11; "BOS" -> 1; "BRO" -> 2; "CHA" -> 12; "CHI" -> 6
-                        "CLE" -> 7; "DAL" -> 16; "DEN" -> 21; "DET" -> 8; "GSW" -> 26
-                        "HOU" -> 17; "IND" -> 9; "LAC" -> 27; "LAL" -> 28; "MEM" -> 18
-                        "MIA" -> 13; "MIL" -> 10; "MIN" -> 22; "NOR" -> 19; "NYK" -> 3
-                        "OKC" -> 24; "ORL" -> 14; "PHI" -> 4; "PHO" -> 29; "POR" -> 23
-                        "SAC" -> 30; "SAN" -> 20; "TOR" -> 5; "UTA" -> 25; "WAS" -> 15
-                        else -> 0
-                    }
-
-                    val player = PlayerEntity(
+                    players.add(PlayerEntity(
                         name = data["name"] ?: "Unknown",
                         age = data["age"]?.toIntOrNull() ?: 20,
                         teamId = teamId,
@@ -59,11 +70,24 @@ class RosterImporter(private val context: Context, private val database: AppData
                         stateForm = 50,
                         stateInjury = 0,
                         gameId = gameId
-                    )
-                    players.add(player)
+                    ))
                 }
             }
         }
         database.playerDao().insertAll(players)
+
+        // 3. Generate Calendar
+        val matches = SeasonCalendar.generateMatches(gameId)
+        database.matchDao().insertAll(matches)
+
+        // 4. Initialize Tactics for each team
+        teams.forEach { team ->
+            database.tacticDao().insert(TacticEntity(
+                gameId = gameId,
+                teamId = team.id,
+                titPG = 0, titSG = 0, titSF = 0, titPF = 0, titC = 0,
+                resPG = 0, resSG = 0, resSF = 0, resPF = 0, resC = 0
+            ))
+        }
     }
 }

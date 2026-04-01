@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout android:layout_width="fill_parent" android:layout_height="fill_parent"
-  xmlns:android="http://schemas.android.com/apk/res/android">
-    <TextView android:id="@id/spinnerStringTextViewId" android:paddingLeft="@dimen/padding_double" android:visibility="invisible" android:text="@string/name" android:layout_alignParentLeft="true" android:layout_centerVertical="true" style="@style/textViewDefault" />
-    <TextView android:id="@id/spinnerStringTextViewValue" android:paddingLeft="@dimen/padding_double" android:text="@string/name" android:layout_alignParentLeft="true" android:layout_centerVertical="true" style="@style/textViewDefault" />
-</RelativeLayout>

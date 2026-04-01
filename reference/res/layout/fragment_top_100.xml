@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout style="@style/layoutDefault"
-  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:ads="http://schemas.android.com/apk/res-auto">
-    <Button android:id="@id/fragmentTop100ButtonFilter" android:layout_height="@dimen/button_height_small" android:layout_margin="@dimen/padding_double" android:text="@string/button_filter" android:layout_alignParentLeft="true" android:layout_alignParentTop="true" android:layout_alignParentRight="true" style="@style/buttonDefault" />
-    <ListView android:id="@id/fragmentTop100ListViewPlayers" android:layout_width="wrap_content" android:layout_height="wrap_content" android:divider="@color/base_gray_very_light" android:dividerHeight="1.0dip" android:layout_below="@id/fragmentTop100ButtonFilter" android:layout_alignParentBottom="true" android:layout_centerHorizontal="true" />
-</RelativeLayout>
