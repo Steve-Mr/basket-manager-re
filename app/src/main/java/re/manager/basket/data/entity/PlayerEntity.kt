@@ -1,9 +1,30 @@
 package re.manager.basket.data.entity
 
 import androidx.room.Entity
+import androidx.room.ForeignKey
+import androidx.room.Index
 import androidx.room.PrimaryKey
+import kotlin.math.abs
+import kotlin.math.pow
 
-@Entity(tableName = "players")
+@Entity(
+    tableName = "players",
+    foreignKeys = [
+        ForeignKey(
+            entity = TeamEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["teamId"],
+            onDelete = ForeignKey.CASCADE
+        ),
+        ForeignKey(
+            entity = GameEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["gameId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [Index("teamId"), Index("gameId")]
+)
 data class PlayerEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val name: String,
@@ -27,4 +48,76 @@ data class PlayerEntity(
     val stateForm: Int,
     val stateInjury: Int,
     val gameId: Int
-)
+) {
+    fun getAverageSkillAll(): Double {
+        return getAverageForPosition(positionFirst, attack = true, defense = true)
+    }
+
+    fun getValue(): Double {
+        return getAverageSkillAll() + (potential * 2.0) - (age / 2.0)
+    }
+
+    fun getMarketValue(): Double {
+        val value = getValue()
+        var marketValue = (((value - 70.0) * abs(value - 70.0)) / 4.0) -
+                ((salary / 2500000.0) + ((age - 18.0).pow(2.0) / 15.0)) + 10.0
+
+        if (age < 24 && potential > 8) {
+            marketValue += potential
+        }
+        if (getAverageSkillAll() > 79.0) {
+            marketValue += potential + 10.0
+        }
+        return if (marketValue < 0.0) marketValue / 4.0 else marketValue
+    }
+
+    private fun getAverageForPosition(position: Int, attack: Boolean, defense: Boolean): Double {
+        var average = 0.0
+        if (position == 0) return 40.0
+
+        if (attack) {
+            average += (skillPass * getBaseOfPosition(position, 5) +
+                    skillShotInterior * getBaseOfPosition(position, 6) +
+                    skillShotExterior * getBaseOfPosition(position, 7) +
+                    skillShotFree * getBaseOfPosition(position, 8)) / getAttackDivisor(position).toDouble()
+        }
+        if (defense) {
+            average += (skillPhysique * getBaseOfPosition(position, 1) +
+                    skillBlock * getBaseOfPosition(position, 2) +
+                    skillSteal * getBaseOfPosition(position, 3) +
+                    skillRebound * getBaseOfPosition(position, 4)) / getDefenseDivisor(position).toDouble()
+        }
+
+        average = if (attack && defense) {
+            (average / 1.5) - 19.0
+        } else {
+            (average / 0.75) - 19.0
+        }
+
+        return average.coerceIn(40.0, 99.0)
+    }
+
+    private fun getAttackDivisor(position: Int) =
+        getBaseOfPosition(position, 5) + getBaseOfPosition(position, 6) +
+        getBaseOfPosition(position, 7) + getBaseOfPosition(position, 8)
+
+    private fun getDefenseDivisor(position: Int) =
+        getBaseOfPosition(position, 1) + getBaseOfPosition(position, 2) +
+        getBaseOfPosition(position, 3) + getBaseOfPosition(position, 4)
+
+    companion object {
+        fun getBaseOfPosition(position: Int, skill: Int): Int {
+            return when (skill) {
+                1 -> if (position == 1 || position == 2) 25 else if (position == 3) 27 else 31
+                2 -> when (position) { 1 -> 10; 2 -> 15; 3 -> 27; else -> 31 }
+                3 -> when (position) { 1 -> 30; 4 -> 15; 5 -> 10; else -> 27 }
+                4 -> when (position) { 1 -> 20; 2 -> 20; 3 -> 27; 4 -> 31; else -> 35 }
+                5 -> when (position) { 1 -> 35; 2 -> 30; 3 -> 27; else -> 18 }
+                6 -> when (position) { 1 -> 15; 2 -> 25; 3 -> 28; 4 -> 33; else -> 35 }
+                7 -> when (position) { 1 -> 30; 2 -> 35; 3 -> 28; 4 -> 25; else -> 15 }
+                8 -> if (position == 1 || position == 2) 30 else if (position == 3) 28 else 20
+                else -> 0
+            }
+        }
+    }
+}

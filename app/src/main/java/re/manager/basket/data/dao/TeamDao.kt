@@ -13,4 +13,7 @@ interface TeamDao {
 
     @Query("SELECT * FROM teams WHERE gameId = :gameId")
     suspend fun getTeamsByGame(gameId: Int): List<TeamEntity>
+
+    @Query("SELECT COUNT(*) FROM teams")
+    suspend fun getCount(): Int
 }
