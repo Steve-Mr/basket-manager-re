@@ -21,9 +21,12 @@ import re.manager.basket.data.entity.*
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
+    abstract fun gameDao(): GameDao
     abstract fun teamDao(): TeamDao
     abstract fun playerDao(): PlayerDao
-    // other daos...
+    abstract fun leagueDao(): LeagueDao
+    abstract fun matchDao(): MatchDao
+    abstract fun tacticDao(): TacticDao
 
     companion object {
         @Volatile
