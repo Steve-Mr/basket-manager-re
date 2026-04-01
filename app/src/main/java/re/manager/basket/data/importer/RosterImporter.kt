@@ -2,6 +2,7 @@ package re.manager.basket.data.importer
 
 import android.content.Context
 import re.manager.basket.data.AppDatabase
+import re.manager.basket.data.entity.GameEntity
 import re.manager.basket.data.entity.PlayerEntity
 import re.manager.basket.data.entity.TeamEntity
 import re.manager.basket.data.entity.TacticEntity
@@ -12,6 +13,16 @@ import java.io.InputStreamReader
 class RosterImporter(private val context: Context, private val database: AppDatabase) {
 
     suspend fun importFromAssets(gameId: Int) {
+        // 0. Ensure Game exists to satisfy Foreign Key constraints
+        if (database.gameDao().getGameById(gameId) == null) {
+            database.gameDao().insert(GameEntity(
+                id = gameId,
+                currentMatchday = 1,
+                currentSeason = 2025,
+                name = "My Save"
+            ))
+        }
+
         val players = mutableListOf<PlayerEntity>()
         val teams = mutableListOf<TeamEntity>()
 

@@ -8,9 +8,7 @@ import kotlinx.coroutines.launch
 import re.manager.basket.data.AppDatabase
 import re.manager.basket.data.entity.GameEntity
 import re.manager.basket.data.entity.MatchEntity
-import re.manager.basket.domain.engine.MatchSimulator
 import re.manager.basket.domain.engine.SeasonManager
-import re.manager.basket.domain.engine.StateEvolver
 
 class GameViewModel(private val database: AppDatabase) : ViewModel() {
 
@@ -22,8 +20,9 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
 
     fun loadGame() {
         viewModelScope.launch {
-            // Placeholder: Load game with id 1
-            _gameState.value = GameEntity(id = 1, currentMatchday = 1, currentSeason = 2025, name = "My Save")
+            // Load game with id 1 from database
+            val game = database.gameDao().getGameById(1)
+            _gameState.value = game
             _recentMatches.value = database.matchDao().getRecentMatches(1)
         }
     }
@@ -41,6 +40,9 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
 
             val nextDay = seasonManager.getNextMatchday()
             val updated = current.copy(currentMatchday = nextDay)
+
+            // Persist the updated state
+            database.gameDao().insert(updated)
             _gameState.value = updated
         }
     }
