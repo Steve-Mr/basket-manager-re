@@ -1,5 +1,6 @@
 package re.manager.basket.ui.screen
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -31,8 +32,11 @@ fun TeamSquadScreen(viewModel: PlayerListViewModel) {
 
         items(players) { player ->
             Card(
-                modifier = Modifier.fillMaxWidth(),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { /* Toggle titular status logic */ },
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                colors = if (player.yearsContract > 0) CardDefaults.cardColors() else CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(
@@ -45,8 +49,8 @@ fun TeamSquadScreen(viewModel: PlayerListViewModel) {
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Pos: ${player.positionFirst}",
-                            style = MaterialTheme.typography.bodyLarge
+                            text = if (player.positionSecond > 0) "Starter" else "Bench",
+                            color = MaterialTheme.colorScheme.secondary
                         )
                     }
                     Spacer(modifier = Modifier.height(8.dp))
@@ -58,12 +62,6 @@ fun TeamSquadScreen(viewModel: PlayerListViewModel) {
                         Text(text = "Avg: ${player.getAverageSkillAll().toInt()}")
                         Text(text = "Val: ${player.getValue().toInt()}")
                     }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    LinearProgressIndicator(
-                        progress = player.stateEnergy / 100f,
-                        modifier = Modifier.fillMaxWidth(),
-                        color = if (player.stateEnergy < 40) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-                    )
                 }
             }
         }

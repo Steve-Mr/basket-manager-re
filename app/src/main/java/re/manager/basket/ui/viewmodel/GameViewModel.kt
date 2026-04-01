@@ -7,6 +7,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import re.manager.basket.data.AppDatabase
 import re.manager.basket.data.entity.GameEntity
+import re.manager.basket.data.entity.MatchEntity
+import re.manager.basket.domain.engine.MatchSimulator
 import re.manager.basket.domain.engine.SeasonManager
 import re.manager.basket.domain.engine.StateEvolver
 
@@ -15,13 +17,14 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
     private val _gameState = MutableStateFlow<GameEntity?>(null)
     val gameState: StateFlow<GameEntity?> = _gameState
 
-    private val evolver = StateEvolver()
+    private val _recentMatches = MutableStateFlow<List<MatchEntity>>(emptyList())
+    val recentMatches: StateFlow<List<MatchEntity>> = _recentMatches
 
     fun loadGame() {
         viewModelScope.launch {
-            // In a real app, we'd load the current game from DB
-            // For now, use a placeholder
+            // Placeholder: Load game with id 1
             _gameState.value = GameEntity(id = 1, currentMatchday = 1, currentSeason = 2025, name = "My Save")
+            _recentMatches.value = database.matchDao().getRecentMatches(1)
         }
     }
 
@@ -29,12 +32,15 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
         val current = _gameState.value ?: return
         viewModelScope.launch {
             val seasonManager = SeasonManager(current)
+
+            // 1. Simulate Match if any
+            // (Placeholder for actual matching logic)
+
+            // 2. Evolve states
+            // (Placeholder for evolving all players)
+
             val nextDay = seasonManager.getNextMatchday()
-
-            // Logic for match simulation and state evolution would be triggered here
-
             val updated = current.copy(currentMatchday = nextDay)
-            // database.gameDao().update(updated)
             _gameState.value = updated
         }
     }
