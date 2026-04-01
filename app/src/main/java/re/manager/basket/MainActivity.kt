@@ -28,7 +28,7 @@ class MainActivity : ComponentActivity() {
     private val playerListViewModel: PlayerListViewModel by viewModels {
         object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return PlayerListViewModel(database.playerDao()) as T
+                return PlayerListViewModel(database) as T
             }
         }
     }

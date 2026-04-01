@@ -39,6 +39,7 @@ data class MatchResultEntity(
     val minutesPlayed: Int = 0,
     val points: Int = 0,
     val rebounds: Int = 0,
+    val assists: Int = 0,
     val blocks: Int = 0,
     val steals: Int = 0,
     val foulsMade: Int = 0,

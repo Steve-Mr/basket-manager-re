@@ -54,7 +54,6 @@ class MatchSimulator(
     }
 
     private fun simulatePossession(isLocalAttacking: Boolean): Int {
-        var points = 0
         var offensiveRebound = true
         var reboundCount = 0
 
@@ -73,25 +72,25 @@ class MatchSimulator(
             val isInterior = Random.nextInt(100) < attackingTactic.shotIntPercent
             val isTriple = !isInterior && Random.nextInt(100) < attackingTactic.shotTriplePercent
 
-            // 3. Block Check
+            // 3. Shot Attempt
+            val shooter = rulete.pickPlayer(if (isInterior) 6 else 7, isLocalAttacking, benchImportance)
+            val shooterSkill = if (isInterior) shooter.skillShotInterior else shooter.skillShotExterior
+
+            // 4. Block Check
             val blockAttemptProb = if (isInterior) Constants.BLOCK_ATTEMPT_PROB_INTERIOR else Constants.BLOCK_ATTEMPT_PROB_EXTERIOR
             if (Random.nextInt(100) < blockAttemptProb) {
                 val blocker = rulete.pickPlayer(2, !isLocalAttacking, benchImportance)
-                val shooter = rulete.pickPlayer(if (isInterior) 6 else 7, isLocalAttacking, benchImportance)
-                val shooterSkill = if (isInterior) shooter.skillShotInterior else shooter.skillShotExterior
                 if (blocker.skillBlock + getRandomGauss(0, 100) > shooterSkill + getRandomGauss(0, 100)) return 0
             }
 
-            // 4. Shot Success
-            val shooter = rulete.pickPlayer(if (isInterior) 6 else 7, isLocalAttacking, benchImportance)
-            val shooterSkill = if (isInterior) shooter.skillShotInterior else shooter.skillShotExterior
+            // 5. Shot Success
             val modifier = if (isInterior) Constants.SHOT_MODIFIER_INTERIOR else if (isTriple) Constants.SHOT_MODIFIER_TRIPLE else Constants.SHOT_MODIFIER_EXTERIOR
 
             if (Random.nextInt(1, 101) <= shooterSkill * modifier) {
                 return if (isTriple) 3 else 2
             }
 
-            // 5. Rebound
+            // 6. Rebound
             if (Random.nextInt(100) < Constants.REBOUND_TRIGGER_PROB) {
                 val offRebounder = rulete.pickPlayer(4, isLocalAttacking, benchImportance)
                 val defRebounder = rulete.pickPlayer(4, !isLocalAttacking, benchImportance)

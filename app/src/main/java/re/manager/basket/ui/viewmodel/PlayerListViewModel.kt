@@ -6,17 +6,25 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import re.manager.basket.data.dao.PlayerDao
+import re.manager.basket.data.AppDatabase
 
-class PlayerListViewModel(private val playerDao: PlayerDao) : ViewModel() {
+class PlayerListViewModel(private val database: AppDatabase) : ViewModel() {
 
     private val _players = MutableStateFlow<List<PlayerUiState>>(emptyList())
     val players: StateFlow<List<PlayerUiState>> = _players.asStateFlow()
 
-    fun loadPlayers(teamId: Int) {
+    fun loadPlayers(teamId: Int, gameId: Int = 1) {
         viewModelScope.launch {
-            val entities = playerDao.getPlayersByTeam(teamId)
-            _players.value = entities.map { it.toUiState() }
+            val entities = database.playerDao().getPlayersByTeam(teamId)
+            val tactic = database.tacticDao().getTacticForTeam(teamId, gameId)
+
+            val starters = tactic?.let {
+                setOf(it.titPG, it.titSG, it.titSF, it.titPF, it.titC)
+            } ?: emptySet()
+
+            _players.value = entities.map {
+                it.toUiState(isStarter = starters.contains(it.id))
+            }
         }
     }
 }
