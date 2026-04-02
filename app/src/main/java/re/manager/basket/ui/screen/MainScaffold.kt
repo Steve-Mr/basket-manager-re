@@ -12,11 +12,14 @@ import androidx.compose.ui.Modifier
 import re.manager.basket.ui.viewmodel.GameViewModel
 import re.manager.basket.ui.viewmodel.PlayerListViewModel
 import re.manager.basket.ui.viewmodel.PlayerUiState
+import re.manager.basket.ui.viewmodel.MarketViewModel
 
 @Composable
 fun MainScaffold(
     gameViewModel: GameViewModel,
-    playerListViewModel: PlayerListViewModel
+    playerListViewModel: PlayerListViewModel,
+    marketViewModel: MarketViewModel,
+    leagueViewModel: LeagueViewModel
 ) {
     val gameState by gameViewModel.gameState.collectAsState()
     val players by playerListViewModel.players.collectAsState()
@@ -25,6 +28,8 @@ fun MainScaffold(
         selectedItemInitial = 0,
         gameState = gameState,
         players = players,
+        marketViewModel = marketViewModel,
+        leagueViewModel = leagueViewModel,
         onNextDay = { gameViewModel.nextDay() }
     )
 }
@@ -34,6 +39,8 @@ fun MainScaffoldContent(
     selectedItemInitial: Int,
     gameState: re.manager.basket.data.entity.GameEntity?,
     players: List<PlayerUiState>,
+    marketViewModel: MarketViewModel,
+    leagueViewModel: LeagueViewModel,
     onNextDay: () -> Unit
 ) {
     var selectedItem by remember { mutableIntStateOf(selectedItemInitial) }
@@ -66,8 +73,16 @@ fun MainScaffoldContent(
                 when (selectedItem) {
                     0 -> DashboardContent(gameState)
                     1 -> TeamSquadContent(players)
-                    2 -> Box(Modifier.fillMaxSize()) { Text("League Standings Coming Soon", Modifier.align(Alignment.Center)) }
-                    3 -> Box(Modifier.fillMaxSize()) { Text("Transfer Market Coming Soon", Modifier.align(Alignment.Center)) }
+                    2 -> gameState?.let {
+                        LeagueStandingsScreen(gameId = it.id, leagueViewModel = leagueViewModel)
+                    }
+                    3 -> gameState?.let {
+                        MarketScreen(
+                            gameId = it.id,
+                            userTeamId = it.userTeamId ?: 1,
+                            marketViewModel = marketViewModel
+                        )
+                    }
                 }
             }
         }

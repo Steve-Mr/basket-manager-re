@@ -15,18 +15,6 @@ class RosterImporter(private val context: Context, private val database: AppData
 
     suspend fun importFromAssets(gameId: Int) {
         database.withTransaction {
-            // 0. Ensure Game exists
-            if (database.gameDao().getGameById(gameId) == null) {
-                database.gameDao().insert(
-                    GameEntity(
-                        id = gameId,
-                        currentMatchday = 1,
-                        currentSeason = 2025,
-                        name = "My Save"
-                    )
-                )
-            }
-
             val players = mutableListOf<PlayerEntity>()
             val teams = mutableListOf<TeamEntity>()
 

@@ -19,30 +19,59 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
     private val _gameState = MutableStateFlow<GameEntity?>(null)
     val gameState: StateFlow<GameEntity?> = _gameState
 
+    private val _allGames = MutableStateFlow<List<GameEntity>>(emptyList())
+    val allGames: StateFlow<List<GameEntity>> = _allGames
+
+    private val _availableTeams = MutableStateFlow<List<re.manager.basket.data.entity.TeamEntity>>(emptyList())
+    val availableTeams: StateFlow<List<re.manager.basket.data.entity.TeamEntity>> = _availableTeams
+
     private val _recentMatches = MutableStateFlow<List<MatchEntity>>(emptyList())
     val recentMatches: StateFlow<List<MatchEntity>> = _recentMatches
 
-    fun initializeAndLoadGame(context: Context) {
+    fun loadAllGames() {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
-                if (database.teamDao().getCount() == 0) {
-                    val importer = RosterImporter(context, database)
-                    importer.importFromAssets(gameId = 1)
-                }
-                val game = database.gameDao().getGameById(1)
-                _gameState.value = game
-                _recentMatches.value = database.matchDao().getRecentMatches(1)
+                _allGames.value = database.gameDao().getAllGames()
             }
         }
     }
 
-    fun loadGame() {
+    fun createNewGame(context: Context, name: String) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
-                // Load game with id 1 from database
-                val game = database.gameDao().getGameById(1)
+                val newGame = GameEntity(
+                    currentMatchday = 1,
+                    currentSeason = 2025,
+                    name = name
+                )
+                val gameId = database.gameDao().insertAndReturnId(newGame).toInt()
+                val importer = RosterImporter(context, database)
+                importer.importFromAssets(gameId)
+
+                val createdGame = database.gameDao().getGameById(gameId)
+                _gameState.value = createdGame
+                _availableTeams.value = database.teamDao().getTeamsByGame(gameId)
+            }
+        }
+    }
+
+    fun selectTeam(teamId: Int) {
+        val current = _gameState.value ?: return
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                val updated = current.copy(userTeamId = teamId)
+                database.gameDao().insert(updated)
+                _gameState.value = updated
+            }
+        }
+    }
+
+    fun loadGame(gameId: Int) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                val game = database.gameDao().getGameById(gameId)
                 _gameState.value = game
-                _recentMatches.value = database.matchDao().getRecentMatches(1)
+                _recentMatches.value = database.matchDao().getRecentMatches(gameId)
             }
         }
     }
@@ -50,20 +79,66 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
     fun nextDay() {
         val current = _gameState.value ?: return
         viewModelScope.launch {
-            val seasonManager = SeasonManager(current)
+            withContext(Dispatchers.IO) {
+                // 1. Get all matches for this matchday
+                val matches = database.matchDao().getMatchesByDay(current.id, current.currentMatchday)
 
-            // 1. Simulate Match if any
-            // (Placeholder for actual matching logic)
+                matches.forEach { match ->
+                    val localPlayers = database.playerDao().getPlayersByTeam(match.teamLocalId)
+                    val visitorPlayers = database.playerDao().getPlayersByTeam(match.teamVisitorId)
+                    val localTactic = database.tacticDao().getTacticForTeam(match.teamLocalId, current.id)!!
+                    val visitorTactic = database.tacticDao().getTacticForTeam(match.teamVisitorId, current.id)!!
 
-            // 2. Evolve states
-            // (Placeholder for evolving all players)
+                    val simulator = re.manager.basket.domain.engine.MatchSimulator(
+                        match, localPlayers, visitorPlayers, localTactic, visitorTactic
+                    )
+                    val result = simulator.simulate()
 
-            val nextDay = seasonManager.getNextMatchday()
-            val updated = current.copy(currentMatchday = nextDay)
+                    // Save match result and player stats
+                    database.matchDao().update(result.match)
+                    database.matchResultDao().insertAll(result.playerResults)
 
-            // Persist the updated state
-            database.gameDao().insert(updated)
-            _gameState.value = updated
+                    // Update League Standings
+                    updateLeagueStandings(result)
+                }
+
+                // 2. Evolve states (Daily recovery)
+                val allPlayers = database.playerDao().getPlayersByGame(current.id)
+                val evolvedPlayers = re.manager.basket.domain.engine.StateEvolver().evolveAllPlayersDaily(allPlayers)
+                database.playerDao().insertAll(evolvedPlayers)
+
+                // 3. Move to next day
+                val seasonManager = SeasonManager(current)
+                val nextDay = seasonManager.getNextMatchday()
+                val updated = current.copy(currentMatchday = nextDay)
+
+                database.gameDao().insert(updated)
+                _gameState.value = updated
+                _recentMatches.value = database.matchDao().getRecentMatches(current.id)
+            }
         }
     }
+
+    private suspend fun updateLeagueStandings(result: re.manager.basket.domain.engine.MatchFullResult) {
+        val match = result.match
+        val localWin = match.localQ1 + match.localQ2 + match.localQ3 + match.localQ4 >
+                       match.visitorQ1 + match.visitorQ2 + match.visitorQ3 + match.visitorQ4
+
+        updateTeamStanding(match.teamLocalId, match.gameId, localWin, result.match.getTotalLocal(), result.match.getTotalVisitor())
+        updateTeamStanding(match.teamVisitorId, match.gameId, !localWin, result.match.getTotalVisitor(), result.match.getTotalLocal())
+    }
+
+    private suspend fun updateTeamStanding(teamId: Int, gameId: Int, won: Boolean, scored: Int, allowed: Int) {
+        val standing = database.leagueDao().getLeagueForTeam(teamId, gameId) ?: return
+        val updated = standing.copy(
+            gamesWon = standing.gamesWon + (if (won) 1 else 0),
+            gamesLost = standing.gamesLost + (if (won) 0 else 1),
+            pointsScored = standing.pointsScored + scored,
+            pointsAllowed = standing.pointsAllowed + allowed
+        )
+        database.leagueDao().insert(updated)
+    }
+
+    private fun MatchEntity.getTotalLocal() = localQ1 + localQ2 + localQ3 + localQ4
+    private fun MatchEntity.getTotalVisitor() = visitorQ1 + visitorQ2 + visitorQ3 + visitorQ4
 }

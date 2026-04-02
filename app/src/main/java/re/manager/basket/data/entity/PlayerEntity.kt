@@ -54,39 +54,72 @@ data class PlayerEntity(
         return getAverageForPosition(positionFirst, attack = true, defense = true)
     }
 
+    fun getAverageSkillAllByPosition(position: Position): Double {
+        return getAverageForPosition(position, attack = true, defense = true)
+    }
+
     fun getValue(): Double {
-        return getAverageSkillAll() + (potential * 2.0) - (age / 2.0)
+        return (getAverageSkillAll() + (potential * 2.0)) - (age / 2.0)
     }
 
     fun getMarketValue(): Double {
         val value = getValue()
-        var marketValue = (((value - 70.0) * abs(value - 70.0)) / 4.0) -
-                ((salary / 2500000.0) + ((age - 18.0).pow(2.0) / 15.0)) + 10.0
+        var marketValue = ((((value - 70.0) * abs(value - 70.0)) / 4.0) - ((salary / 2500000.0) + (((age - 18.0) * (age - 18.0)) / 15.0))) + 10.0
 
         if (age < 24 && potential > 8) {
-            marketValue += potential
+            marketValue += potential.toDouble()
         }
         if (getAverageSkillAll() > 79.0) {
-            marketValue += potential + 10.0
+            marketValue += potential.toDouble() + 10.0
         }
+
         return if (marketValue < 0.0) marketValue / 4.0 else marketValue
+    }
+
+    fun getPenalty(position: Position): Int {
+        var playerModifier = 0
+
+        if (position != Position.NONE && position != positionFirst) {
+            playerModifier = if (position == positionSecond) -2 else -7
+        }
+
+        // Form Penalty
+        playerModifier += when {
+            stateForm >= 80 -> 0
+            stateForm >= 60 -> -1
+            stateForm >= 40 -> -2
+            stateForm >= 20 -> -4
+            else -> -8
+        }
+
+        // Energy Penalty
+        playerModifier += when {
+            stateEnergy >= 80 -> 0
+            stateEnergy >= 60 -> -1
+            stateEnergy >= 40 -> -2
+            stateEnergy >= 20 -> -4
+            else -> -8
+        }
+
+        return playerModifier
     }
 
     private fun getAverageForPosition(position: Position, attack: Boolean, defense: Boolean): Double {
         var average = 0.0
         if (position == Position.NONE) return 40.0
 
+        val posId = position.id
         if (attack) {
-            average += (skillPass * getBaseOfPosition(position.id, 5) +
-                    skillShotInterior * getBaseOfPosition(position.id, 6) +
-                    skillShotExterior * getBaseOfPosition(position.id, 7) +
-                    skillShotFree * getBaseOfPosition(position.id, 8)) / getAttackDivisor(position.id).toDouble()
+            average += (skillPass * getBaseOfPosition(posId, 5) +
+                    skillShotInterior * getBaseOfPosition(posId, 6) +
+                    skillShotExterior * getBaseOfPosition(posId, 7) +
+                    skillShotFree * getBaseOfPosition(posId, 8)) / getAttackDivisor(posId).toDouble()
         }
         if (defense) {
-            average += (skillPhysique * getBaseOfPosition(position.id, 1) +
-                    skillBlock * getBaseOfPosition(position.id, 2) +
-                    skillSteal * getBaseOfPosition(position.id, 3) +
-                    skillRebound * getBaseOfPosition(position.id, 4)) / getDefenseDivisor(position.id).toDouble()
+            average += (skillPhysique * getBaseOfPosition(posId, 1) +
+                    skillBlock * getBaseOfPosition(posId, 2) +
+                    skillSteal * getBaseOfPosition(posId, 3) +
+                    skillRebound * getBaseOfPosition(posId, 4)) / getDefenseDivisor(posId).toDouble()
         }
 
         average = if (attack && defense) {
@@ -95,7 +128,7 @@ data class PlayerEntity(
             (average / 0.75) - 19.0
         }
 
-        return average.coerceIn(40.0, 99.0)
+        return if (average > 99.0) 99.0 else if (average < 40.0) 40.0 else average
     }
 
     private fun getAttackDivisor(position: Int) =

@@ -28,6 +28,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun playerDao(): PlayerDao
     abstract fun leagueDao(): LeagueDao
     abstract fun matchDao(): MatchDao
+    abstract fun matchResultDao(): MatchResultDao
     abstract fun tacticDao(): TacticDao
 
     companion object {

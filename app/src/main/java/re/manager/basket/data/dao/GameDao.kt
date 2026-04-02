@@ -14,6 +14,12 @@ interface GameDao {
     @Query("SELECT * FROM games WHERE id = :id")
     suspend fun getGameById(id: Int): GameEntity?
 
+    @Query("SELECT * FROM games ORDER BY id DESC")
+    suspend fun getAllGames(): List<GameEntity>
+
     @Query("SELECT COUNT(*) FROM games")
     suspend fun getCount(): Int
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAndReturnId(game: GameEntity): Long
 }

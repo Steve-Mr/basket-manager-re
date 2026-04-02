@@ -16,4 +16,7 @@ interface LeagueDao {
 
     @Query("SELECT * FROM leagues WHERE gameId = :gameId ORDER BY gamesWon DESC, (pointsScored - pointsAllowed) DESC")
     suspend fun getStandings(gameId: Int): List<LeagueEntity>
+
+    @Query("SELECT * FROM leagues WHERE teamId = :teamId AND gameId = :gameId")
+    suspend fun getLeagueForTeam(teamId: Int, gameId: Int): LeagueEntity?
 }
