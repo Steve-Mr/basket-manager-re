@@ -5,7 +5,7 @@ import re.manager.basket.data.entity.TacticEntity
 
 @Dao
 interface TacticDao {
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(tactic: TacticEntity)
 
     @Update

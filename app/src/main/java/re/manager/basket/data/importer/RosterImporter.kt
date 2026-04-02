@@ -1,6 +1,7 @@
 package re.manager.basket.data.importer
 
 import android.content.Context
+import android.util.Log
 import re.manager.basket.data.AppDatabase
 import re.manager.basket.data.entity.*
 import androidx.room.withTransaction
@@ -14,19 +15,8 @@ import java.io.InputStreamReader
 class RosterImporter(private val context: Context, private val database: AppDatabase) {
 
     suspend fun importFromAssets(gameId: Int) {
+        Log.d("RosterImporter", "Starting import process for gameId: $gameId")
         database.withTransaction {
-            // 0. Ensure Game exists
-            if (database.gameDao().getGameById(gameId) == null) {
-                database.gameDao().insert(
-                    GameEntity(
-                        id = gameId,
-                        currentMatchday = 1,
-                        currentSeason = 2025,
-                        name = "My Save"
-                    )
-                )
-            }
-
             val players = mutableListOf<PlayerEntity>()
             val teams = mutableListOf<TeamEntity>()
 
@@ -40,57 +30,72 @@ class RosterImporter(private val context: Context, private val database: AppData
             teamNames.forEachIndexed { index, name ->
                 val conference = if (index < 15) Conference.EAST else Conference.WEST
                 val division = Division.fromId(index / 5 + 1)
+                val teamId = index + 1
 
                 teams.add(
                     TeamEntity(
-                        id = index + 1,
+                        id = teamId,
                         name = name,
                         fullName = "Team $name",
                         color = "#FFFFFF",
                         conference = conference,
                         division = division,
-                        salaryCap = 60000000,
+                        salaryCap = re.manager.basket.domain.model.Constants.INITIAL_SALARY_CAPS[name] ?: re.manager.basket.domain.model.Constants.SALARY_CAP_MED,
                         gameId = gameId
                     )
                 )
             }
             database.teamDao().insertAll(teams)
+            Log.d("RosterImporter", "Initialized 30 teams")
 
             // 2. Import Players from CSV
             context.assets.open("rosters.csv").use { inputStream ->
-                val reader = BufferedReader(InputStreamReader(inputStream))
+                // Using ISO-8859-1 as original Java apps often used this for simple CSVs, or just default to UTF-8
+                val reader = BufferedReader(InputStreamReader(inputStream, Charsets.UTF_8))
+
+                // Original file uses ";" as delimiter. Let's handle potential lack of newlines by reading char by char if needed,
+                // but first try standard line reading since the user confirmed the file is correct.
                 val header = reader.readLine() ?: return@use
+                Log.d("RosterImporter", "CSV Header: $header")
                 val columns = header.split(";")
 
+                var rowCount = 0
                 reader.forEachLine { line ->
+                    if (line.isBlank()) return@forEachLine
                     val values = line.split(";")
+
                     if (values.size >= columns.size) {
                         val data = columns.zip(values).toMap()
-                        val teamName = data["team"] ?: "0"
+                        val teamName = data["team"]?.trim() ?: "0"
+
+                        // Map team name to ID (BOS -> 1, etc.)
                         val teamIdx = teamNames.indexOf(teamName)
-                        val teamId = if (teamIdx != -1) teamIdx + 1 else null // team=0 becomes null (free agent)
+                        val teamId = if (teamIdx != -1) teamIdx + 1 else null
+
+                        rowCount++
+                        if (rowCount % 100 == 0) Log.d("RosterImporter", "Parsed $rowCount players...")
 
                         players.add(
                             PlayerEntity(
-                                name = data["name"] ?: "Unknown",
-                                age = data["age"]?.toIntOrNull() ?: 20,
+                                name = data["name"]?.trim() ?: "Unknown",
+                                age = data["age"]?.trim()?.toIntOrNull() ?: 20,
                                 teamId = teamId,
-                                positionFirst = Position.fromId(data["positionFirst"]?.toIntOrNull() ?: 1),
-                                positionSecond = Position.fromId(data["positionSecond"]?.toIntOrNull() ?: 0),
-                                potential = data["potential"]?.toIntOrNull() ?: 5,
-                                salary = data["salary"]?.toIntOrNull() ?: 0,
-                                yearsContract = data["yearsContract"]?.toIntOrNull() ?: 1,
-                                yearsExperience = data["yearsExperience"]?.toIntOrNull() ?: 0,
-                                skillPhysique = data["skillPhysique"]?.toIntOrNull() ?: 50,
-                                skillBlock = data["skillBlock"]?.toIntOrNull() ?: 50,
-                                skillSteal = data["skillSteal"]?.toIntOrNull() ?: 50,
-                                skillRebound = data["skillRebound"]?.toIntOrNull() ?: 50,
-                                skillPass = data["skillPass"]?.toIntOrNull() ?: 50,
-                                skillShotInterior = data["skillShotInterior"]?.toIntOrNull() ?: 50,
-                                skillShotExterior = data["skillShotExterior"]?.toIntOrNull() ?: 50,
-                                skillShotFree = data["skillShotFree"]?.toIntOrNull() ?: 50,
+                                positionFirst = Position.fromId(data["positionFirst"]?.trim()?.toIntOrNull() ?: 1),
+                                positionSecond = Position.fromId(data["positionSecond"]?.trim()?.toIntOrNull() ?: 0),
+                                potential = data["potential"]?.trim()?.toIntOrNull() ?: 5,
+                                salary = data["salary"]?.trim()?.toIntOrNull() ?: 0,
+                                yearsContract = data["yearsContract"]?.trim()?.toIntOrNull() ?: 1,
+                                yearsExperience = data["yearsExperience"]?.trim()?.toIntOrNull() ?: 0,
+                                skillPhysique = data["skillPhysique"]?.trim()?.toIntOrNull() ?: 50,
+                                skillBlock = data["skillBlock"]?.trim()?.toIntOrNull() ?: 50,
+                                skillSteal = data["skillSteal"]?.trim()?.toIntOrNull() ?: 50,
+                                skillRebound = data["skillRebound"]?.trim()?.toIntOrNull() ?: 50,
+                                skillPass = data["skillPass"]?.trim()?.toIntOrNull() ?: 50,
+                                skillShotInterior = data["skillShotInterior"]?.trim()?.toIntOrNull() ?: 50,
+                                skillShotExterior = data["skillShotExterior"]?.trim()?.toIntOrNull() ?: 50,
+                                skillShotFree = data["skillShotFree"]?.trim()?.toIntOrNull() ?: 50,
                                 stateEnergy = 99,
-                                stateForm = 50,
+                                stateForm = (30..70).random(), // Match original getRandomValue(30, 70)
                                 stateInjury = 0,
                                 gameId = gameId
                             )
@@ -99,10 +104,12 @@ class RosterImporter(private val context: Context, private val database: AppData
                 }
             }
             database.playerDao().insertAll(players)
+            Log.d("RosterImporter", "Inserted ${players.size} players into database")
 
             // 3. Generate Calendar
             val matches = SeasonCalendar.generateMatches(gameId)
             database.matchDao().insertAll(matches)
+            Log.d("RosterImporter", "Generated ${matches.size} matches")
 
             // 4. Initialize Tactics for each team
             teams.forEach { team ->
@@ -125,6 +132,7 @@ class RosterImporter(private val context: Context, private val database: AppData
                     )
                 )
             }
+            Log.d("RosterImporter", "Initialized leagues and tactics. Import complete.")
         }
     }
 }

@@ -16,12 +16,12 @@ import androidx.room.PrimaryKey
         ),
         ForeignKey(
             entity = TeamEntity::class,
-            parentColumns = ["id"],
-            childColumns = ["teamId"],
+            parentColumns = ["id", "gameId"],
+            childColumns = ["teamId", "gameId"],
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index("gameId"), Index("teamId")]
+    indices = [Index("gameId"), Index("teamId", "gameId")]
 )
 data class TacticEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,

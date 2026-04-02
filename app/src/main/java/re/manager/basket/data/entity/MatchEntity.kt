@@ -9,25 +9,29 @@ import androidx.room.PrimaryKey
     tableName = "matches",
     foreignKeys = [
         ForeignKey(
+            entity = TeamEntity::class,
+            parentColumns = ["id", "gameId"],
+            childColumns = ["teamLocalId", "gameId"],
+            onDelete = ForeignKey.CASCADE
+        ),
+        ForeignKey(
+            entity = TeamEntity::class,
+            parentColumns = ["id", "gameId"],
+            childColumns = ["teamVisitorId", "gameId"],
+            onDelete = ForeignKey.CASCADE
+        ),
+        ForeignKey(
             entity = GameEntity::class,
             parentColumns = ["id"],
             childColumns = ["gameId"],
             onDelete = ForeignKey.CASCADE
-        ),
-        ForeignKey(
-            entity = TeamEntity::class,
-            parentColumns = ["id"],
-            childColumns = ["teamLocalId"],
-            onDelete = ForeignKey.CASCADE
-        ),
-        ForeignKey(
-            entity = TeamEntity::class,
-            parentColumns = ["id"],
-            childColumns = ["teamVisitorId"],
-            onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index("gameId"), Index("teamLocalId"), Index("teamVisitorId")]
+    indices = [
+        Index("gameId"),
+        Index("teamLocalId", "gameId"),
+        Index("teamVisitorId", "gameId")
+    ]
 )
 data class MatchEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,

@@ -54,8 +54,8 @@ fun TeamSquadContent(players: List<PlayerUiState>) {
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = if (player.isStarter) "Starter" else "Bench",
-                            color = MaterialTheme.colorScheme.secondary
+                            text = if (player.isStarter) "Starter" else "List",
+                            color = if (player.isStarter) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
                         )
                     }
                     Spacer(modifier = Modifier.height(8.dp))

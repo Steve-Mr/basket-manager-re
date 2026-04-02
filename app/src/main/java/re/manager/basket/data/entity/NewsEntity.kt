@@ -6,14 +6,8 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 
 @Entity(
-    tableName = "leagues",
+    tableName = "news",
     foreignKeys = [
-        ForeignKey(
-            entity = TeamEntity::class,
-            parentColumns = ["id", "gameId"],
-            childColumns = ["teamId", "gameId"],
-            onDelete = ForeignKey.CASCADE
-        ),
         ForeignKey(
             entity = GameEntity::class,
             parentColumns = ["id"],
@@ -21,14 +15,13 @@ import androidx.room.PrimaryKey
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index("gameId"), Index("teamId", "gameId")]
+    indices = [Index("gameId")]
 )
-data class LeagueEntity(
+data class NewsEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val gameId: Int,
-    val teamId: Int,
-    val gamesWon: Int = 0,
-    val gamesLost: Int = 0,
-    val pointsScored: Int = 0,
-    val pointsAllowed: Int = 0
+    val matchday: Int,
+    val title: String,
+    val body: String,
+    val type: String = "INFO" // INFO, MATCH, INJURY, TROPHY
 )
