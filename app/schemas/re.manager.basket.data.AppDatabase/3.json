@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 3,
-    "identityHash": "267b03cc5e818f78fd4abc12f30a695f",
+    "identityHash": "eaff4e80e2776752f2cafd8bc5684dd0",
     "entities": [
       {
         "tableName": "games",
@@ -50,7 +50,7 @@
       },
       {
         "tableName": "teams",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `name` TEXT NOT NULL, `fullName` TEXT NOT NULL, `color` TEXT NOT NULL, `conference` INTEGER NOT NULL, `division` INTEGER NOT NULL, `salaryCap` INTEGER NOT NULL, `gameId` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`gameId`) REFERENCES `games`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `name` TEXT NOT NULL, `fullName` TEXT NOT NULL, `color` TEXT NOT NULL, `conference` INTEGER NOT NULL, `division` INTEGER NOT NULL, `salaryCap` INTEGER NOT NULL, `gameId` INTEGER NOT NULL, PRIMARY KEY(`id`, `gameId`), FOREIGN KEY(`gameId`) REFERENCES `games`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "id",
@@ -104,7 +104,8 @@
         "primaryKey": {
           "autoGenerate": false,
           "columnNames": [
-            "id"
+            "id",
+            "gameId"
           ]
         },
         "indices": [
@@ -134,7 +135,7 @@
       },
       {
         "tableName": "players",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `age` INTEGER NOT NULL, `teamId` INTEGER, `positionFirst` INTEGER NOT NULL, `positionSecond` INTEGER NOT NULL, `potential` INTEGER NOT NULL, `salary` INTEGER NOT NULL, `yearsContract` INTEGER NOT NULL, `yearsExperience` INTEGER NOT NULL, `skillPhysique` INTEGER NOT NULL, `skillBlock` INTEGER NOT NULL, `skillSteal` INTEGER NOT NULL, `skillRebound` INTEGER NOT NULL, `skillPass` INTEGER NOT NULL, `skillShotInterior` INTEGER NOT NULL, `skillShotExterior` INTEGER NOT NULL, `skillShotFree` INTEGER NOT NULL, `stateEnergy` INTEGER NOT NULL, `stateForm` INTEGER NOT NULL, `stateInjury` INTEGER NOT NULL, `gameId` INTEGER NOT NULL, FOREIGN KEY(`teamId`) REFERENCES `teams`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL , FOREIGN KEY(`gameId`) REFERENCES `games`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `age` INTEGER NOT NULL, `teamId` INTEGER, `positionFirst` INTEGER NOT NULL, `positionSecond` INTEGER NOT NULL, `potential` INTEGER NOT NULL, `salary` INTEGER NOT NULL, `yearsContract` INTEGER NOT NULL, `yearsExperience` INTEGER NOT NULL, `skillPhysique` INTEGER NOT NULL, `skillBlock` INTEGER NOT NULL, `skillSteal` INTEGER NOT NULL, `skillRebound` INTEGER NOT NULL, `skillPass` INTEGER NOT NULL, `skillShotInterior` INTEGER NOT NULL, `skillShotExterior` INTEGER NOT NULL, `skillShotFree` INTEGER NOT NULL, `stateEnergy` INTEGER NOT NULL, `stateForm` INTEGER NOT NULL, `stateInjury` INTEGER NOT NULL, `gameId` INTEGER NOT NULL, FOREIGN KEY(`teamId`, `gameId`) REFERENCES `teams`(`id`, `gameId`) ON UPDATE NO ACTION ON DELETE SET NULL , FOREIGN KEY(`gameId`) REFERENCES `games`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "id",
@@ -277,13 +278,14 @@
         },
         "indices": [
           {
-            "name": "index_players_teamId",
+            "name": "index_players_teamId_gameId",
             "unique": false,
             "columnNames": [
-              "teamId"
+              "teamId",
+              "gameId"
             ],
             "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_players_teamId` ON `${TABLE_NAME}` (`teamId`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_players_teamId_gameId` ON `${TABLE_NAME}` (`teamId`, `gameId`)"
           },
           {
             "name": "index_players_gameId",
@@ -301,10 +303,12 @@
             "onDelete": "SET NULL",
             "onUpdate": "NO ACTION",
             "columns": [
-              "teamId"
+              "teamId",
+              "gameId"
             ],
             "referencedColumns": [
-              "id"
+              "id",
+              "gameId"
             ]
           },
           {
@@ -322,7 +326,7 @@
       },
       {
         "tableName": "leagues",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `gameId` INTEGER NOT NULL, `teamId` INTEGER NOT NULL, `gamesWon` INTEGER NOT NULL, `gamesLost` INTEGER NOT NULL, `pointsScored` INTEGER NOT NULL, `pointsAllowed` INTEGER NOT NULL, FOREIGN KEY(`gameId`) REFERENCES `games`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`teamId`) REFERENCES `teams`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `gameId` INTEGER NOT NULL, `teamId` INTEGER NOT NULL, `gamesWon` INTEGER NOT NULL, `gamesLost` INTEGER NOT NULL, `pointsScored` INTEGER NOT NULL, `pointsAllowed` INTEGER NOT NULL, FOREIGN KEY(`teamId`, `gameId`) REFERENCES `teams`(`id`, `gameId`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`gameId`) REFERENCES `games`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "id",
@@ -395,6 +399,19 @@
         ],
         "foreignKeys": [
           {
+            "table": "teams",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "teamId",
+              "gameId"
+            ],
+            "referencedColumns": [
+              "id",
+              "gameId"
+            ]
+          },
+          {
             "table": "games",
             "onDelete": "CASCADE",
             "onUpdate": "NO ACTION",
@@ -404,23 +421,12 @@
             "referencedColumns": [
               "id"
             ]
-          },
-          {
-            "table": "teams",
-            "onDelete": "CASCADE",
-            "onUpdate": "NO ACTION",
-            "columns": [
-              "teamId"
-            ],
-            "referencedColumns": [
-              "id"
-            ]
           }
         ]
       },
       {
         "tableName": "matches",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `gameId` INTEGER NOT NULL, `matchday` INTEGER NOT NULL, `teamLocalId` INTEGER NOT NULL, `teamVisitorId` INTEGER NOT NULL, `name` TEXT, `localQ1` INTEGER NOT NULL, `localQ2` INTEGER NOT NULL, `localQ3` INTEGER NOT NULL, `localQ4` INTEGER NOT NULL, `localExtension` INTEGER NOT NULL, `visitorQ1` INTEGER NOT NULL, `visitorQ2` INTEGER NOT NULL, `visitorQ3` INTEGER NOT NULL, `visitorQ4` INTEGER NOT NULL, `visitorExtension` INTEGER NOT NULL, FOREIGN KEY(`gameId`) REFERENCES `games`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`teamLocalId`) REFERENCES `teams`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`teamVisitorId`) REFERENCES `teams`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `gameId` INTEGER NOT NULL, `matchday` INTEGER NOT NULL, `teamLocalId` INTEGER NOT NULL, `teamVisitorId` INTEGER NOT NULL, `name` TEXT, `localQ1` INTEGER NOT NULL, `localQ2` INTEGER NOT NULL, `localQ3` INTEGER NOT NULL, `localQ4` INTEGER NOT NULL, `localExtension` INTEGER NOT NULL, `visitorQ1` INTEGER NOT NULL, `visitorQ2` INTEGER NOT NULL, `visitorQ3` INTEGER NOT NULL, `visitorQ4` INTEGER NOT NULL, `visitorExtension` INTEGER NOT NULL, FOREIGN KEY(`teamLocalId`, `gameId`) REFERENCES `teams`(`id`, `gameId`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`teamVisitorId`, `gameId`) REFERENCES `teams`(`id`, `gameId`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`gameId`) REFERENCES `games`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "id",
@@ -556,33 +562,37 @@
         ],
         "foreignKeys": [
           {
+            "table": "teams",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "teamLocalId",
+              "gameId"
+            ],
+            "referencedColumns": [
+              "id",
+              "gameId"
+            ]
+          },
+          {
+            "table": "teams",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "teamVisitorId",
+              "gameId"
+            ],
+            "referencedColumns": [
+              "id",
+              "gameId"
+            ]
+          },
+          {
             "table": "games",
             "onDelete": "CASCADE",
             "onUpdate": "NO ACTION",
             "columns": [
               "gameId"
-            ],
-            "referencedColumns": [
-              "id"
-            ]
-          },
-          {
-            "table": "teams",
-            "onDelete": "CASCADE",
-            "onUpdate": "NO ACTION",
-            "columns": [
-              "teamLocalId"
-            ],
-            "referencedColumns": [
-              "id"
-            ]
-          },
-          {
-            "table": "teams",
-            "onDelete": "CASCADE",
-            "onUpdate": "NO ACTION",
-            "columns": [
-              "teamVisitorId"
             ],
             "referencedColumns": [
               "id"
@@ -806,7 +816,7 @@
       },
       {
         "tableName": "tactics",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `gameId` INTEGER NOT NULL, `teamId` INTEGER NOT NULL, `titPG` INTEGER NOT NULL, `titSG` INTEGER NOT NULL, `titSF` INTEGER NOT NULL, `titPF` INTEGER NOT NULL, `titC` INTEGER NOT NULL, `resPG` INTEGER NOT NULL, `resSG` INTEGER NOT NULL, `resSF` INTEGER NOT NULL, `resPF` INTEGER NOT NULL, `resC` INTEGER NOT NULL, `benchImportance` INTEGER NOT NULL, `gameType` INTEGER NOT NULL, `shotIntPercent` INTEGER NOT NULL, `shotTriplePercent` INTEGER NOT NULL, `star1` INTEGER, `star2` INTEGER, `star3` INTEGER, FOREIGN KEY(`gameId`) REFERENCES `games`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`teamId`) REFERENCES `teams`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `gameId` INTEGER NOT NULL, `teamId` INTEGER NOT NULL, `titPG` INTEGER NOT NULL, `titSG` INTEGER NOT NULL, `titSF` INTEGER NOT NULL, `titPF` INTEGER NOT NULL, `titC` INTEGER NOT NULL, `resPG` INTEGER NOT NULL, `resSG` INTEGER NOT NULL, `resSF` INTEGER NOT NULL, `resPF` INTEGER NOT NULL, `resC` INTEGER NOT NULL, `benchImportance` INTEGER NOT NULL, `gameType` INTEGER NOT NULL, `shotIntPercent` INTEGER NOT NULL, `shotTriplePercent` INTEGER NOT NULL, `star1` INTEGER, `star2` INTEGER, `star3` INTEGER, FOREIGN KEY(`gameId`) REFERENCES `games`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`teamId`, `gameId`) REFERENCES `teams`(`id`, `gameId`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "id",
@@ -972,10 +982,12 @@
             "onDelete": "CASCADE",
             "onUpdate": "NO ACTION",
             "columns": [
-              "teamId"
+              "teamId",
+              "gameId"
             ],
             "referencedColumns": [
-              "id"
+              "id",
+              "gameId"
             ]
           }
         ]
@@ -1056,7 +1068,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '267b03cc5e818f78fd4abc12f30a695f')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'eaff4e80e2776752f2cafd8bc5684dd0')"
     ]
   }
 }

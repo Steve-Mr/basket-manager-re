@@ -93,10 +93,10 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 val updated = current.copy(userTeamId = teamId)
-                database.gameDao().insert(updated)
+                database.gameDao().update(updated)
                 _gameState.value = updated
                 updateNextMatch(updated)
-                Log.d("GameViewModel", "userTeamId updated in DB")
+                Log.d("GameViewModel", "userTeamId updated in DB using update()")
             }
         }
     }
@@ -106,6 +106,14 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
             withContext(Dispatchers.IO) {
                 val game = database.gameDao().getGameById(gameId)
                 _gameState.value = game
+
+                // Integrity check: if players for this game are 0, something is wrong
+                val playerCount = database.playerDao().getPlayersByGame(gameId).size
+                Log.d("GameViewModel", "Loaded gameId: $gameId, found $playerCount players")
+                if (game != null && playerCount == 0) {
+                    Log.w("GameViewModel", "CRITICAL: Game exists but players are missing! Data might have been wiped.")
+                }
+
                 _recentMatches.value = database.matchDao().getRecentMatches(gameId)
                 _news.value = database.newsDao().getNewsByGame(gameId)
                 updateNextMatch(game)
@@ -115,6 +123,7 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
 
     private suspend fun updateNextMatch(game: GameEntity?) {
         val userTeamId = game?.userTeamId ?: return
+        Log.d("GameViewModel", "Updating next match for team: $userTeamId, day: ${game.currentMatchday}")
         val match = database.matchDao().getNextMatchForTeam(game.id, userTeamId, game.currentMatchday)
         if (match != null) {
             val opponentId = if (match.teamLocalId == userTeamId) match.teamVisitorId else match.teamLocalId
@@ -183,7 +192,7 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
 
                 val updated = current.copy(currentMatchday = nextDay)
 
-                database.gameDao().insert(updated)
+                database.gameDao().update(updated)
                 _gameState.value = updated
                 _recentMatches.value = database.matchDao().getRecentMatches(current.id)
                 _news.value = database.newsDao().getNewsByGame(current.id)
@@ -210,7 +219,7 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
             pointsScored = standing.pointsScored + scored,
             pointsAllowed = standing.pointsAllowed + allowed
         )
-        database.leagueDao().insert(updated)
+        database.leagueDao().update(updated)
 
         // Check for Salary Cap update at the end of regular season (day 166)
         // Original logic: manage() in ManageRenewals.java
@@ -300,7 +309,7 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
         processConference(eastTeams)
         processConference(westTeams)
 
-        database.teamDao().insertAll(updatedTeams)
+        database.teamDao().updateAll(updatedTeams)
     }
 
     private fun MatchEntity.getTotalLocal() = localQ1 + localQ2 + localQ3 + localQ4

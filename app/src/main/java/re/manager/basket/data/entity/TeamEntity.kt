@@ -9,6 +9,7 @@ import re.manager.basket.domain.model.Division
 
 @Entity(
     tableName = "teams",
+    primaryKeys = ["id", "gameId"],
     foreignKeys = [
         ForeignKey(
             entity = GameEntity::class,
@@ -20,7 +21,7 @@ import re.manager.basket.domain.model.Division
     indices = [Index("gameId")]
 )
 data class TeamEntity(
-    @PrimaryKey val id: Int,
+    val id: Int,
     val name: String,
     val fullName: String,
     val color: String,

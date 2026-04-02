@@ -1,17 +1,17 @@
 package re.manager.basket.data.dao
 
-import androidx.room.Dao
-import androidx.room.Insert
-import androidx.room.OnConflictStrategy
-import androidx.room.Query
+import androidx.room.*
 import re.manager.basket.data.entity.LeagueEntity
 
 @Dao
 interface LeagueDao {
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(league: LeagueEntity)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Update
+    suspend fun update(league: LeagueEntity)
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAll(leagues: List<LeagueEntity>)
 
     @Query("SELECT * FROM leagues WHERE gameId = :gameId ORDER BY gamesWon DESC, (pointsScored - pointsAllowed) DESC")

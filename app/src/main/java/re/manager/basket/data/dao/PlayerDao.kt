@@ -5,7 +5,7 @@ import re.manager.basket.data.entity.PlayerEntity
 
 @Dao
 interface PlayerDao {
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAll(players: List<PlayerEntity>)
 
     @Update

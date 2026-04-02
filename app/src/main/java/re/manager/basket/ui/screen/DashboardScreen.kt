@@ -44,7 +44,8 @@ fun DashboardContent(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(text = "Next Event", style = MaterialTheme.typography.titleMedium)
-                    nextMatch?.let { (match, opponent) ->
+                    if (nextMatch != null) {
+                        val (match, opponent) = nextMatch
                         Text(
                             text = "Day ${match.matchday}: vs ${opponent.fullName}",
                             style = MaterialTheme.typography.headlineSmall
@@ -53,7 +54,9 @@ fun DashboardContent(
                             text = if (match.teamLocalId == game.userTeamId) "At Home" else "Away Game",
                             style = MaterialTheme.typography.bodyMedium
                         )
-                    } ?: Text(text = "No matches scheduled", style = MaterialTheme.typography.bodyLarge)
+                    } else {
+                        Text(text = "Season Finished or No Matches", style = MaterialTheme.typography.bodyLarge)
+                    }
                 }
             }
 

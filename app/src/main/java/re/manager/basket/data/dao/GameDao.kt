@@ -1,15 +1,15 @@
 package re.manager.basket.data.dao
 
-import androidx.room.Dao
-import androidx.room.Insert
-import androidx.room.OnConflictStrategy
-import androidx.room.Query
+import androidx.room.*
 import re.manager.basket.data.entity.GameEntity
 
 @Dao
 interface GameDao {
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(game: GameEntity)
+
+    @Update
+    suspend fun update(game: GameEntity)
 
     @Query("SELECT * FROM games WHERE id = :id")
     suspend fun getGameById(id: Int): GameEntity?

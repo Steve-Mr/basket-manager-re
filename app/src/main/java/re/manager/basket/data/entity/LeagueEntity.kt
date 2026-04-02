@@ -9,15 +9,15 @@ import androidx.room.PrimaryKey
     tableName = "leagues",
     foreignKeys = [
         ForeignKey(
-            entity = GameEntity::class,
-            parentColumns = ["id"],
-            childColumns = ["gameId"],
+            entity = TeamEntity::class,
+            parentColumns = ["id", "gameId"],
+            childColumns = ["teamId", "gameId"],
             onDelete = ForeignKey.CASCADE
         ),
         ForeignKey(
-            entity = TeamEntity::class,
+            entity = GameEntity::class,
             parentColumns = ["id"],
-            childColumns = ["teamId"],
+            childColumns = ["gameId"],
             onDelete = ForeignKey.CASCADE
         )
     ],

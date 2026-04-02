@@ -5,7 +5,7 @@ import re.manager.basket.data.entity.MatchEntity
 
 @Dao
 interface MatchDao {
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAll(matches: List<MatchEntity>)
 
     @Update

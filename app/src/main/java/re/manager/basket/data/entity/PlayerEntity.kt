@@ -13,8 +13,8 @@ import kotlin.math.pow
     foreignKeys = [
         ForeignKey(
             entity = TeamEntity::class,
-            parentColumns = ["id"],
-            childColumns = ["teamId"],
+            parentColumns = ["id", "gameId"],
+            childColumns = ["teamId", "gameId"],
             onDelete = ForeignKey.SET_NULL
         ),
         ForeignKey(
@@ -24,7 +24,7 @@ import kotlin.math.pow
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index("teamId"), Index("gameId")]
+    indices = [Index("teamId", "gameId"), Index("gameId")]
 )
 data class PlayerEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,

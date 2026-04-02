@@ -30,10 +30,11 @@ class RosterImporter(private val context: Context, private val database: AppData
             teamNames.forEachIndexed { index, name ->
                 val conference = if (index < 15) Conference.EAST else Conference.WEST
                 val division = Division.fromId(index / 5 + 1)
+                val teamId = index + 1
 
                 teams.add(
                     TeamEntity(
-                        id = index + 1,
+                        id = teamId,
                         name = name,
                         fullName = "Team $name",
                         color = "#FFFFFF",
