@@ -26,4 +26,10 @@ object Constants {
     const val MAX_SKILL = 99
     const val DEFAULT_ENERGY = 99
     const val DEFAULT_FORM = 50
+
+    // Salary Cap
+    const val SALARY_CAP_MIN = 55000000
+    const val SALARY_CAP_MED = 70000000
+    const val SALARY_CAP_MAX = 85000000
+    const val SALARY_CAP_STEP = 1000000
 }

@@ -15,6 +15,7 @@ import re.manager.basket.data.entity.MatchEntity
 import re.manager.basket.data.entity.TeamEntity
 import re.manager.basket.data.importer.RosterImporter
 import re.manager.basket.domain.engine.SeasonManager
+import re.manager.basket.domain.model.Constants
 
 class GameViewModel(private val database: AppDatabase) : ViewModel() {
 
@@ -126,8 +127,13 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
                 matches.forEachIndexed { index, match ->
                     val localPlayers = database.playerDao().getPlayersByTeam(match.teamLocalId)
                     val visitorPlayers = database.playerDao().getPlayersByTeam(match.teamVisitorId)
-                    val localTactic = database.tacticDao().getTacticForTeam(match.teamLocalId, current.id)!!
-                    val visitorTactic = database.tacticDao().getTacticForTeam(match.teamVisitorId, current.id)!!
+                    val localTactic = database.tacticDao().getTacticForTeam(match.teamLocalId, current.id)
+                    val visitorTactic = database.tacticDao().getTacticForTeam(match.teamVisitorId, current.id)
+
+                    if (localTactic == null || visitorTactic == null) {
+                        Log.e("GameViewModel", "Tactic not found for match: ${match.id}")
+                        return@forEachIndexed
+                    }
 
                     val simulator = re.manager.basket.domain.engine.MatchSimulator(
                         match, localPlayers, visitorPlayers, localTactic, visitorTactic
@@ -155,6 +161,12 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
                 // 3. Move to next day
                 val seasonManager = SeasonManager(current)
                 val nextDay = seasonManager.getNextMatchday()
+
+                // If moving to playoffs (day 167), update salary caps
+                if (current.currentMatchday == 166 && nextDay == 167) {
+                    updateAllSalaryCaps(current.id)
+                }
+
                 val updated = current.copy(currentMatchday = nextDay)
 
                 database.gameDao().insert(updated)
@@ -185,6 +197,10 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
             pointsAllowed = standing.pointsAllowed + allowed
         )
         database.leagueDao().insert(updated)
+
+        // Check for Salary Cap update at the end of regular season (day 166)
+        // Original logic: manage() in ManageRenewals.java
+        // We'll trigger it when nextDay moves from 166 to 167
     }
 
     private suspend fun generateMatchNews(result: re.manager.basket.domain.engine.MatchFullResult) {
@@ -213,6 +229,64 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
                 type = "MATCH"
             )
         )
+    }
+
+    private suspend fun updateAllSalaryCaps(gameId: Int) {
+        val teams = database.teamDao().getTeamsByGame(gameId)
+        val standings = database.leagueDao().getStandings(gameId)
+        val userTeamId = _gameState.value?.userTeamId
+
+        // Group by conference
+        val eastTeams = teams.filter { it.conference == re.manager.basket.domain.model.Conference.EAST }
+        val westTeams = teams.filter { it.conference == re.manager.basket.domain.model.Conference.WEST }
+
+        val updatedTeams = mutableListOf<TeamEntity>()
+
+        fun processConference(confTeams: List<TeamEntity>) {
+            val confIds = confTeams.map { it.id }.toSet()
+            val confStandings = standings.filter { it.teamId in confIds }
+
+            confStandings.forEachIndexed { index, standing ->
+                val team = confTeams.find { it.id == standing.teamId } ?: return@forEachIndexed
+                var bonus = 0
+
+                val isClassified = index < 8
+                if (isClassified) {
+                    bonus += Constants.SALARY_CAP_STEP * 2
+                    // Note: Original code checks for Division Position 1, Semi-finals, etc.
+                    // For now we implement the base Classified bonus.
+                } else {
+                    bonus -= Constants.SALARY_CAP_STEP * 3
+                    // Position in division check (5th)
+                    // Simplified: if last in conference (15th)
+                    if (index == 14) {
+                        bonus -= Constants.SALARY_CAP_STEP
+                    }
+                }
+
+                val updatedTeam = team.addSalaryCap(bonus)
+                updatedTeams.add(updatedTeam)
+
+                if (updatedTeam.id == userTeamId) {
+                    viewModelScope.launch {
+                        database.newsDao().insert(
+                            re.manager.basket.data.entity.NewsEntity(
+                                gameId = gameId,
+                                matchday = 167,
+                                title = "Salary Cap Updated",
+                                body = "Your new Salary Cap is ${re.manager.basket.util.CurrencyUtils.formatCurrency(updatedTeam.salaryCap)}",
+                                type = "INFO"
+                            )
+                        )
+                    }
+                }
+            }
+        }
+
+        processConference(eastTeams)
+        processConference(westTeams)
+
+        database.teamDao().insertAll(updatedTeams)
     }
 
     private fun MatchEntity.getTotalLocal() = localQ1 + localQ2 + localQ3 + localQ4

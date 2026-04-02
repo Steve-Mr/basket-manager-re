@@ -13,6 +13,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import re.manager.basket.ui.viewmodel.MarketViewModel
+import re.manager.basket.util.CurrencyUtils
+import re.manager.basket.domain.model.Constants
 
 @Composable
 fun MarketScreen(
@@ -22,7 +24,7 @@ fun MarketScreen(
 ) {
     val freeAgents by marketViewModel.freeAgents.collectAsState()
     val teamSalary by marketViewModel.teamSalary.collectAsState()
-    val salaryCap = 60_000_000 // Standard Cap from RosterImporter
+    val salaryCap = Constants.SALARY_CAP_MED // Centralized default
 
     LaunchedEffect(gameId, userTeamId) {
         marketViewModel.loadMarketData(gameId, userTeamId)
@@ -32,8 +34,9 @@ fun MarketScreen(
         Text(text = "Free Agency Market", style = MaterialTheme.typography.headlineMedium)
         Spacer(modifier = Modifier.height(8.dp))
 
+        val salaryText = "${CurrencyUtils.formatCurrency(teamSalary)} / ${CurrencyUtils.formatCurrency(salaryCap)}"
         Text(
-            text = "Team Salary: $${String.format("%,d", teamSalary)} / $${String.format("%,d", salaryCap)}",
+            text = "Team Salary: $salaryText",
             style = MaterialTheme.typography.bodySmall,
             color = if (teamSalary > salaryCap) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
         )
@@ -62,7 +65,7 @@ fun MarketScreen(
                             Text(text = "Avg Skill: ${String.format("%.1f", player.getAverageSkillAll())}", color = MaterialTheme.colorScheme.secondary)
                         }
                         Column(horizontalAlignment = Alignment.End) {
-                            Text(text = "$${String.format("%,d", player.salary)}", style = MaterialTheme.typography.titleSmall)
+                            Text(text = CurrencyUtils.formatCurrency(player.salary), style = MaterialTheme.typography.titleSmall)
                             Button(
                                 onClick = { marketViewModel.signPlayer(player, userTeamId) },
                                 enabled = (teamSalary + player.salary <= salaryCap)

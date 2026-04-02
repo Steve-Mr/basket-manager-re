@@ -28,4 +28,12 @@ data class TeamEntity(
     val division: Division,
     val salaryCap: Int,
     val gameId: Int
-)
+) {
+    fun addSalaryCap(amount: Int): TeamEntity {
+        val newCap = (salaryCap + amount).coerceIn(
+            re.manager.basket.domain.model.Constants.SALARY_CAP_MIN,
+            re.manager.basket.domain.model.Constants.SALARY_CAP_MAX
+        )
+        return copy(salaryCap = newCap)
+    }
+}
