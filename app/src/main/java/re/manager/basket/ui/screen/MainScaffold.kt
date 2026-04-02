@@ -1,8 +1,10 @@
 package re.manager.basket.ui.screen
 
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -23,6 +25,10 @@ fun MainScaffold(
 ) {
     val gameState by gameViewModel.gameState.collectAsState()
     val players by playerListViewModel.players.collectAsState()
+    val isSimulating by gameViewModel.isSimulating.collectAsState()
+    val simProgress by gameViewModel.simProgress.collectAsState()
+    val nextMatch by gameViewModel.nextMatch.collectAsState()
+    val news by gameViewModel.news.collectAsState()
 
     MainScaffoldContent(
         selectedItemInitial = 0,
@@ -30,6 +36,10 @@ fun MainScaffold(
         players = players,
         marketViewModel = marketViewModel,
         leagueViewModel = leagueViewModel,
+        isSimulating = isSimulating,
+        simProgress = simProgress,
+        nextMatch = nextMatch,
+        news = news,
         onNextDay = { gameViewModel.nextDay() }
     )
 }
@@ -41,6 +51,10 @@ fun MainScaffoldContent(
     players: List<PlayerUiState>,
     marketViewModel: MarketViewModel,
     leagueViewModel: LeagueViewModel,
+    isSimulating: Boolean,
+    simProgress: Float,
+    nextMatch: Pair<re.manager.basket.data.entity.MatchEntity, re.manager.basket.data.entity.TeamEntity>?,
+    news: List<re.manager.basket.data.entity.NewsEntity>,
     onNextDay: () -> Unit
 ) {
     var selectedItem by remember { mutableIntStateOf(selectedItemInitial) }
@@ -70,8 +84,27 @@ fun MainScaffoldContent(
     ) { innerPadding ->
         Surface(modifier = Modifier.padding(innerPadding)) {
             Box(modifier = Modifier.fillMaxSize()) {
+                if (isSimulating) {
+                    Dialog(onDismissRequest = {}) {
+                        Card {
+                            Column(
+                                modifier = Modifier.padding(24.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text("Simulating League Matches...", style = MaterialTheme.typography.titleMedium)
+                                Spacer(modifier = Modifier.height(16.dp))
+                                LinearProgressIndicator(
+                                    progress = { simProgress },
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                Text("${(simProgress * 100).toInt()}%", modifier = Modifier.padding(top = 8.dp))
+                            }
+                        }
+                    }
+                }
+
                 when (selectedItem) {
-                    0 -> DashboardContent(gameState)
+                    0 -> DashboardContent(gameState, nextMatch, news)
                     1 -> TeamSquadContent(players)
                     2 -> gameState?.let {
                         LeagueStandingsScreen(gameId = it.id, leagueViewModel = leagueViewModel)

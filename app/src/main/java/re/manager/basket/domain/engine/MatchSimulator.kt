@@ -262,5 +262,6 @@ class MatchSimulator(
 
 data class MatchFullResult(
     val match: MatchEntity,
-    val playerResults: List<MatchResultEntity>
+    val playerResults: List<MatchResultEntity>,
+    val injuries: List<PlayerEntity> = emptyList()
 )

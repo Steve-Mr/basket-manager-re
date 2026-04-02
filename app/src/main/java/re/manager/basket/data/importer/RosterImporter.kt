@@ -51,34 +51,37 @@ class RosterImporter(private val context: Context, private val database: AppData
                 val columns = header.split(";")
 
                 reader.forEachLine { line ->
+                    if (line.isBlank()) return@forEachLine
                     val values = line.split(";")
                     if (values.size >= columns.size) {
                         val data = columns.zip(values).toMap()
                         val teamName = data["team"] ?: "0"
-                        val teamIdx = teamNames.indexOf(teamName)
-                        val teamId = if (teamIdx != -1) teamIdx + 1 else null // team=0 becomes null (free agent)
+
+                        // Map team name to ID (BOS -> 1, etc.)
+                        val teamIdx = teamNames.indexOf(teamName.trim())
+                        val teamId = if (teamIdx != -1) teamIdx + 1 else null
 
                         players.add(
                             PlayerEntity(
-                                name = data["name"] ?: "Unknown",
-                                age = data["age"]?.toIntOrNull() ?: 20,
+                                name = data["name"]?.trim() ?: "Unknown",
+                                age = data["age"]?.trim()?.toIntOrNull() ?: 20,
                                 teamId = teamId,
-                                positionFirst = Position.fromId(data["positionFirst"]?.toIntOrNull() ?: 1),
-                                positionSecond = Position.fromId(data["positionSecond"]?.toIntOrNull() ?: 0),
-                                potential = data["potential"]?.toIntOrNull() ?: 5,
-                                salary = data["salary"]?.toIntOrNull() ?: 0,
-                                yearsContract = data["yearsContract"]?.toIntOrNull() ?: 1,
-                                yearsExperience = data["yearsExperience"]?.toIntOrNull() ?: 0,
-                                skillPhysique = data["skillPhysique"]?.toIntOrNull() ?: 50,
-                                skillBlock = data["skillBlock"]?.toIntOrNull() ?: 50,
-                                skillSteal = data["skillSteal"]?.toIntOrNull() ?: 50,
-                                skillRebound = data["skillRebound"]?.toIntOrNull() ?: 50,
-                                skillPass = data["skillPass"]?.toIntOrNull() ?: 50,
-                                skillShotInterior = data["skillShotInterior"]?.toIntOrNull() ?: 50,
-                                skillShotExterior = data["skillShotExterior"]?.toIntOrNull() ?: 50,
-                                skillShotFree = data["skillShotFree"]?.toIntOrNull() ?: 50,
+                                positionFirst = Position.fromId(data["positionFirst"]?.trim()?.toIntOrNull() ?: 1),
+                                positionSecond = Position.fromId(data["positionSecond"]?.trim()?.toIntOrNull() ?: 0),
+                                potential = data["potential"]?.trim()?.toIntOrNull() ?: 5,
+                                salary = data["salary"]?.trim()?.toIntOrNull() ?: 0,
+                                yearsContract = data["yearsContract"]?.trim()?.toIntOrNull() ?: 1,
+                                yearsExperience = data["yearsExperience"]?.trim()?.toIntOrNull() ?: 0,
+                                skillPhysique = data["skillPhysique"]?.trim()?.toIntOrNull() ?: 50,
+                                skillBlock = data["skillBlock"]?.trim()?.toIntOrNull() ?: 50,
+                                skillSteal = data["skillSteal"]?.trim()?.toIntOrNull() ?: 50,
+                                skillRebound = data["skillRebound"]?.trim()?.toIntOrNull() ?: 50,
+                                skillPass = data["skillPass"]?.trim()?.toIntOrNull() ?: 50,
+                                skillShotInterior = data["skillShotInterior"]?.trim()?.toIntOrNull() ?: 50,
+                                skillShotExterior = data["skillShotExterior"]?.trim()?.toIntOrNull() ?: 50,
+                                skillShotFree = data["skillShotFree"]?.trim()?.toIntOrNull() ?: 50,
                                 stateEnergy = 99,
-                                stateForm = 50,
+                                stateForm = (30..70).random(), // Match original getRandomValue(30, 70)
                                 stateInjury = 0,
                                 gameId = gameId
                             )
