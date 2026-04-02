@@ -41,15 +41,17 @@ class MatchSimulator(
         }
     }
 
+    private val injuredPlayers = mutableListOf<PlayerEntity>()
+
     fun simulate(): MatchFullResult {
         createInitialResults()
         calculateMinutes(true)
         calculateMinutes(false)
 
-        val localTitPairs = localPlayers.filter { isTitular(it, localTactic) }.map { it to localResults[it.id]!! }
-        val localResPairs = localPlayers.filter { isReserve(it, localTactic) }.map { it to localResults[it.id]!! }
-        val visitorTitPairs = visitorPlayers.filter { isTitular(it, visitorTactic) }.map { it to visitorResults[it.id]!! }
-        val visitorResPairs = visitorPlayers.filter { isReserve(it, visitorTactic) }.map { it to visitorResults[it.id]!! }
+        val localTitPairs = localPlayers.filter { isTitular(it, localTactic) }.mapNotNull { p -> localResults[p.id]?.let { r -> p to r } }
+        val localResPairs = localPlayers.filter { isReserve(it, localTactic) }.mapNotNull { p -> localResults[p.id]?.let { r -> p to r } }
+        val visitorTitPairs = visitorPlayers.filter { isTitular(it, visitorTactic) }.mapNotNull { p -> visitorResults[p.id]?.let { r -> p to r } }
+        val visitorResPairs = visitorPlayers.filter { isReserve(it, visitorTactic) }.mapNotNull { p -> visitorResults[p.id]?.let { r -> p to r } }
 
         rulete = Rulete(
             localTitulars = localTitPairs,
@@ -61,17 +63,15 @@ class MatchSimulator(
             localTeamId = match.teamLocalId
         )
 
-        var possessions = 120
+        var possessions = Constants.BASE_POSSESSIONS
         var currentPos = 0
         while (currentPos < possessions) {
             val isVisitorAttacking = currentPos % 2 == 0
-            val teamAttackId = if (isVisitorAttacking) match.teamVisitorId else match.teamLocalId
-            val teamDefenseId = if (isVisitorAttacking) match.teamLocalId else match.teamVisitorId
 
             playPossession(currentPos, isVisitorAttacking)
 
             if (currentPos == possessions - 1 && getTotalPoints(true) == getTotalPoints(false)) {
-                possessions += 5
+                possessions += Constants.OVERTIME_POSSESSIONS
                 // Overtime handling could be more precise but following original tie logic
             }
             currentPos++
@@ -83,10 +83,30 @@ class MatchSimulator(
     private fun playPossession(pos: Int, isVisitorAttacking: Boolean) {
         val isLocalAttacking = !isVisitorAttacking
 
-        // 1. Injury Check (Simplified from original but following structure)
-        if (Random.nextInt(100) < 4) {
+        // 1. Injury Check
+        if (Random.nextInt(100) < Constants.INJURY_CHECK_PROB) {
             val playerPair = rulete.pickPlayer(0, isLocalAttacking, if (isLocalAttacking) match.teamLocalId else match.teamVisitorId)
-            // Original injury logic would go here
+            playerPair?.let { (player, _) ->
+                // Note: stateInjury = -1 means "bruised" or just got injured in this match
+                // Logic based on com.blank.bm15.model.core.Simulate.java:playPossession
+                val defenseModifier = getDefenseModifier(player, isLocalAttacking)
+                val injuryCheckValue = (player.stateEnergy * (player.skillPhysique + defenseModifier)) / 100
+                if (!accomplishedAction(injuryCheckValue, 1.0f)) {
+                    if (player.stateInjury == 0) {
+                        // Mark as bruising
+                        injuredPlayers.add(player.copy(stateInjury = -1))
+                    } else if (player.stateInjury == -1) {
+                        // Serious injury
+                        val damageType = Random.nextInt(101)
+                        val duration = when {
+                            damageType <= Constants.INJURY_TYPE_MINOR_PROB -> Random.nextInt(2, 8)
+                            damageType <= Constants.INJURY_TYPE_MEDIUM_PROB -> Random.nextInt(8, 50)
+                            else -> Random.nextInt(50, 181)
+                        }
+                        injuredPlayers.add(player.copy(stateInjury = duration))
+                    }
+                }
+            }
         }
 
         // 2. Steal Check
@@ -170,9 +190,18 @@ class MatchSimulator(
                     defRebPair.first.skillRebound + getDefenseModifier(defRebPair.first, !isLocalAttacking) + getRandomGauss(0, 100)) {
 
                     offRebPair.second.copy(rebounds = offRebPair.second.rebounds + 1).also { updateResult(it, isLocalAttacking) }
-                    // Recursive possession simplified but available in original
+
+                    // Recursive possession logic from Simulate.java
+                    if (loseManyPoints(isLocalAttacking)) {
+                        playPossession(pos, isVisitorAttacking)
+                    }
                 } else if (defRebPair != null) {
                     defRebPair.second.copy(rebounds = defRebPair.second.rebounds + 1).also { updateResult(it, !isLocalAttacking) }
+
+                    // Recursive possession logic from Simulate.java
+                    if (loseManyPoints(!isLocalAttacking)) {
+                        playPossession(pos, !isVisitorAttacking)
+                    }
                 }
             }
         }
@@ -195,7 +224,8 @@ class MatchSimulator(
 
         return MatchFullResult(
             match = finalizedMatch,
-            playerResults = localResults.values.toList() + visitorResults.values.toList()
+            playerResults = localResults.values.toList() + visitorResults.values.toList(),
+            injuries = injuredPlayers.toList()
         )
     }
 
@@ -212,8 +242,8 @@ class MatchSimulator(
             val res = reservas.getOrNull(i)
             val resMinutes = benchImportance + Random.nextInt((benchImportance - 1) * 4, benchImportance * 4 + 1)
 
-            tit?.let { results[it.id] = results[it.id]!!.copy(minutesPlayed = 48 - resMinutes) }
-            res?.let { results[it.id] = results[it.id]!!.copy(minutesPlayed = resMinutes) }
+            tit?.let { p -> results[p.id]?.let { r -> results[p.id] = r.copy(minutesPlayed = 48 - resMinutes) } }
+            res?.let { p -> results[p.id]?.let { r -> results[p.id] = r.copy(minutesPlayed = resMinutes) } }
         }
     }
 
@@ -230,6 +260,26 @@ class MatchSimulator(
 
     private fun isReserve(player: PlayerEntity, tactic: TacticEntity) =
         player.id == tactic.resPG || player.id == tactic.resSG || player.id == tactic.resSF || player.id == tactic.resPF || player.id == tactic.resC
+
+    private fun loseManyPoints(isLocalGettingRebound: Boolean): Boolean {
+        // Logic from com.blank.bm15.model.core.Simulate.java:loseManyPoints
+        val teamGettingReboundPlayers = if (isLocalGettingRebound) localPlayers else visitorPlayers
+        val otherTeamPlayers = if (isLocalGettingRebound) visitorPlayers else localPlayers
+        val tacticGetting = if (isLocalGettingRebound) localTactic else visitorTactic
+        val tacticOther = if (isLocalGettingRebound) visitorTactic else localTactic
+
+        val avgGetting = teamGettingReboundPlayers.filter { isTitular(it, tacticGetting) || isReserve(it, tacticGetting) }
+            .map { it.getAverageSkillAll() }.average().let { if (it.isNaN()) 40.0 else it }
+        val avgOther = otherTeamPlayers.filter { isTitular(it, tacticOther) || isReserve(it, tacticOther) }
+            .map { it.getAverageSkillAll() }.average().let { if (it.isNaN()) 40.0 else it }
+
+        val difference = Math.abs(avgGetting - avgOther).toInt() + 2
+
+        val pointsGetting = getTotalPoints(isLocalGettingRebound)
+        val pointsOther = getTotalPoints(!isLocalGettingRebound)
+
+        return pointsGetting + difference < pointsOther
+    }
 
     private fun getMatchPosition(player: PlayerEntity, isLocal: Boolean): Position {
         val tactic = if (isLocal) localTactic else visitorTactic

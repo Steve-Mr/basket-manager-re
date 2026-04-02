@@ -27,7 +27,7 @@ class MarketViewModel(private val database: AppDatabase) : ViewModel() {
             Log.d("MarketViewModel", "Found ${freeAgents.size} free agents")
             _freeAgents.value = freeAgents
 
-            val teamPlayers = database.playerDao().getPlayersByTeam(userTeamId)
+            val teamPlayers = database.playerDao().getPlayersByTeam(userTeamId, gameId)
             _teamSalary.value = teamPlayers.sumOf { it.salary }
         }
     }

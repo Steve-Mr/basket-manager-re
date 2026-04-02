@@ -148,8 +148,8 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
                 Log.d("GameViewModel", "Found ${matches.size} matches to simulate")
 
                 matches.forEachIndexed { index, match ->
-                    val localPlayers = database.playerDao().getPlayersByTeam(match.teamLocalId)
-                    val visitorPlayers = database.playerDao().getPlayersByTeam(match.teamVisitorId)
+                    val localPlayers = database.playerDao().getPlayersByTeam(match.teamLocalId, current.id)
+                    val visitorPlayers = database.playerDao().getPlayersByTeam(match.teamVisitorId, current.id)
                     val localTactic = database.tacticDao().getTacticForTeam(match.teamLocalId, current.id)
                     val visitorTactic = database.tacticDao().getTacticForTeam(match.teamVisitorId, current.id)
 
@@ -166,6 +166,11 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
                     // Save match result and player stats
                     database.matchDao().update(result.match)
                     database.matchResultDao().insertAll(result.playerResults)
+
+                    // Update injuries in DB
+                    if (result.injuries.isNotEmpty()) {
+                        database.playerDao().insertAll(result.injuries)
+                    }
 
                     // Generate news
                     generateMatchNews(result)
@@ -209,6 +214,14 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
 
         updateTeamStanding(match.teamLocalId, match.gameId, localWin, result.match.getTotalLocal(), result.match.getTotalVisitor())
         updateTeamStanding(match.teamVisitorId, match.gameId, !localWin, result.match.getTotalVisitor(), result.match.getTotalLocal())
+
+        // Handling playoff bonuses in real-time (based on finishMatch in Simulate.java)
+        if (match.matchday >= 167) {
+            val winnerId = if (localWin) match.teamLocalId else match.teamVisitorId
+            // Bonus for each playoff win (+2M according to simulate finishMatch)
+            // Actually ManageRenewals only updates at end of regular season.
+            // But FinishMatch updates form/energy.
+        }
     }
 
     private suspend fun updateTeamStanding(teamId: Int, gameId: Int, won: Boolean, scored: Int, allowed: Int) {
@@ -252,6 +265,20 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
                 type = "MATCH"
             )
         )
+
+        // Generate Injury News for User Team
+        val userTeamId = _gameState.value?.userTeamId
+        result.injuries.filter { it.teamId == userTeamId && it.stateInjury > 0 }.forEach { injured ->
+            database.newsDao().insert(
+                re.manager.basket.data.entity.NewsEntity(
+                    gameId = match.gameId,
+                    matchday = match.matchday,
+                    title = "Injury Report: ${injured.name}",
+                    body = "${injured.name} has suffered an injury and will be out for ${injured.stateInjury - 1} days.",
+                    type = "INFO"
+                )
+            )
+        }
     }
 
     private suspend fun updateAllSalaryCaps(gameId: Int) {
@@ -265,7 +292,7 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
 
         val updatedTeams = mutableListOf<TeamEntity>()
 
-        fun processConference(confTeams: List<TeamEntity>) {
+        suspend fun processConference(confTeams: List<TeamEntity>) {
             val confIds = confTeams.map { it.id }.toSet()
             val confStandings = standings.filter { it.teamId in confIds }
 
@@ -276,12 +303,31 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
                 val isClassified = index < 8
                 if (isClassified) {
                     bonus += Constants.SALARY_CAP_STEP * 2
-                    // Note: Original code checks for Division Position 1, Semi-finals, etc.
-                    // For now we implement the base Classified bonus.
+
+                    // Division Winner Bonus
+                    // Check standing in division
+                    val divisionTeams = confStandings.filter { tid ->
+                        confTeams.find { it.id == tid.teamId }?.division == team.division
+                    }.sortedByDescending { it.gamesWon }
+                    if (divisionTeams.firstOrNull()?.teamId == team.id) {
+                        bonus += Constants.SALARY_CAP_STEP
+                    }
+
+                    // Note: Original code ManageRenewals.java also checks for
+                    // Semis, conference final, world final, and champion.
+                    // However, at day 166 (end of regular season), these are not yet determined for the current season.
+                    // In the original game, this is called at the end of regular season to set up next season's cap.
                 } else {
                     bonus -= Constants.SALARY_CAP_STEP * 3
+
                     // Position in division check (5th)
-                    // Simplified: if last in conference (15th)
+                    val divisionTeams = confStandings.filter { tid ->
+                        confTeams.find { it.id == tid.teamId }?.division == team.division
+                    }.sortedByDescending { it.gamesWon }
+                    if (divisionTeams.lastOrNull()?.teamId == team.id) {
+                        bonus -= Constants.SALARY_CAP_STEP
+                    }
+
                     if (index == 14) {
                         bonus -= Constants.SALARY_CAP_STEP
                     }
@@ -291,17 +337,15 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
                 updatedTeams.add(updatedTeam)
 
                 if (updatedTeam.id == userTeamId) {
-                    viewModelScope.launch {
-                        database.newsDao().insert(
-                            re.manager.basket.data.entity.NewsEntity(
-                                gameId = gameId,
-                                matchday = 167,
-                                title = "Salary Cap Updated",
-                                body = "Your new Salary Cap is ${re.manager.basket.util.CurrencyUtils.formatCurrency(updatedTeam.salaryCap)}",
-                                type = "INFO"
-                            )
+                    database.newsDao().insert(
+                        re.manager.basket.data.entity.NewsEntity(
+                            gameId = gameId,
+                            matchday = 167,
+                            title = "Salary Cap Updated",
+                            body = "Your new Salary Cap is ${re.manager.basket.util.CurrencyUtils.formatCurrency(updatedTeam.salaryCap)}",
+                            type = "INFO"
                         )
-                    }
+                    )
                 }
             }
         }
@@ -309,7 +353,9 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
         processConference(eastTeams)
         processConference(westTeams)
 
-        database.teamDao().updateAll(updatedTeams)
+        if (updatedTeams.isNotEmpty()) {
+            database.teamDao().updateAll(updatedTeams)
+        }
     }
 
     private fun MatchEntity.getTotalLocal() = localQ1 + localQ2 + localQ3 + localQ4

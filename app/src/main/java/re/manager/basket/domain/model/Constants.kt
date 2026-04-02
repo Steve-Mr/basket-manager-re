@@ -32,4 +32,9 @@ object Constants {
     const val SALARY_CAP_MED = 70000000
     const val SALARY_CAP_MAX = 85000000
     const val SALARY_CAP_STEP = 1000000
+
+    // Injury Simulation
+    const val INJURY_CHECK_PROB = 4
+    const val INJURY_TYPE_MINOR_PROB = 80
+    const val INJURY_TYPE_MEDIUM_PROB = 99
 }
