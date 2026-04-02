@@ -22,6 +22,9 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
     private val _gameState = MutableStateFlow<GameEntity?>(null)
     val gameState: StateFlow<GameEntity?> = _gameState
 
+    private val _previewPlayers = MutableStateFlow<List<re.manager.basket.data.entity.PlayerEntity>>(emptyList())
+    val previewPlayers: StateFlow<List<re.manager.basket.data.entity.PlayerEntity>> = _previewPlayers
+
     private val _allGames = MutableStateFlow<List<GameEntity>>(emptyList())
     val allGames: StateFlow<List<GameEntity>> = _allGames
 
@@ -74,6 +77,16 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
         }
     }
 
+    fun loadPreviewPlayers(teamId: Int) {
+        val gameId = _gameState.value?.id ?: return
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                val players = database.playerDao().getPlayersByGame(gameId)
+                _previewPlayers.value = players.filter { it.teamId == teamId }
+            }
+        }
+    }
+
     fun selectTeam(teamId: Int) {
         val current = _gameState.value ?: return
         Log.d("GameViewModel", "Selecting teamId: $teamId for gameId: ${current.id}")
@@ -82,6 +95,7 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
                 val updated = current.copy(userTeamId = teamId)
                 database.gameDao().insert(updated)
                 _gameState.value = updated
+                updateNextMatch(updated)
                 Log.d("GameViewModel", "userTeamId updated in DB")
             }
         }

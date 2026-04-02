@@ -11,6 +11,7 @@ import re.manager.basket.data.importer.RosterImporter
 import re.manager.basket.ui.screen.MainScaffold
 import re.manager.basket.ui.screen.SaveSelectionScreen
 import re.manager.basket.ui.screen.TeamSelectionScreen
+import re.manager.basket.ui.screen.TeamPreviewScreen
 import re.manager.basket.ui.theme.BasketManagerTheme
 import re.manager.basket.ui.viewmodel.GameViewModel
 import re.manager.basket.ui.viewmodel.PlayerListViewModel
@@ -61,6 +62,9 @@ class MainActivity : ComponentActivity() {
                 val gameState by gameViewModel.gameState.collectAsState()
                 val allGames by gameViewModel.allGames.collectAsState()
                 val availableTeams by gameViewModel.availableTeams.collectAsState()
+                val previewPlayers by gameViewModel.previewPlayers.collectAsState()
+
+                var selectedPreviewTeamId by remember { mutableStateOf<Int?>(null) }
 
                 LaunchedEffect(Unit) {
                     gameViewModel.loadAllGames()
@@ -73,13 +77,27 @@ class MainActivity : ComponentActivity() {
                         onCreateGame = { gameViewModel.createNewGame(this@MainActivity, it) }
                     )
                 } else if (gameState?.userTeamId == null) {
-                    TeamSelectionScreen(
-                        teams = availableTeams,
-                        onSelectTeam = {
-                            gameViewModel.selectTeam(it)
-                            playerListViewModel.loadPlayers(it, gameState?.id ?: 1)
-                        }
-                    )
+                    val previewTeam = availableTeams.find { it.id == selectedPreviewTeamId }
+
+                    if (previewTeam != null) {
+                        TeamPreviewScreen(
+                            team = previewTeam,
+                            players = previewPlayers,
+                            onConfirm = {
+                                gameViewModel.selectTeam(previewTeam.id)
+                                selectedPreviewTeamId = null
+                            },
+                            onBack = { selectedPreviewTeamId = null }
+                        )
+                    } else {
+                        TeamSelectionScreen(
+                            teams = availableTeams,
+                            onSelectTeam = {
+                                selectedPreviewTeamId = it
+                                gameViewModel.loadPreviewPlayers(it)
+                            }
+                        )
+                    }
                 } else {
                     // Make sure player list is loaded when game is loaded
                     LaunchedEffect(gameState?.userTeamId) {

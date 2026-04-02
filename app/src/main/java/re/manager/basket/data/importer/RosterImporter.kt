@@ -39,7 +39,7 @@ class RosterImporter(private val context: Context, private val database: AppData
                         color = "#FFFFFF",
                         conference = conference,
                         division = division,
-                        salaryCap = 60000000,
+                        salaryCap = 70000000, // Default MED Salary Cap
                         gameId = gameId
                     )
                 )
@@ -49,7 +49,11 @@ class RosterImporter(private val context: Context, private val database: AppData
 
             // 2. Import Players from CSV
             context.assets.open("rosters.csv").use { inputStream ->
-                val reader = BufferedReader(InputStreamReader(inputStream))
+                // Using ISO-8859-1 as original Java apps often used this for simple CSVs, or just default to UTF-8
+                val reader = BufferedReader(InputStreamReader(inputStream, Charsets.UTF_8))
+
+                // Original file uses ";" as delimiter. Let's handle potential lack of newlines by reading char by char if needed,
+                // but first try standard line reading since the user confirmed the file is correct.
                 val header = reader.readLine() ?: return@use
                 Log.d("RosterImporter", "CSV Header: $header")
                 val columns = header.split(";")
@@ -58,12 +62,13 @@ class RosterImporter(private val context: Context, private val database: AppData
                 reader.forEachLine { line ->
                     if (line.isBlank()) return@forEachLine
                     val values = line.split(";")
+
                     if (values.size >= columns.size) {
                         val data = columns.zip(values).toMap()
-                        val teamName = data["team"] ?: "0"
+                        val teamName = data["team"]?.trim() ?: "0"
 
                         // Map team name to ID (BOS -> 1, etc.)
-                        val teamIdx = teamNames.indexOf(teamName.trim())
+                        val teamIdx = teamNames.indexOf(teamName)
                         val teamId = if (teamIdx != -1) teamIdx + 1 else null
 
                         rowCount++

@@ -17,15 +17,18 @@ class PlayerListViewModel(private val database: AppDatabase) : ViewModel() {
     fun loadPlayers(teamId: Int, gameId: Int = 1) {
         Log.d("PlayerListViewModel", "Loading players for teamId: $teamId, gameId: $gameId")
         viewModelScope.launch {
-            val entities = database.playerDao().getPlayersByTeam(teamId)
-            Log.d("PlayerListViewModel", "Found ${entities.size} players in DB")
+            // First, find all players for this game and team
+            val allGamePlayers = database.playerDao().getPlayersByGame(gameId)
+            val teamPlayers = allGamePlayers.filter { it.teamId == teamId }
+
+            Log.d("PlayerListViewModel", "Found ${teamPlayers.size} players in DB for team $teamId")
             val tactic = database.tacticDao().getTacticForTeam(teamId, gameId)
 
             val starters = tactic?.let {
                 setOf(it.titPG, it.titSG, it.titSF, it.titPF, it.titC)
             } ?: emptySet()
 
-            _players.value = entities.map {
+            _players.value = teamPlayers.map {
                 it.toUiState(isStarter = starters.contains(it.id))
             }
         }
