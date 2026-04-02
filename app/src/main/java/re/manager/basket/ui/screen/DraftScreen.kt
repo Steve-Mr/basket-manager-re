@@ -7,10 +7,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import re.manager.basket.data.entity.PlayerEntity
+import re.manager.basket.ui.viewmodel.PlayerUiState
 
 @Composable
-fun DraftScreen(rookies: List<PlayerEntity>, onPick: (PlayerEntity) -> Unit) {
+fun DraftScreen(rookies: List<PlayerUiState>, onPick: (PlayerUiState) -> Unit) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
@@ -27,8 +27,8 @@ fun DraftScreen(rookies: List<PlayerEntity>, onPick: (PlayerEntity) -> Unit) {
                 Row(modifier = Modifier.padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                     Column {
                         Text(player.name, style = MaterialTheme.typography.titleMedium)
-                        Text("Potential: ${player.potential}/10")
-                        Text("Avg Skill: ${player.getAverageSkillAll().toInt()}")
+                        Text("Potential: ${player.originalEntity.potential}/10")
+                        Text("Avg Skill: ${player.avgSkill}")
                     }
                     Button(onClick = { onPick(player) }) {
                         Text("Pick")

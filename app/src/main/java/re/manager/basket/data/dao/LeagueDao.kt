@@ -9,6 +9,9 @@ import re.manager.basket.data.entity.LeagueEntity
 @Dao
 interface LeagueDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(league: LeagueEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(leagues: List<LeagueEntity>)
 
     @Query("SELECT * FROM leagues WHERE gameId = :gameId ORDER BY gamesWon DESC, (pointsScored - pointsAllowed) DESC")

@@ -4,6 +4,7 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import re.manager.basket.domain.model.Position
 import kotlin.math.abs
 import kotlin.math.pow
 
@@ -14,7 +15,7 @@ import kotlin.math.pow
             entity = TeamEntity::class,
             parentColumns = ["id"],
             childColumns = ["teamId"],
-            onDelete = ForeignKey.CASCADE
+            onDelete = ForeignKey.SET_NULL
         ),
         ForeignKey(
             entity = GameEntity::class,
@@ -29,9 +30,9 @@ data class PlayerEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val name: String,
     val age: Int,
-    val teamId: Int,
-    val positionFirst: Int,
-    val positionSecond: Int,
+    val teamId: Int?, // Nullable for free agents
+    val positionFirst: Position,
+    val positionSecond: Position,
     val potential: Int,
     val salary: Int,
     val yearsContract: Int,
@@ -71,21 +72,21 @@ data class PlayerEntity(
         return if (marketValue < 0.0) marketValue / 4.0 else marketValue
     }
 
-    private fun getAverageForPosition(position: Int, attack: Boolean, defense: Boolean): Double {
+    private fun getAverageForPosition(position: Position, attack: Boolean, defense: Boolean): Double {
         var average = 0.0
-        if (position == 0) return 40.0
+        if (position == Position.NONE) return 40.0
 
         if (attack) {
-            average += (skillPass * getBaseOfPosition(position, 5) +
-                    skillShotInterior * getBaseOfPosition(position, 6) +
-                    skillShotExterior * getBaseOfPosition(position, 7) +
-                    skillShotFree * getBaseOfPosition(position, 8)) / getAttackDivisor(position).toDouble()
+            average += (skillPass * getBaseOfPosition(position.id, 5) +
+                    skillShotInterior * getBaseOfPosition(position.id, 6) +
+                    skillShotExterior * getBaseOfPosition(position.id, 7) +
+                    skillShotFree * getBaseOfPosition(position.id, 8)) / getAttackDivisor(position.id).toDouble()
         }
         if (defense) {
-            average += (skillPhysique * getBaseOfPosition(position, 1) +
-                    skillBlock * getBaseOfPosition(position, 2) +
-                    skillSteal * getBaseOfPosition(position, 3) +
-                    skillRebound * getBaseOfPosition(position, 4)) / getDefenseDivisor(position).toDouble()
+            average += (skillPhysique * getBaseOfPosition(position.id, 1) +
+                    skillBlock * getBaseOfPosition(position.id, 2) +
+                    skillSteal * getBaseOfPosition(position.id, 3) +
+                    skillRebound * getBaseOfPosition(position.id, 4)) / getDefenseDivisor(position.id).toDouble()
         }
 
         average = if (attack && defense) {

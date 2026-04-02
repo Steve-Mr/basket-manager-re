@@ -4,6 +4,8 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import re.manager.basket.domain.model.Conference
+import re.manager.basket.domain.model.Division
 
 @Entity(
     tableName = "teams",
@@ -22,8 +24,8 @@ data class TeamEntity(
     val name: String,
     val fullName: String,
     val color: String,
-    val conference: Int,
-    val division: Int,
+    val conference: Conference,
+    val division: Division,
     val salaryCap: Int,
     val gameId: Int
 )

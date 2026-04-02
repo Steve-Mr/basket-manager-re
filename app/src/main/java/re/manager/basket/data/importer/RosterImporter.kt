@@ -2,12 +2,12 @@ package re.manager.basket.data.importer
 
 import android.content.Context
 import re.manager.basket.data.AppDatabase
-import re.manager.basket.data.entity.GameEntity
-import re.manager.basket.data.entity.PlayerEntity
-import re.manager.basket.data.entity.TeamEntity
+import re.manager.basket.data.entity.*
 import androidx.room.withTransaction
-import re.manager.basket.data.entity.TacticEntity
 import re.manager.basket.domain.generator.SeasonCalendar
+import re.manager.basket.domain.model.Conference
+import re.manager.basket.domain.model.Division
+import re.manager.basket.domain.model.Position
 import java.io.BufferedReader
 import java.io.InputStreamReader
 
@@ -15,7 +15,7 @@ class RosterImporter(private val context: Context, private val database: AppData
 
     suspend fun importFromAssets(gameId: Int) {
         database.withTransaction {
-            // 0. Ensure Game exists to satisfy Foreign Key constraints
+            // 0. Ensure Game exists
             if (database.gameDao().getGameById(gameId) == null) {
                 database.gameDao().insert(
                     GameEntity(
@@ -38,14 +38,17 @@ class RosterImporter(private val context: Context, private val database: AppData
             )
 
             teamNames.forEachIndexed { index, name ->
+                val conference = if (index < 15) Conference.EAST else Conference.WEST
+                val division = Division.fromId(index / 5 + 1)
+
                 teams.add(
                     TeamEntity(
                         id = index + 1,
                         name = name,
                         fullName = "Team $name",
                         color = "#FFFFFF",
-                        conference = if (index < 15) 1 else 2,
-                        division = index / 5 + 1,
+                        conference = conference,
+                        division = division,
                         salaryCap = 60000000,
                         gameId = gameId
                     )
@@ -65,15 +68,15 @@ class RosterImporter(private val context: Context, private val database: AppData
                         val data = columns.zip(values).toMap()
                         val teamName = data["team"] ?: "0"
                         val teamIdx = teamNames.indexOf(teamName)
-                        val teamId = if (teamIdx != -1) teamIdx + 1 else 0
+                        val teamId = if (teamIdx != -1) teamIdx + 1 else null // team=0 becomes null (free agent)
 
                         players.add(
                             PlayerEntity(
                                 name = data["name"] ?: "Unknown",
                                 age = data["age"]?.toIntOrNull() ?: 20,
                                 teamId = teamId,
-                                positionFirst = data["positionFirst"]?.toIntOrNull() ?: 1,
-                                positionSecond = data["positionSecond"]?.toIntOrNull() ?: 0,
+                                positionFirst = Position.fromId(data["positionFirst"]?.toIntOrNull() ?: 1),
+                                positionSecond = Position.fromId(data["positionSecond"]?.toIntOrNull() ?: 0),
                                 potential = data["potential"]?.toIntOrNull() ?: 5,
                                 salary = data["salary"]?.toIntOrNull() ?: 0,
                                 yearsContract = data["yearsContract"]?.toIntOrNull() ?: 1,
@@ -109,6 +112,16 @@ class RosterImporter(private val context: Context, private val database: AppData
                         teamId = team.id,
                         titPG = 0, titSG = 0, titSF = 0, titPF = 0, titC = 0,
                         resPG = 0, resSG = 0, resSF = 0, resPF = 0, resC = 0
+                    )
+                )
+            }
+
+            // 5. Initialize Leagues for standings
+            teams.forEach { team ->
+                database.leagueDao().insert(
+                    LeagueEntity(
+                        gameId = gameId,
+                        teamId = team.id
                     )
                 )
             }

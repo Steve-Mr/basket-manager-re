@@ -4,6 +4,7 @@ import re.manager.basket.data.entity.MatchEntity
 import re.manager.basket.data.entity.MatchResultEntity
 import re.manager.basket.data.entity.PlayerEntity
 import re.manager.basket.data.entity.TacticEntity
+import re.manager.basket.domain.model.Constants
 import kotlin.random.Random
 
 class MatchSimulator(
@@ -23,16 +24,18 @@ class MatchSimulator(
     fun simulate(): MatchFullResult {
         var localScore = 0
         var visitorScore = 0
-        var possessions = 120
+        var possessions = Constants.BASE_POSSESSIONS
 
-        repeat(possessions) { pos ->
-            val isLocalAttacking = pos % 2 != 0
+        var currentPos = 0
+        while (currentPos < possessions) {
+            val isLocalAttacking = currentPos % 2 != 0
             val result = simulatePossession(isLocalAttacking)
             if (isLocalAttacking) localScore += result else visitorScore += result
 
-            if (pos == possessions - 1 && localScore == visitorScore) {
-                possessions += 5
+            if (currentPos == possessions - 1 && localScore == visitorScore) {
+                possessions += Constants.OVERTIME_POSSESSIONS
             }
+            currentPos++
         }
 
         return MatchFullResult(
@@ -51,42 +54,50 @@ class MatchSimulator(
     }
 
     private fun simulatePossession(isLocalAttacking: Boolean): Int {
-        val attackingTactic = if (isLocalAttacking) localTactic else visitorTactic
-        val benchImportance = attackingTactic.benchImportance
+        var offensiveRebound = true
+        var reboundCount = 0
 
-        // 1. Steal Check
-        val defender = rulete.pickPlayer(3, !isLocalAttacking, benchImportance)
-        if (Random.nextInt(100) < 14) {
-            if (Random.nextInt(100) < defender.skillSteal * 0.5) return 0
-        }
+        while (offensiveRebound && reboundCount < 5) {
+            offensiveRebound = false
+            val attackingTactic = if (isLocalAttacking) localTactic else visitorTactic
+            val benchImportance = attackingTactic.benchImportance
 
-        // 2. Shot Selection
-        val isInterior = Random.nextInt(100) < attackingTactic.shotIntPercent
-        val isTriple = !isInterior && Random.nextInt(100) < attackingTactic.shotTriplePercent
+            // 1. Steal Check
+            val defender = rulete.pickPlayer(3, !isLocalAttacking, benchImportance)
+            if (Random.nextInt(100) < Constants.STEAL_CHECK_PROB) {
+                if (Random.nextInt(100) < defender.skillSteal * Constants.STEAL_SKILL_MODIFIER) return 0
+            }
 
-        // 3. Block Check
-        val blockAttemptProb = if (isInterior) 11 else 9
-        if (Random.nextInt(100) < blockAttemptProb) {
-            val blocker = rulete.pickPlayer(2, !isLocalAttacking, benchImportance)
+            // 2. Shot Selection
+            val isInterior = Random.nextInt(100) < attackingTactic.shotIntPercent
+            val isTriple = !isInterior && Random.nextInt(100) < attackingTactic.shotTriplePercent
+
+            // 3. Shot Attempt
             val shooter = rulete.pickPlayer(if (isInterior) 6 else 7, isLocalAttacking, benchImportance)
-            if (blocker.skillBlock + getRandomGauss(0, 100) > (if (isInterior) shooter.skillShotInterior else shooter.skillShotExterior) + getRandomGauss(0, 100)) return 0
-        }
+            val shooterSkill = if (isInterior) shooter.skillShotInterior else shooter.skillShotExterior
 
-        // 4. Shot Success
-        val shooter = rulete.pickPlayer(if (isInterior) 6 else 7, isLocalAttacking, benchImportance)
-        val shooterSkill = if (isInterior) shooter.skillShotInterior else shooter.skillShotExterior
-        val modifier = if (isInterior) 0.65f else if (isTriple) 0.45f else 0.55f
+            // 4. Block Check
+            val blockAttemptProb = if (isInterior) Constants.BLOCK_ATTEMPT_PROB_INTERIOR else Constants.BLOCK_ATTEMPT_PROB_EXTERIOR
+            if (Random.nextInt(100) < blockAttemptProb) {
+                val blocker = rulete.pickPlayer(2, !isLocalAttacking, benchImportance)
+                if (blocker.skillBlock + getRandomGauss(0, 100) > shooterSkill + getRandomGauss(0, 100)) return 0
+            }
 
-        if (Random.nextInt(1, 101) <= shooterSkill * modifier) {
-            return if (isTriple) 3 else 2
-        }
+            // 5. Shot Success
+            val modifier = if (isInterior) Constants.SHOT_MODIFIER_INTERIOR else if (isTriple) Constants.SHOT_MODIFIER_TRIPLE else Constants.SHOT_MODIFIER_EXTERIOR
 
-        // 5. Rebound
-        if (Random.nextInt(100) < 76) {
-            val offRebounder = rulete.pickPlayer(4, isLocalAttacking, benchImportance)
-            val defRebounder = rulete.pickPlayer(4, !isLocalAttacking, benchImportance)
-            if (offRebounder.skillRebound + getRandomGauss(0, 100) > defRebounder.skillRebound + getRandomGauss(0, 100)) {
-                return simulatePossession(isLocalAttacking)
+            if (Random.nextInt(1, 101) <= shooterSkill * modifier) {
+                return if (isTriple) 3 else 2
+            }
+
+            // 6. Rebound
+            if (Random.nextInt(100) < Constants.REBOUND_TRIGGER_PROB) {
+                val offRebounder = rulete.pickPlayer(4, isLocalAttacking, benchImportance)
+                val defRebounder = rulete.pickPlayer(4, !isLocalAttacking, benchImportance)
+                if (offRebounder.skillRebound + getRandomGauss(0, 100) > defRebounder.skillRebound + getRandomGauss(0, 100)) {
+                    offensiveRebound = true
+                    reboundCount++
+                }
             }
         }
 
@@ -94,7 +105,12 @@ class MatchSimulator(
     }
 
     private fun getRandomGauss(min: Int, max: Int): Int {
-        val rolls = listOf(Random.nextInt(min, max + 1), Random.nextInt(min, max + 1), Random.nextInt(min, max + 1)).sorted()
+        val range = (max - min + 1).coerceAtLeast(1)
+        val rolls = listOf(
+            Random.nextInt(min, min + range),
+            Random.nextInt(min, min + range),
+            Random.nextInt(min, min + range)
+        ).sorted()
         return rolls[1]
     }
 }

@@ -16,7 +16,11 @@ class SeasonEvolver {
             val newContract = (player.yearsContract - 1).coerceAtLeast(0)
 
             // 3. Skill progression based on potential
-            val growth = if (player.age < 27) Random.nextInt(0, player.potential) else Random.nextInt(-3, 2)
+            val growth = if (player.age < 27) {
+                Random.nextInt(0, player.potential.coerceAtLeast(1))
+            } else {
+                Random.nextInt(-3, 2)
+            }
 
             player.copy(
                 age = newAge,
