@@ -26,6 +26,7 @@ fun MainScaffold(
     val gameState by gameViewModel.gameState.collectAsState()
     val players by playerListViewModel.players.collectAsState()
     val isSimulating by gameViewModel.isSimulating.collectAsState()
+    val showAutoLineupDialog by gameViewModel.showAutoLineupDialog.collectAsState()
     val simProgress by gameViewModel.simProgress.collectAsState()
     val nextMatch by gameViewModel.nextMatch.collectAsState()
     val news by gameViewModel.news.collectAsState()
@@ -35,6 +36,8 @@ fun MainScaffold(
     val selectedPlayerStats by gameViewModel.selectedPlayerStats.collectAsState()
     val selectedTeamRoster by gameViewModel.selectedTeamRoster.collectAsState()
     val selectedTeamLeague by gameViewModel.selectedTeamLeague.collectAsState()
+    val selectedMatchDetail by gameViewModel.selectedMatchDetail.collectAsState()
+    val selectedMatchResults by gameViewModel.selectedMatchResults.collectAsState()
 
     MainScaffoldContent(
         selectedItemInitial = 0,
@@ -52,12 +55,20 @@ fun MainScaffold(
         selectedPlayerStats = selectedPlayerStats,
         selectedTeamRoster = selectedTeamRoster,
         selectedTeamLeague = selectedTeamLeague,
+        selectedMatchDetail = selectedMatchDetail,
+        selectedMatchResults = selectedMatchResults,
         onLoadPlayerStats = { gameViewModel.loadPlayerStats(it) },
         onLoadTeamRoster = { gameViewModel.loadTeamRoster(it) },
+        onLoadMatchDetail = { gameViewModel.loadMatchDetail(it.id) },
+        onCloseMatchDetail = { gameViewModel.closeMatchDetail() },
+        onTogglePosition = { gameViewModel.togglePlayerPosition(it) },
         onUpdateTactic = { gameViewModel.updateTactic(it) },
-        onNextDay = { gameViewModel.nextDay(1) },
-        onNextWeek = { gameViewModel.nextDay(7) },
-        onNextMonth = { gameViewModel.nextDay(30) }
+        onNextDay = { gameViewModel.onNextDayClick(1) },
+        onNextWeek = { gameViewModel.onNextDayClick(7) },
+        onNextMonth = { gameViewModel.onNextDayClick(30) },
+        showAutoLineupDialog = showAutoLineupDialog,
+        onDismissAutoLineup = { gameViewModel.dismissAutoLineupDialog() },
+        onAutoLineupConfirm = { gameViewModel.autoArrangeAndSimulate(1) } // Simplified for now
     )
 }
 
@@ -78,12 +89,20 @@ fun MainScaffoldContent(
     selectedPlayerStats: List<re.manager.basket.data.entity.MatchResultEntity>,
     selectedTeamRoster: List<re.manager.basket.data.entity.PlayerEntity>,
     selectedTeamLeague: re.manager.basket.data.entity.LeagueEntity?,
+    selectedMatchDetail: re.manager.basket.data.entity.MatchEntity?,
+    selectedMatchResults: List<re.manager.basket.data.entity.MatchResultEntity>,
     onLoadPlayerStats: (Int) -> Unit,
     onLoadTeamRoster: (Int) -> Unit,
+    onLoadMatchDetail: (re.manager.basket.data.entity.MatchEntity) -> Unit,
+    onCloseMatchDetail: () -> Unit,
+    onTogglePosition: (re.manager.basket.data.entity.PlayerEntity) -> Unit,
     onUpdateTactic: (re.manager.basket.data.entity.TacticEntity) -> Unit,
     onNextDay: () -> Unit,
     onNextWeek: () -> Unit,
-    onNextMonth: () -> Unit
+    onNextMonth: () -> Unit,
+    showAutoLineupDialog: Boolean = false,
+    onDismissAutoLineup: () -> Unit = {},
+    onAutoLineupConfirm: () -> Unit = {}
 ) {
     var selectedItem by remember { mutableIntStateOf(selectedItemInitial) }
     val items = listOf("Home", "Team", "League", "Market")
@@ -150,13 +169,40 @@ fun MainScaffoldContent(
                     }
                 }
 
+                if (showAutoLineupDialog) {
+                    AlertDialog(
+                        onDismissRequest = onDismissAutoLineup,
+                        title = { Text("Incomplete Lineup") },
+                        text = { Text("Your lineup is not fully assigned. Would you like to automatically arrange the best possible lineup or cancel to set it manually?") },
+                        confirmButton = {
+                            Button(onClick = onAutoLineupConfirm) { Text("Auto Arrange") }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = onDismissAutoLineup) { Text("Set Manually") }
+                        }
+                    )
+                }
+
                 // Nested Navigation Handlers
-                if (detailPlayerId != null) {
+                if (selectedMatchDetail != null) {
+                    MatchDetailScreen(
+                        match = selectedMatchDetail!!,
+                        localTeam = availableTeams.find { it.id == selectedMatchDetail!!.teamLocalId },
+                        visitorTeam = availableTeams.find { it.id == selectedMatchDetail!!.teamVisitorId },
+                        playerStats = selectedMatchResults,
+                        onBack = onCloseMatchDetail
+                    )
+                } else if (detailPlayerId != null) {
                     val player = players.find { it.id == detailPlayerId }?.originalEntity ?:
                                  selectedTeamRoster.find { it.id == detailPlayerId }
                     if (player != null) {
                         LaunchedEffect(detailPlayerId) { onLoadPlayerStats(detailPlayerId!!) }
-                        PlayerDetailScreen(player = player, stats = selectedPlayerStats, onBack = { detailPlayerId = null })
+                        PlayerDetailScreen(
+                            player = player,
+                            stats = selectedPlayerStats,
+                            onTogglePosition = { onTogglePosition(player) },
+                            onBack = { detailPlayerId = null }
+                        )
                     } else {
                         detailPlayerId = null
                     }
@@ -176,7 +222,14 @@ fun MainScaffoldContent(
                     }
                 } else if (showCalendar) {
                     gameState?.let { game ->
-                        CalendarScreen(matches = allMatches, teams = availableTeams, currentMatchday = game.currentMatchday, onBack = { showCalendar = false })
+                        CalendarScreen(
+                            matches = allMatches,
+                            teams = availableTeams,
+                            currentMatchday = game.currentMatchday,
+                            userTeamId = game.userTeamId,
+                            onMatchClick = onLoadMatchDetail,
+                            onBack = { showCalendar = false }
+                        )
                     }
                 } else {
                     when (selectedItem) {

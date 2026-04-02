@@ -45,22 +45,24 @@ class MatchSimulator(
 
     fun simulate(): MatchFullResult {
         createInitialResults()
-        calculateMinutes(true)
-        calculateMinutes(false)
 
-        val localTitPairs = localPlayers.filter { isTitular(it, localTactic) }.mapNotNull { p -> localResults[p.id]?.let { r -> p to r } }
-        val localResPairs = localPlayers.filter { isReserve(it, localTactic) }.mapNotNull { p -> localResults[p.id]?.let { r -> p to r } }
-        val visitorTitPairs = visitorPlayers.filter { isTitular(it, visitorTactic) }.mapNotNull { p -> visitorResults[p.id]?.let { r -> p to r } }
-        val visitorResPairs = visitorPlayers.filter { isReserve(it, visitorTactic) }.mapNotNull { p -> visitorResults[p.id]?.let { r -> p to r } }
+        // Safety: If any team has no starters, auto-assign for this match
+        val optimizer = LineupOptimizer()
+        val effectiveLocalTactic = if (localTactic.titPG == 0) optimizer.optimize(localPlayers, localTactic) else localTactic
+        val effectiveVisitorTactic = if (visitorTactic.titPG == 0) optimizer.optimize(visitorPlayers, visitorTactic) else visitorTactic
+
+        calculateMinutes(true, effectiveLocalTactic)
+        calculateMinutes(false, effectiveVisitorTactic)
 
         rulete = Rulete(
-            localTitulars = localTitPairs,
-            localReserves = localResPairs,
-            visitorTitulars = visitorTitPairs,
-            visitorReserves = visitorResPairs,
-            localTactic = localTactic,
-            visitorTactic = visitorTactic,
-            localTeamId = match.teamLocalId
+            localTitulars = localPlayers.filter { isTitular(it, effectiveLocalTactic) },
+            localReserves = localPlayers.filter { isReserve(it, effectiveLocalTactic) },
+            visitorTitulars = visitorPlayers.filter { isTitular(it, effectiveVisitorTactic) },
+            visitorReserves = visitorPlayers.filter { isReserve(it, effectiveVisitorTactic) },
+            localTactic = effectiveLocalTactic,
+            visitorTactic = effectiveVisitorTactic,
+            localTeamId = match.teamLocalId,
+            resultsProvider = { id -> localResults[id] ?: visitorResults[id] }
         )
 
         var possessions = Constants.BASE_POSSESSIONS
@@ -85,56 +87,49 @@ class MatchSimulator(
 
         // 1. Injury Check
         if (Random.nextInt(100) < Constants.INJURY_CHECK_PROB) {
-            val playerPair = rulete.pickPlayer(0, isLocalAttacking, if (isLocalAttacking) match.teamLocalId else match.teamVisitorId)
-            playerPair?.let { (player, _) ->
-                // Note: stateInjury = -1 means "bruised" or just got injured in this match
-                // Logic based on com.blank.bm15.model.core.Simulate.java:playPossession
-                val defenseModifier = getDefenseModifier(player, isLocalAttacking)
-                val injuryCheckValue = (player.stateEnergy * (player.skillPhysique + defenseModifier)) / 100
+            val player = rulete.pickPlayer(0, isLocalAttacking, if (isLocalAttacking) match.teamLocalId else match.teamVisitorId)
+            player?.let { p ->
+                val defenseModifier = getDefenseModifier(p, isLocalAttacking)
+                val injuryCheckValue = (p.stateEnergy * (p.skillPhysique + defenseModifier)) / 100
                 if (!accomplishedAction(injuryCheckValue, 1.0f)) {
-                    if (player.stateInjury == 0) {
-                        // Mark as bruising
-                        injuredPlayers.add(player.copy(stateInjury = -1))
-                    } else if (player.stateInjury == -1) {
-                        // Serious injury
+                    if (p.stateInjury == 0) {
+                        injuredPlayers.add(p.copy(stateInjury = -1))
+                    } else if (p.stateInjury == -1) {
                         val damageType = Random.nextInt(101)
                         val duration = when {
                             damageType <= Constants.INJURY_TYPE_MINOR_PROB -> Random.nextInt(2, 8)
                             damageType <= Constants.INJURY_TYPE_MEDIUM_PROB -> Random.nextInt(8, 50)
                             else -> Random.nextInt(50, 181)
                         }
-                        injuredPlayers.add(player.copy(stateInjury = duration))
+                        injuredPlayers.add(p.copy(stateInjury = duration))
                     }
                 }
             }
         }
 
         // 2. Steal Check
-        val stealerPair = rulete.pickPlayer(3, !isLocalAttacking, if (!isLocalAttacking) match.teamLocalId else match.teamVisitorId)
-        if (stealerPair != null && accomplishedAction(stealerPair.first.skillSteal + getDefenseModifier(stealerPair.first, !isLocalAttacking), 0.5f)) {
-            stealerPair.second.copy(steals = stealerPair.second.steals + 1).also {
-                updateResult(it, !isLocalAttacking)
-            }
+        val stealer = rulete.pickPlayer(3, !isLocalAttacking, if (!isLocalAttacking) match.teamLocalId else match.teamVisitorId)
+        if (stealer != null && accomplishedAction(stealer.skillSteal + getDefenseModifier(stealer, !isLocalAttacking), 0.5f)) {
+            val res = (if (!isLocalAttacking) localResults else visitorResults)[stealer.id]!!
+            updateResult(res.copy(steals = res.steals + 1), !isLocalAttacking)
             return
         }
 
         // 3. Turnover Check
-        val passerPair = rulete.pickPlayer(5, isLocalAttacking, if (isLocalAttacking) match.teamLocalId else match.teamVisitorId)
-        if (passerPair != null && !accomplishedAction(passerPair.first.skillPass + getAttackModifier(passerPair.first, isLocalAttacking), 0.6f)) {
-            passerPair.second.copy(passesKo = passerPair.second.passesKo + 1).also {
-                updateResult(it, isLocalAttacking)
-            }
+        val passer = rulete.pickPlayer(5, isLocalAttacking, if (isLocalAttacking) match.teamLocalId else match.teamVisitorId)
+        if (passer != null && !accomplishedAction(passer.skillPass + getAttackModifier(passer, isLocalAttacking), 0.6f)) {
+            val res = (if (isLocalAttacking) localResults else visitorResults)[passer.id]!!
+            updateResult(res.copy(passesKo = res.passesKo + 1), isLocalAttacking)
             return
         }
 
         // 4. Assistance Check
         var assistanceModifier = 0
         if (Random.nextInt(100) < 34) {
-            val astPair = rulete.pickPlayer(5, isLocalAttacking, if (isLocalAttacking) match.teamLocalId else match.teamVisitorId)
-            if (astPair != null && accomplishedAction(astPair.first.skillPass + getAttackModifier(astPair.first, isLocalAttacking), 1.0f)) {
-                astPair.second.copy(passesOk = astPair.second.passesOk + 1, assists = astPair.second.assists + 1).also {
-                    updateResult(it, isLocalAttacking)
-                }
+            val ast = rulete.pickPlayer(5, isLocalAttacking, if (isLocalAttacking) match.teamLocalId else match.teamVisitorId)
+            if (ast != null && accomplishedAction(ast.skillPass + getAttackModifier(ast, isLocalAttacking), 1.0f)) {
+                val res = (if (isLocalAttacking) localResults else visitorResults)[ast.id]!!
+                updateResult(res.copy(passesOk = res.passesOk + 1, assists = res.assists + 1), isLocalAttacking)
                 assistanceModifier = 5
             }
         }
@@ -145,20 +140,19 @@ class MatchSimulator(
         val isTriple = !isInterior && Random.nextInt(100) < attackingTactic.shotTriplePercent
         val shotType = if (isInterior) 1 else if (isTriple) 3 else 2
 
-        val shooterPair = rulete.pickPlayer(if (isInterior) 6 else 7, isLocalAttacking, if (isLocalAttacking) match.teamLocalId else match.teamVisitorId)
-        if (shooterPair == null) return
+        val shooter = rulete.pickPlayer(if (isInterior) 6 else 7, isLocalAttacking, if (isLocalAttacking) match.teamLocalId else match.teamVisitorId)
+        if (shooter == null) return
 
-        var shotValue = (if (isInterior) shooterPair.first.skillShotInterior else shooterPair.first.skillShotExterior) + getAttackModifier(shooterPair.first, isLocalAttacking)
+        var shotValue = (if (isInterior) shooter.skillShotInterior else shooter.skillShotExterior) + getAttackModifier(shooter, isLocalAttacking)
         shotValue += (shotValue * assistanceModifier) / 100
 
         // 6. Block Check
-        val blockerPair = rulete.pickPlayer(2, !isLocalAttacking, if (!isLocalAttacking) match.teamLocalId else match.teamVisitorId)
+        val blocker = rulete.pickPlayer(2, !isLocalAttacking, if (!isLocalAttacking) match.teamLocalId else match.teamVisitorId)
         val attemptBlockProb = if (isInterior) 11 else 9
-        if (Random.nextInt(100) < attemptBlockProb && blockerPair != null) {
-            if (blockerPair.first.skillBlock + getDefenseModifier(blockerPair.first, !isLocalAttacking) + getRandomGauss(0, 100) > getRandomGauss(0, 100) + shotValue) {
-                blockerPair.second.copy(blocks = blockerPair.second.blocks + 1).also {
-                    updateResult(it, !isLocalAttacking)
-                }
+        if (Random.nextInt(100) < attemptBlockProb && blocker != null) {
+            if (blocker.skillBlock + getDefenseModifier(blocker, !isLocalAttacking) + getRandomGauss(0, 100) > getRandomGauss(0, 100) + shotValue) {
+                val res = (if (!isLocalAttacking) localResults else visitorResults)[blocker.id]!!
+                updateResult(res.copy(blocks = res.blocks + 1), !isLocalAttacking)
                 return
             }
         }
@@ -166,37 +160,40 @@ class MatchSimulator(
         // 7. Shot Success
         val modifier = if (isInterior) 0.65f else if (isTriple) 0.45f else 0.55f
         if (accomplishedAction(shotValue, modifier)) {
+            val res = (if (isLocalAttacking) localResults else visitorResults)[shooter.id]!!
             val updated = when(shotType) {
-                1 -> shooterPair.second.copy(shotsIntOk = shooterPair.second.shotsIntOk + 1, points = shooterPair.second.points + 2)
-                2 -> shooterPair.second.copy(shotsExt2Ok = shooterPair.second.shotsExt2Ok + 1, points = shooterPair.second.points + 2)
-                else -> shooterPair.second.copy(shotsExt3Ok = shooterPair.second.shotsExt3Ok + 1, points = shooterPair.second.points + 3)
+                1 -> res.copy(shotsIntOk = res.shotsIntOk + 1, points = res.points + 2)
+                2 -> res.copy(shotsExt2Ok = res.shotsExt2Ok + 1, points = res.points + 2)
+                else -> res.copy(shotsExt3Ok = res.shotsExt3Ok + 1, points = res.points + 3)
             }
             updateResult(updated, isLocalAttacking)
         } else {
+            val res = (if (isLocalAttacking) localResults else visitorResults)[shooter.id]!!
             val updated = when(shotType) {
-                1 -> shooterPair.second.copy(shotsIntKo = shooterPair.second.shotsIntKo + 1)
-                2 -> shooterPair.second.copy(shotsExt2Ko = shooterPair.second.shotsExt2Ko + 1)
-                else -> shooterPair.second.copy(shotsExt3Ko = shooterPair.second.shotsExt3Ko + 1)
+                1 -> res.copy(shotsIntKo = res.shotsIntKo + 1)
+                2 -> res.copy(shotsExt2Ko = res.shotsExt2Ko + 1)
+                else -> res.copy(shotsExt3Ko = res.shotsExt3Ko + 1)
             }
             updateResult(updated, isLocalAttacking)
 
             // 8. Rebound
             if (Random.nextInt(100) < 76) {
-                val offRebPair = rulete.pickPlayer(4, isLocalAttacking, if (isLocalAttacking) match.teamLocalId else match.teamVisitorId)
-                val defRebPair = rulete.pickPlayer(4, !isLocalAttacking, if (!isLocalAttacking) match.teamLocalId else match.teamVisitorId)
+                val offRebounder = rulete.pickPlayer(4, isLocalAttacking, if (isLocalAttacking) match.teamLocalId else match.teamVisitorId)
+                val defRebounder = rulete.pickPlayer(4, !isLocalAttacking, if (!isLocalAttacking) match.teamLocalId else match.teamVisitorId)
 
-                if (offRebPair != null && defRebPair != null &&
-                    offRebPair.first.skillRebound + getDefenseModifier(offRebPair.first, isLocalAttacking) + getRandomGauss(0, 100) >
-                    defRebPair.first.skillRebound + getDefenseModifier(defRebPair.first, !isLocalAttacking) + getRandomGauss(0, 100)) {
+                if (offRebounder != null && defRebounder != null &&
+                    offRebounder.skillRebound + getDefenseModifier(offRebounder, isLocalAttacking) + getRandomGauss(0, 100) >
+                    defRebounder.skillRebound + getDefenseModifier(defRebounder, !isLocalAttacking) + getRandomGauss(0, 100)) {
 
-                    offRebPair.second.copy(rebounds = offRebPair.second.rebounds + 1).also { updateResult(it, isLocalAttacking) }
+                    val res = (if (isLocalAttacking) localResults else visitorResults)[offRebounder.id]!!
+                    updateResult(res.copy(rebounds = res.rebounds + 1), isLocalAttacking)
 
-                    // Recursive possession logic from Simulate.java
                     if (loseManyPoints(isLocalAttacking)) {
                         playPossession(pos, isVisitorAttacking)
                     }
-                } else if (defRebPair != null) {
-                    defRebPair.second.copy(rebounds = defRebPair.second.rebounds + 1).also { updateResult(it, !isLocalAttacking) }
+                } else if (defRebounder != null) {
+                    val res = (if (!isLocalAttacking) localResults else visitorResults)[defRebounder.id]!!
+                    updateResult(res.copy(rebounds = res.rebounds + 1), !isLocalAttacking)
                 }
             }
         }
@@ -206,15 +203,29 @@ class MatchSimulator(
         val totalLocal = getTotalPoints(true)
         val totalVisitor = getTotalPoints(false)
 
+        // Standard quarter distribution logic based on original game
+        val quarters = listOf(21, 24, 29) // Reference from Simulate.java:getQuarters
+
+        fun distribute(total: Int): List<Int> {
+            val q1 = (total * 0.22).toInt()
+            val q2 = (total * 0.25).toInt()
+            val q3 = (total * 0.28).toInt()
+            val q4 = total - q1 - q2 - q3
+            return listOf(q1, q2, q3, q4)
+        }
+
+        val lq = distribute(totalLocal)
+        val vq = distribute(totalVisitor)
+
         val finalizedMatch = match.copy(
-            localQ1 = (totalLocal * 0.25).toInt(),
-            localQ2 = (totalLocal * 0.25).toInt(),
-            localQ3 = (totalLocal * 0.25).toInt(),
-            localQ4 = totalLocal - ((totalLocal * 0.25).toInt() * 3),
-            visitorQ1 = (totalVisitor * 0.25).toInt(),
-            visitorQ2 = (totalVisitor * 0.25).toInt(),
-            visitorQ3 = (totalVisitor * 0.25).toInt(),
-            visitorQ4 = totalVisitor - ((totalVisitor * 0.25).toInt() * 3)
+            localQ1 = lq[0],
+            localQ2 = lq[1],
+            localQ3 = lq[2],
+            localQ4 = lq[3],
+            visitorQ1 = vq[0],
+            visitorQ2 = vq[1],
+            visitorQ3 = vq[2],
+            visitorQ4 = vq[3]
         )
 
         return MatchFullResult(
@@ -224,8 +235,7 @@ class MatchSimulator(
         )
     }
 
-    private fun calculateMinutes(isLocal: Boolean) {
-        val tactic = if (isLocal) localTactic else visitorTactic
+    private fun calculateMinutes(isLocal: Boolean, tactic: TacticEntity) {
         val results = if (isLocal) localResults else visitorResults
         val benchImportance = tactic.benchImportance
 

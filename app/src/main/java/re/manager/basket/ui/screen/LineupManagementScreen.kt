@@ -20,6 +20,16 @@ fun LineupManagementScreen(
     tactic: TacticEntity,
     onTacticUpdate: (TacticEntity) -> Unit
 ) {
+    fun getSortedPlayersFor(pos: Position): List<PlayerEntity> {
+        return players.sortedWith(compareByDescending<PlayerEntity> {
+            it.positionFirst == pos
+        }.thenByDescending {
+            it.positionSecond == pos
+        }.thenByDescending {
+            it.getAverageSkillAll()
+        })
+    }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -33,21 +43,21 @@ fun LineupManagementScreen(
             Text("Starters", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         }
 
-        item { PositionSelector("Point Guard (PG)", tactic.titPG, players) { onTacticUpdate(tactic.copy(titPG = it)) } }
-        item { PositionSelector("Shooting Guard (SG)", tactic.titSG, players) { onTacticUpdate(tactic.copy(titSG = it)) } }
-        item { PositionSelector("Small Forward (SF)", tactic.titSF, players) { onTacticUpdate(tactic.copy(titSF = it)) } }
-        item { PositionSelector("Power Forward (PF)", tactic.titPF, players) { onTacticUpdate(tactic.copy(titPF = it)) } }
-        item { PositionSelector("Center (C)", tactic.titC, players) { onTacticUpdate(tactic.copy(titC = it)) } }
+        item { PositionSelector("Point Guard (PG)", tactic.titPG, getSortedPlayersFor(Position.PG)) { onTacticUpdate(tactic.copy(titPG = it)) } }
+        item { PositionSelector("Shooting Guard (SG)", tactic.titSG, getSortedPlayersFor(Position.SG)) { onTacticUpdate(tactic.copy(titSG = it)) } }
+        item { PositionSelector("Small Forward (SF)", tactic.titSF, getSortedPlayersFor(Position.SF)) { onTacticUpdate(tactic.copy(titSF = it)) } }
+        item { PositionSelector("Power Forward (PF)", tactic.titPF, getSortedPlayersFor(Position.PF)) { onTacticUpdate(tactic.copy(titPF = it)) } }
+        item { PositionSelector("Center (C)", tactic.titC, getSortedPlayersFor(Position.C)) { onTacticUpdate(tactic.copy(titC = it)) } }
 
         item {
             Text("Reserves", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         }
 
-        item { PositionSelector("PG Reserve", tactic.resPG, players) { onTacticUpdate(tactic.copy(resPG = it)) } }
-        item { PositionSelector("SG Reserve", tactic.resSG, players) { onTacticUpdate(tactic.copy(resSG = it)) } }
-        item { PositionSelector("SF Reserve", tactic.resSF, players) { onTacticUpdate(tactic.copy(resSF = it)) } }
-        item { PositionSelector("PF Reserve", tactic.resPF, players) { onTacticUpdate(tactic.copy(resPF = it)) } }
-        item { PositionSelector("C Reserve", tactic.resC, players) { onTacticUpdate(tactic.copy(resC = it)) } }
+        item { PositionSelector("PG Reserve", tactic.resPG, getSortedPlayersFor(Position.PG)) { onTacticUpdate(tactic.copy(resPG = it)) } }
+        item { PositionSelector("SG Reserve", tactic.resSG, getSortedPlayersFor(Position.SG)) { onTacticUpdate(tactic.copy(resSG = it)) } }
+        item { PositionSelector("SF Reserve", tactic.resSF, getSortedPlayersFor(Position.SF)) { onTacticUpdate(tactic.copy(resSF = it)) } }
+        item { PositionSelector("PF Reserve", tactic.resPF, getSortedPlayersFor(Position.PF)) { onTacticUpdate(tactic.copy(resPF = it)) } }
+        item { PositionSelector("C Reserve", tactic.resC, getSortedPlayersFor(Position.C)) { onTacticUpdate(tactic.copy(resC = it)) } }
     }
 }
 

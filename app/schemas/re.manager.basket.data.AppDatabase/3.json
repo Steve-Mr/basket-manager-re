@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 3,
-    "identityHash": "3d96cbe739ce72db3edc590e51eccfa0",
+    "identityHash": "b73bfa6b7d036555b3d6c3fb2b29365c",
     "entities": [
       {
         "tableName": "games",
@@ -135,7 +135,7 @@
       },
       {
         "tableName": "players",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `age` INTEGER NOT NULL, `teamId` INTEGER, `positionFirst` INTEGER NOT NULL, `positionSecond` INTEGER NOT NULL, `potential` INTEGER NOT NULL, `salary` INTEGER NOT NULL, `yearsContract` INTEGER NOT NULL, `yearsExperience` INTEGER NOT NULL, `skillPhysique` INTEGER NOT NULL, `skillBlock` INTEGER NOT NULL, `skillSteal` INTEGER NOT NULL, `skillRebound` INTEGER NOT NULL, `skillPass` INTEGER NOT NULL, `skillShotInterior` INTEGER NOT NULL, `skillShotExterior` INTEGER NOT NULL, `skillShotFree` INTEGER NOT NULL, `stateEnergy` INTEGER NOT NULL, `stateForm` INTEGER NOT NULL, `stateInjury` INTEGER NOT NULL, `gameId` INTEGER NOT NULL, FOREIGN KEY(`teamId`, `gameId`) REFERENCES `teams`(`id`, `gameId`) ON UPDATE NO ACTION ON DELETE SET NULL , FOREIGN KEY(`gameId`) REFERENCES `games`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `age` INTEGER NOT NULL, `teamId` INTEGER, `positionFirst` INTEGER NOT NULL, `positionSecond` INTEGER NOT NULL, `potential` INTEGER NOT NULL, `salary` INTEGER NOT NULL, `yearsContract` INTEGER NOT NULL, `yearsExperience` INTEGER NOT NULL, `skillPhysique` INTEGER NOT NULL, `skillBlock` INTEGER NOT NULL, `skillSteal` INTEGER NOT NULL, `skillRebound` INTEGER NOT NULL, `skillPass` INTEGER NOT NULL, `skillShotInterior` INTEGER NOT NULL, `skillShotExterior` INTEGER NOT NULL, `skillShotFree` INTEGER NOT NULL, `stateEnergy` INTEGER NOT NULL, `stateForm` INTEGER NOT NULL, `stateInjury` INTEGER NOT NULL, `gameId` INTEGER NOT NULL, `primaryPositionActive` INTEGER NOT NULL, FOREIGN KEY(`teamId`, `gameId`) REFERENCES `teams`(`id`, `gameId`) ON UPDATE NO ACTION ON DELETE SET NULL , FOREIGN KEY(`gameId`) REFERENCES `games`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "id",
@@ -266,6 +266,12 @@
           {
             "fieldPath": "gameId",
             "columnName": "gameId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "primaryPositionActive",
+            "columnName": "primaryPositionActive",
             "affinity": "INTEGER",
             "notNull": true
           }
@@ -1072,7 +1078,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '3d96cbe739ce72db3edc590e51eccfa0')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'b73bfa6b7d036555b3d6c3fb2b29365c')"
     ]
   }
 }

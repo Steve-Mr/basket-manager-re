@@ -118,7 +118,11 @@ class RosterImporter(private val context: Context, private val database: AppData
                         gameId = gameId,
                         teamId = team.id,
                         titPG = 0, titSG = 0, titSF = 0, titPF = 0, titC = 0,
-                        resPG = 0, resSG = 0, resSF = 0, resPF = 0, resC = 0
+                        resPG = 0, resSG = 0, resSF = 0, resPF = 0, resC = 0,
+                        benchImportance = 3,
+                        gameType = 0,
+                        shotIntPercent = 40,
+                        shotTriplePercent = 40
                     )
                 )
             }

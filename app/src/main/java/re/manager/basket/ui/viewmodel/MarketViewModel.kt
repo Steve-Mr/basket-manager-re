@@ -40,11 +40,27 @@ class MarketViewModel(private val database: AppDatabase) : ViewModel() {
         }
     }
 
+    private val _signingResult = MutableStateFlow<String?>(null)
+    val signingResult: StateFlow<String?> = _signingResult.asStateFlow()
+
     fun signPlayer(player: PlayerEntity, teamId: Int) {
         viewModelScope.launch {
-            val updated = player.copy(teamId = teamId)
-            database.playerDao().update(updated)
+            // Logic based on NegotiationDialog's satisfaction check
+            val expectedSalary = (player.getValue() * 100000).toInt().coerceAtLeast(500000)
+            val satisfaction = (player.salary.toFloat() / expectedSalary.toFloat() * 100).toInt()
+
+            if (satisfaction >= 80) {
+                val updated = player.copy(teamId = teamId)
+                database.playerDao().update(updated)
+                _signingResult.value = "Success: ${player.name} has signed with your team!"
+            } else {
+                _signingResult.value = "Rejected: ${player.name} found the offer insufficient."
+            }
             loadMarketData(player.gameId, teamId)
         }
+    }
+
+    fun clearSigningResult() {
+        _signingResult.value = null
     }
 }

@@ -17,6 +17,7 @@ import re.manager.basket.data.entity.MatchResultEntity
 fun PlayerDetailScreen(
     player: PlayerEntity,
     stats: List<MatchResultEntity>,
+    onTogglePosition: () -> Unit = {},
     onBack: () -> Unit
 ) {
     Scaffold(
@@ -46,8 +47,23 @@ fun PlayerDetailScreen(
                             Text("Age: ${player.age}")
                             Text("Exp: ${player.yearsExperience}y")
                         }
-                        Text("Position: ${player.positionFirst} / ${player.positionSecond}")
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                        ) {
+                            val activePos = if (player.primaryPositionActive) player.positionFirst else player.positionSecond
+                            Text("Position: $activePos (Active)")
+                            if (player.positionSecond != re.manager.basket.domain.model.Position.NONE) {
+                                TextButton(onClick = onTogglePosition) {
+                                    Text("Switch to ${if (player.primaryPositionActive) player.positionSecond else player.positionFirst}")
+                                }
+                            }
+                        }
                         Text("Potential: ${player.potential}")
+
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("Average Skill: ${player.getAverageSkillAll().toInt()}", fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -98,11 +114,18 @@ fun PlayerDetailScreen(
 
 @Composable
 fun SkillRow(label: String, value: Int) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(label)
-        Text(value.toString(), fontWeight = FontWeight.Bold, color = if (value >= 80) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(label)
+            Text(value.toString(), fontWeight = FontWeight.Bold, color = if (value >= 80) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+        }
+        LinearProgressIndicator(
+            progress = { (value.toFloat() / 100f).coerceIn(0f, 1f) },
+            modifier = Modifier.fillMaxWidth().height(4.dp),
+            color = if (value >= 80) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+        )
     }
 }

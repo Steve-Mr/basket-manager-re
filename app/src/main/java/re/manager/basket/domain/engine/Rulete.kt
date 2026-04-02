@@ -8,38 +8,21 @@ import re.manager.basket.data.entity.TacticEntity
 import re.manager.basket.domain.model.Position
 
 class Rulete(
-    private val localTitulars: List<Pair<PlayerEntity, MatchResultEntity>>,
-    private val localReserves: List<Pair<PlayerEntity, MatchResultEntity>>,
-    private val visitorTitulars: List<Pair<PlayerEntity, MatchResultEntity>>,
-    private val visitorReserves: List<Pair<PlayerEntity, MatchResultEntity>>,
+    private val localTitulars: List<PlayerEntity>,
+    private val localReserves: List<PlayerEntity>,
+    private val visitorTitulars: List<PlayerEntity>,
+    private val visitorReserves: List<PlayerEntity>,
     private val localTactic: TacticEntity,
     private val visitorTactic: TacticEntity,
-    private val localTeamId: Int
+    private val localTeamId: Int,
+    private val resultsProvider: (Int) -> MatchResultEntity?
 ) {
-    private val totalWeights = Array(2) { Array(2) { IntArray(9) } } // [isLocal][isTitular][skillIndex]
 
-    init {
-        calculateTotalWeights()
-    }
-
-    private fun calculateTotalWeights() {
-        // Local
-        for (i in 0..8) {
-            totalWeights[1][1][i] = localTitulars.sumOf { getTotalRulete(it.first, it.second, i) }
-            totalWeights[1][0][i] = localReserves.sumOf { getTotalRulete(it.first, it.second, i) }
-        }
-        // Visitor
-        for (i in 0..8) {
-            totalWeights[0][1][i] = visitorTitulars.sumOf { getTotalRulete(it.first, it.second, i) }
-            totalWeights[0][0][i] = visitorReserves.sumOf { getTotalRulete(it.first, it.second, i) }
-        }
-    }
-
-    fun pickPlayer(skillIndex: Int, isLocal: Boolean, teamId: Int): Pair<PlayerEntity, MatchResultEntity>? {
+    fun pickPlayer(skillIndex: Int, isLocal: Boolean, teamId: Int): PlayerEntity? {
         val tactic = if (isLocal) localTactic else visitorTactic
-        val benchImportance = 6 - tactic.benchImportance
+        val benchWeight = 6 - tactic.benchImportance
 
-        val isTitularPick = Random.nextInt(0, (benchImportance).coerceAtLeast(1)) < benchImportance
+        val isTitularPick = Random.nextInt(0, 6) < benchWeight
 
         val list = if (isTitularPick) {
             if (isLocal) localTitulars else visitorTitulars
@@ -47,13 +30,19 @@ class Rulete(
             if (isLocal) localReserves else visitorReserves
         }
 
-        val totalWeight = totalWeights[if (isLocal) 1 else 0][if (isTitularPick) 1 else 0][skillIndex]
+        if (list.isEmpty()) return null
+
+        val totalWeight = list.sumOf { p ->
+            resultsProvider(p.id)?.let { r -> getTotalRulete(p, r, skillIndex) } ?: 0
+        }
+
         if (totalWeight <= 0) return list.firstOrNull()
 
         var randomVal = Random.nextInt(1, totalWeight + 1)
-        for (pair in list) {
-            randomVal -= getTotalRulete(pair.first, pair.second, skillIndex)
-            if (randomVal <= 0) return pair
+        for (player in list) {
+            val res = resultsProvider(player.id) ?: continue
+            randomVal -= getTotalRulete(player, res, skillIndex)
+            if (randomVal <= 0) return player
         }
         return list.lastOrNull()
     }

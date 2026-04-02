@@ -29,6 +29,7 @@ fun MarketScreen(
     val freeAgents by marketViewModel.freeAgents.collectAsState()
     val teamSalary by marketViewModel.teamSalary.collectAsState()
     val salaryCap by marketViewModel.salaryCap.collectAsState()
+    val signingResult by marketViewModel.signingResult.collectAsState()
 
     LaunchedEffect(gameId, userTeamId) {
         marketViewModel.loadMarketData(gameId, userTeamId)
@@ -51,6 +52,15 @@ fun MarketScreen(
         )
 
         Spacer(modifier = Modifier.height(16.dp))
+
+        if (signingResult != null) {
+            AlertDialog(
+                onDismissRequest = { marketViewModel.clearSigningResult() },
+                title = { Text("Negotiation Result") },
+                text = { Text(signingResult!!) },
+                confirmButton = { Button(onClick = { marketViewModel.clearSigningResult() }) { Text("OK") } }
+            )
+        }
 
         LazyColumn(
             modifier = Modifier.fillMaxWidth().weight(1f),

@@ -14,21 +14,30 @@ class PlayerListViewModel(private val database: AppDatabase) : ViewModel() {
     private val _players = MutableStateFlow<List<PlayerUiState>>(emptyList())
     val players: StateFlow<List<PlayerUiState>> = _players.asStateFlow()
 
-    fun loadPlayers(teamId: Int, gameId: Int = 1) {
-        Log.d("PlayerListViewModel", "Loading players for teamId: $teamId, gameId: $gameId")
+    fun loadPlayers(teamId: Int, gameId: Int = 1, filterPosition: re.manager.basket.domain.model.Position = re.manager.basket.domain.model.Position.NONE) {
+        Log.d("PlayerListViewModel", "Loading players for teamId: $teamId, gameId: $gameId, filter: $filterPosition")
         viewModelScope.launch {
-            // First, find all players for this game and team
             val allGamePlayers = database.playerDao().getPlayersByGame(gameId)
             val teamPlayers = allGamePlayers.filter { it.teamId == teamId }
 
-            Log.d("PlayerListViewModel", "Found ${teamPlayers.size} players in DB for team $teamId")
             val tactic = database.tacticDao().getTacticForTeam(teamId, gameId)
-
             val starters = tactic?.let {
                 setOf(it.titPG, it.titSG, it.titSF, it.titPF, it.titC)
             } ?: emptySet()
 
-            _players.value = teamPlayers.map {
+            val sortedPlayers = if (filterPosition != re.manager.basket.domain.model.Position.NONE) {
+                teamPlayers.sortedWith(compareByDescending<re.manager.basket.data.entity.PlayerEntity> {
+                    it.positionFirst == filterPosition
+                }.thenByDescending {
+                    it.positionSecond == filterPosition
+                }.thenByDescending {
+                    it.getAverageSkillAll()
+                })
+            } else {
+                teamPlayers.sortedByDescending { it.getAverageSkillAll() }
+            }
+
+            _players.value = sortedPlayers.map {
                 it.toUiState(isStarter = starters.contains(it.id))
             }
         }

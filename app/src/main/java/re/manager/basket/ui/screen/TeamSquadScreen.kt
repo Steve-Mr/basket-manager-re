@@ -9,8 +9,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import re.manager.basket.BasketApplication
 import re.manager.basket.ui.viewmodel.PlayerListViewModel
 import re.manager.basket.ui.viewmodel.PlayerUiState
 
@@ -61,11 +63,32 @@ fun TeamSquadContent(players: List<PlayerUiState>, onPlayerClick: (Int) -> Unit 
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
                     ) {
                         Text(text = "Age: ${player.age}")
-                        Text(text = "Avg: ${player.avgSkill} (${player.potential})")
+                        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                            Text(text = "Avg: ${player.avgSkill} ")
+                            val context = androidx.compose.ui.platform.LocalContext.current
+                            val resId = context.resources.getIdentifier(player.starIcon, "drawable", context.packageName)
+                            if (resId != 0) {
+                                Icon(
+                                    painter = painterResource(id = resId),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = androidx.compose.ui.graphics.Color.Unspecified
+                                )
+                            }
+                        }
                         Text(text = "Val: ${player.totalValue}")
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Text(text = "Form: ${player.form}", style = MaterialTheme.typography.bodySmall)
+                        Text(text = "Energy: ${player.energy}", style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }

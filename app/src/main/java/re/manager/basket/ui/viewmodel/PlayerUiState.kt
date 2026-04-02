@@ -12,10 +12,22 @@ data class PlayerUiState(
     val marketValue: Int,
     val isStarter: Boolean,
     val hasContract: Boolean,
+    val form: Int,
+    val energy: Int,
+    val starIcon: String,
     val originalEntity: PlayerEntity
 )
 
 fun PlayerEntity.toUiState(isStarter: Boolean = false): PlayerUiState {
+    val starIcon = when {
+        potential >= 9 -> "star6"
+        potential >= 7 -> "star5"
+        potential >= 5 -> "star4"
+        potential >= 3 -> "star3"
+        potential >= 1 -> "star2"
+        else -> "star1"
+    }
+
     return PlayerUiState(
         id = id,
         name = name,
@@ -26,6 +38,9 @@ fun PlayerEntity.toUiState(isStarter: Boolean = false): PlayerUiState {
         marketValue = getMarketValue().toInt(),
         isStarter = isStarter,
         hasContract = yearsContract > 0,
+        form = stateForm,
+        energy = stateEnergy,
+        starIcon = starIcon,
         originalEntity = this
     )
 }

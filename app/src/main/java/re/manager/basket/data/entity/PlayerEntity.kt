@@ -48,10 +48,13 @@ data class PlayerEntity(
     val stateEnergy: Int,
     val stateForm: Int,
     val stateInjury: Int,
-    val gameId: Int
+    val gameId: Int,
+    val primaryPositionActive: Boolean = true // True for positionFirst, False for positionSecond
 ) {
+    fun getActivePosition(): Position = if (primaryPositionActive) positionFirst else positionSecond
+
     fun getAverageSkillAll(): Double {
-        return getAverageForPosition(positionFirst, attack = true, defense = true)
+        return getAverageForPosition(getActivePosition(), attack = true, defense = true)
     }
 
     fun getAverageSkillAllByPosition(position: Position): Double {
