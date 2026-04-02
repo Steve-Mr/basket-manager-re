@@ -3,6 +3,7 @@ package re.manager.basket.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import android.content.Context
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -42,14 +43,18 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
     val simProgress: StateFlow<Float> = _simProgress
 
     fun loadAllGames() {
+        Log.d("GameViewModel", "Loading all save games")
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
-                _allGames.value = database.gameDao().getAllGames()
+                val games = database.gameDao().getAllGames()
+                Log.d("GameViewModel", "Found ${games.size} saves")
+                _allGames.value = games
             }
         }
     }
 
     fun createNewGame(context: Context, name: String) {
+        Log.d("GameViewModel", "Creating new game: $name")
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 val newGame = GameEntity(
@@ -70,11 +75,13 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
 
     fun selectTeam(teamId: Int) {
         val current = _gameState.value ?: return
+        Log.d("GameViewModel", "Selecting teamId: $teamId for gameId: ${current.id}")
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 val updated = current.copy(userTeamId = teamId)
                 database.gameDao().insert(updated)
                 _gameState.value = updated
+                Log.d("GameViewModel", "userTeamId updated in DB")
             }
         }
     }
@@ -107,12 +114,14 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
 
     fun nextDay() {
         val current = _gameState.value ?: return
+        Log.d("GameViewModel", "Triggering nextDay for day: ${current.currentMatchday}")
         viewModelScope.launch {
             _isSimulating.value = true
             _simProgress.value = 0f
             withContext(Dispatchers.IO) {
                 // 1. Get all matches for this matchday
                 val matches = database.matchDao().getMatchesByDay(current.id, current.currentMatchday)
+                Log.d("GameViewModel", "Found ${matches.size} matches to simulate")
 
                 matches.forEachIndexed { index, match ->
                     val localPlayers = database.playerDao().getPlayersByTeam(match.teamLocalId)

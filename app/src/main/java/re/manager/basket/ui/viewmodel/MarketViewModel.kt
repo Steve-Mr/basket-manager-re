@@ -1,5 +1,6 @@
 package re.manager.basket.ui.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,10 +19,13 @@ class MarketViewModel(private val database: AppDatabase) : ViewModel() {
     val teamSalary: StateFlow<Int> = _teamSalary.asStateFlow()
 
     fun loadMarketData(gameId: Int, userTeamId: Int) {
+        Log.d("MarketViewModel", "Loading market data for gameId: $gameId, userTeamId: $userTeamId")
         viewModelScope.launch {
             // Free Agents have teamId = null (as per RosterImporter)
             val players = database.playerDao().getPlayersByGame(gameId)
-            _freeAgents.value = players.filter { it.teamId == null }.sortedByDescending { it.getAverageSkillAll() }
+            val freeAgents = players.filter { it.teamId == null }.sortedByDescending { it.getAverageSkillAll() }
+            Log.d("MarketViewModel", "Found ${freeAgents.size} free agents")
+            _freeAgents.value = freeAgents
 
             val teamPlayers = database.playerDao().getPlayersByTeam(userTeamId)
             _teamSalary.value = teamPlayers.sumOf { it.salary }

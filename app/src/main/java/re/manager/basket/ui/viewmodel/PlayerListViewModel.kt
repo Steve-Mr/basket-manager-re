@@ -1,5 +1,6 @@
 package re.manager.basket.ui.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,8 +15,10 @@ class PlayerListViewModel(private val database: AppDatabase) : ViewModel() {
     val players: StateFlow<List<PlayerUiState>> = _players.asStateFlow()
 
     fun loadPlayers(teamId: Int, gameId: Int = 1) {
+        Log.d("PlayerListViewModel", "Loading players for teamId: $teamId, gameId: $gameId")
         viewModelScope.launch {
             val entities = database.playerDao().getPlayersByTeam(teamId)
+            Log.d("PlayerListViewModel", "Found ${entities.size} players in DB")
             val tactic = database.tacticDao().getTacticForTeam(teamId, gameId)
 
             val starters = tactic?.let {

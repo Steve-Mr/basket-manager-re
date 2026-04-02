@@ -1,6 +1,7 @@
 package re.manager.basket.data.importer
 
 import android.content.Context
+import android.util.Log
 import re.manager.basket.data.AppDatabase
 import re.manager.basket.data.entity.*
 import androidx.room.withTransaction
@@ -14,6 +15,7 @@ import java.io.InputStreamReader
 class RosterImporter(private val context: Context, private val database: AppDatabase) {
 
     suspend fun importFromAssets(gameId: Int) {
+        Log.d("RosterImporter", "Starting import process for gameId: $gameId")
         database.withTransaction {
             val players = mutableListOf<PlayerEntity>()
             val teams = mutableListOf<TeamEntity>()
@@ -43,13 +45,16 @@ class RosterImporter(private val context: Context, private val database: AppData
                 )
             }
             database.teamDao().insertAll(teams)
+            Log.d("RosterImporter", "Initialized 30 teams")
 
             // 2. Import Players from CSV
             context.assets.open("rosters.csv").use { inputStream ->
                 val reader = BufferedReader(InputStreamReader(inputStream))
                 val header = reader.readLine() ?: return@use
+                Log.d("RosterImporter", "CSV Header: $header")
                 val columns = header.split(";")
 
+                var rowCount = 0
                 reader.forEachLine { line ->
                     if (line.isBlank()) return@forEachLine
                     val values = line.split(";")
@@ -60,6 +65,9 @@ class RosterImporter(private val context: Context, private val database: AppData
                         // Map team name to ID (BOS -> 1, etc.)
                         val teamIdx = teamNames.indexOf(teamName.trim())
                         val teamId = if (teamIdx != -1) teamIdx + 1 else null
+
+                        rowCount++
+                        if (rowCount % 100 == 0) Log.d("RosterImporter", "Parsed $rowCount players...")
 
                         players.add(
                             PlayerEntity(
@@ -90,10 +98,12 @@ class RosterImporter(private val context: Context, private val database: AppData
                 }
             }
             database.playerDao().insertAll(players)
+            Log.d("RosterImporter", "Inserted ${players.size} players into database")
 
             // 3. Generate Calendar
             val matches = SeasonCalendar.generateMatches(gameId)
             database.matchDao().insertAll(matches)
+            Log.d("RosterImporter", "Generated ${matches.size} matches")
 
             // 4. Initialize Tactics for each team
             teams.forEach { team ->
@@ -116,6 +126,7 @@ class RosterImporter(private val context: Context, private val database: AppData
                     )
                 )
             }
+            Log.d("RosterImporter", "Initialized leagues and tactics. Import complete.")
         }
     }
 }
