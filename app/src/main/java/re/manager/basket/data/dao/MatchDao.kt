@@ -19,4 +19,7 @@ interface MatchDao {
 
     @Query("SELECT * FROM matches WHERE gameId = :gameId AND matchday >= :currentDay AND (teamLocalId = :teamId OR teamVisitorId = :teamId) AND (localQ1 + visitorQ1 = 0) ORDER BY matchday ASC LIMIT 1")
     suspend fun getNextMatchForTeam(gameId: Int, teamId: Int, currentDay: Int): MatchEntity?
+
+    @Query("SELECT * FROM matches WHERE gameId = :gameId ORDER BY matchday ASC")
+    suspend fun getAllMatchesForGame(gameId: Int): List<MatchEntity>
 }

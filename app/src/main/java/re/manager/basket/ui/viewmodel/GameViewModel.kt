@@ -40,6 +40,21 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
     private val _news = MutableStateFlow<List<re.manager.basket.data.entity.NewsEntity>>(emptyList())
     val news: StateFlow<List<re.manager.basket.data.entity.NewsEntity>> = _news
 
+    private val _allMatches = MutableStateFlow<List<MatchEntity>>(emptyList())
+    val allMatches: StateFlow<List<MatchEntity>> = _allMatches
+
+    private val _userTactic = MutableStateFlow<re.manager.basket.data.entity.TacticEntity?>(null)
+    val userTactic: StateFlow<re.manager.basket.data.entity.TacticEntity?> = _userTactic
+
+    private val _selectedPlayerStats = MutableStateFlow<List<re.manager.basket.data.entity.MatchResultEntity>>(emptyList())
+    val selectedPlayerStats: StateFlow<List<re.manager.basket.data.entity.MatchResultEntity>> = _selectedPlayerStats
+
+    private val _selectedTeamRoster = MutableStateFlow<List<re.manager.basket.data.entity.PlayerEntity>>(emptyList())
+    val selectedTeamRoster: StateFlow<List<re.manager.basket.data.entity.PlayerEntity>> = _selectedTeamRoster
+
+    private val _selectedTeamLeague = MutableStateFlow<re.manager.basket.data.entity.LeagueEntity?>(null)
+    val selectedTeamLeague: StateFlow<re.manager.basket.data.entity.LeagueEntity?> = _selectedTeamLeague
+
     private val _isSimulating = MutableStateFlow(false)
     val isSimulating: StateFlow<Boolean> = _isSimulating
 
@@ -53,6 +68,25 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
                 val games = database.gameDao().getAllGames()
                 Log.d("GameViewModel", "Found ${games.size} saves")
                 _allGames.value = games
+            }
+        }
+    }
+
+    fun loadPlayerStats(playerId: Int) {
+        val gameId = _gameState.value?.id ?: return
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                _selectedPlayerStats.value = database.matchResultDao().getResultsByPlayer(playerId, gameId)
+            }
+        }
+    }
+
+    fun loadTeamRoster(teamId: Int) {
+        val gameId = _gameState.value?.id ?: return
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                _selectedTeamRoster.value = database.playerDao().getPlayersByTeam(teamId, gameId)
+                _selectedTeamLeague.value = database.leagueDao().getLeagueForTeam(teamId, gameId)
             }
         }
     }
@@ -95,8 +129,18 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
                 val updated = current.copy(userTeamId = teamId)
                 database.gameDao().update(updated)
                 _gameState.value = updated
+                _userTactic.value = database.tacticDao().getTacticForTeam(teamId, current.id)
                 updateNextMatch(updated)
                 Log.d("GameViewModel", "userTeamId updated in DB using update()")
+            }
+        }
+    }
+
+    fun updateTactic(tactic: re.manager.basket.data.entity.TacticEntity) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                database.tacticDao().update(tactic)
+                _userTactic.value = tactic
             }
         }
     }
@@ -116,7 +160,13 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
 
                 _recentMatches.value = database.matchDao().getRecentMatches(gameId)
                 _news.value = database.newsDao().getNewsByGame(gameId)
+                _allMatches.value = database.matchDao().getAllMatchesForGame(gameId)
+                _availableTeams.value = database.teamDao().getTeamsByGame(gameId)
+                if (game?.userTeamId != null) {
+                    _userTactic.value = database.tacticDao().getTacticForTeam(game.userTeamId, gameId)
+                }
                 updateNextMatch(game)
+                Log.d("GameViewModel", "Game loaded, teams: ${_availableTeams.value.size}, matches: ${_allMatches.value.size}")
             }
         }
     }
@@ -136,73 +186,110 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
         }
     }
 
-    fun nextDay() {
+    fun nextDay(daysToSimulate: Int = 1) {
         val current = _gameState.value ?: return
-        Log.d("GameViewModel", "Triggering nextDay for day: ${current.currentMatchday}")
+        Log.d("GameViewModel", "Triggering nextDay for day: ${current.currentMatchday}, count: $daysToSimulate")
         viewModelScope.launch {
             _isSimulating.value = true
             _simProgress.value = 0f
-            withContext(Dispatchers.IO) {
-                // 1. Get all matches for this matchday
-                val matches = database.matchDao().getMatchesByDay(current.id, current.currentMatchday)
-                Log.d("GameViewModel", "Found ${matches.size} matches to simulate")
+            try {
+                withContext(Dispatchers.IO) {
+                    var simulatedCount = 0
+                    while (simulatedCount < daysToSimulate) {
+                        val activeGame = database.gameDao().getGameById(current.id) ?: break
+                        val currentDay = activeGame.currentMatchday
+                        val userTeamId = activeGame.userTeamId ?: -1
 
-                matches.forEachIndexed { index, match ->
-                    val localPlayers = database.playerDao().getPlayersByTeam(match.teamLocalId, current.id)
-                    val visitorPlayers = database.playerDao().getPlayersByTeam(match.teamVisitorId, current.id)
-                    val localTactic = database.tacticDao().getTacticForTeam(match.teamLocalId, current.id)
-                    val visitorTactic = database.tacticDao().getTacticForTeam(match.teamVisitorId, current.id)
+                        // 0. Auto-optimize AI lineups
+                        optimizeAiLineups(activeGame.id, userTeamId)
 
-                    if (localTactic == null || visitorTactic == null) {
-                        Log.e("GameViewModel", "Tactic not found for match: ${match.id}")
-                        return@forEachIndexed
+                        // 1. Get all matches for this matchday
+                        val matches = database.matchDao().getMatchesByDay(activeGame.id, currentDay)
+                        Log.d("GameViewModel", "Day $currentDay: Found ${matches.size} matches")
+
+                        var injuryOccurred = false
+                        matches.forEachIndexed { index, match ->
+                            val localPlayers = database.playerDao().getPlayersByTeam(match.teamLocalId, activeGame.id)
+                            val visitorPlayers = database.playerDao().getPlayersByTeam(match.teamVisitorId, activeGame.id)
+                            val localTactic = database.tacticDao().getTacticForTeam(match.teamLocalId, activeGame.id)
+                            val visitorTactic = database.tacticDao().getTacticForTeam(match.teamVisitorId, activeGame.id)
+
+                            if (localTactic != null && visitorTactic != null) {
+                                val simulator = re.manager.basket.domain.engine.MatchSimulator(
+                                    match, localPlayers, visitorPlayers, localTactic, visitorTactic
+                                )
+                                val result = simulator.simulate()
+
+                                database.matchDao().update(result.match)
+                                database.matchResultDao().insertAll(result.playerResults)
+
+                                if (result.injuries.isNotEmpty()) {
+                                    database.playerDao().insertAll(result.injuries)
+                                    // Check if user team had an injury
+                                    if (result.injuries.any { it.teamId == userTeamId && it.stateInjury > 0 }) {
+                                        injuryOccurred = true
+                                    }
+                                }
+                                generateMatchNews(result)
+                                updateLeagueStandings(result)
+                            }
+                            if (daysToSimulate == 1) {
+                                _simProgress.value = (index + 1).toFloat() / matches.size
+                            }
+                        }
+
+                        // 2. Evolve states
+                        val allPlayers = database.playerDao().getPlayersByGame(activeGame.id)
+                        val evolvedPlayers = re.manager.basket.domain.engine.StateEvolver().evolveAllPlayersDaily(allPlayers)
+                        database.playerDao().insertAll(evolvedPlayers)
+
+                        // 3. Move to next day
+                        val seasonManager = SeasonManager(activeGame)
+                        val nextDayVal = seasonManager.getNextMatchday()
+
+                        if (currentDay == 166 && nextDayVal == 167) {
+                            updateAllSalaryCaps(activeGame.id)
+                        }
+
+                        val updated = activeGame.copy(currentMatchday = nextDayVal)
+                        database.gameDao().update(updated)
+
+                        simulatedCount++
+                        if (daysToSimulate > 1) {
+                            _simProgress.value = simulatedCount.toFloat() / daysToSimulate
+                        }
+
+                        if (injuryOccurred) {
+                            Log.i("GameViewModel", "Stopping multi-day simulation due to user team injury")
+                            break
+                        }
+                        if (nextDayVal == 0) break // Season end
                     }
 
-                    val simulator = re.manager.basket.domain.engine.MatchSimulator(
-                        match, localPlayers, visitorPlayers, localTactic, visitorTactic
-                    )
-                    val result = simulator.simulate()
-
-                    // Save match result and player stats
-                    database.matchDao().update(result.match)
-                    database.matchResultDao().insertAll(result.playerResults)
-
-                    // Update injuries in DB
-                    if (result.injuries.isNotEmpty()) {
-                        database.playerDao().insertAll(result.injuries)
-                    }
-
-                    // Generate news
-                    generateMatchNews(result)
-
-                    // Update League Standings
-                    updateLeagueStandings(result)
-
-                    _simProgress.value = (index + 1).toFloat() / matches.size
+                    // Refresh final state
+                    val finalGame = database.gameDao().getGameById(current.id)
+                    _gameState.value = finalGame
+                    _recentMatches.value = database.matchDao().getRecentMatches(current.id)
+                    _news.value = database.newsDao().getNewsByGame(current.id)
+                    finalGame?.let { updateNextMatch(it) }
                 }
-
-                // 2. Evolve states (Daily recovery)
-                val allPlayers = database.playerDao().getPlayersByGame(current.id)
-                val evolvedPlayers = re.manager.basket.domain.engine.StateEvolver().evolveAllPlayersDaily(allPlayers)
-                database.playerDao().insertAll(evolvedPlayers)
-
-                // 3. Move to next day
-                val seasonManager = SeasonManager(current)
-                val nextDay = seasonManager.getNextMatchday()
-
-                // If moving to playoffs (day 167), update salary caps
-                if (current.currentMatchday == 166 && nextDay == 167) {
-                    updateAllSalaryCaps(current.id)
-                }
-
-                val updated = current.copy(currentMatchday = nextDay)
-
-                database.gameDao().update(updated)
-                _gameState.value = updated
-                _recentMatches.value = database.matchDao().getRecentMatches(current.id)
-                _news.value = database.newsDao().getNewsByGame(current.id)
-                updateNextMatch(updated)
+            } catch (e: Exception) {
+                Log.e("GameViewModel", "Error during simulation", e)
+            } finally {
                 _isSimulating.value = false
+            }
+        }
+    }
+
+    private suspend fun optimizeAiLineups(gameId: Int, userTeamId: Int) {
+        val teams = database.teamDao().getTeamsByGame(gameId)
+        val optimizer = re.manager.basket.domain.engine.LineupOptimizer()
+        teams.filter { it.id != userTeamId }.forEach { team ->
+            val players = database.playerDao().getPlayersByTeam(team.id, gameId)
+            val tactic = database.tacticDao().getTacticForTeam(team.id, gameId)
+            if (tactic != null) {
+                val optimized = optimizer.optimize(players, tactic)
+                database.tacticDao().update(optimized)
             }
         }
     }

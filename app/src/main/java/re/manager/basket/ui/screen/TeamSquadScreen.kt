@@ -17,11 +17,11 @@ import re.manager.basket.ui.viewmodel.PlayerUiState
 @Composable
 fun TeamSquadScreen(viewModel: PlayerListViewModel) {
     val players by viewModel.players.collectAsState()
-    TeamSquadContent(players)
+    TeamSquadContent(players, onPlayerClick = { /* Navigate to player detail */ })
 }
 
 @Composable
-fun TeamSquadContent(players: List<PlayerUiState>) {
+fun TeamSquadContent(players: List<PlayerUiState>, onPlayerClick: (Int) -> Unit = {}) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
@@ -39,7 +39,7 @@ fun TeamSquadContent(players: List<PlayerUiState>) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { /* Toggle titular status logic */ },
+                    .clickable { onPlayerClick(player.id) },
                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                 colors = if (player.hasContract) CardDefaults.cardColors() else CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
@@ -64,7 +64,7 @@ fun TeamSquadContent(players: List<PlayerUiState>) {
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(text = "Age: ${player.age}")
-                        Text(text = "Avg: ${player.avgSkill}")
+                        Text(text = "Avg: ${player.avgSkill} (${player.potential})")
                         Text(text = "Val: ${player.totalValue}")
                     }
                 }

@@ -20,6 +20,7 @@ import kotlinx.coroutines.launch
 import re.manager.basket.data.AppDatabase
 import re.manager.basket.data.entity.LeagueEntity
 import re.manager.basket.data.entity.TeamEntity
+import androidx.compose.foundation.clickable
 
 class LeagueViewModel(private val database: AppDatabase) : ViewModel() {
     private val _standings = MutableStateFlow<List<Pair<TeamEntity, LeagueEntity>>>(emptyList())
@@ -37,7 +38,11 @@ class LeagueViewModel(private val database: AppDatabase) : ViewModel() {
 }
 
 @Composable
-fun LeagueStandingsScreen(gameId: Int, leagueViewModel: LeagueViewModel) {
+fun LeagueStandingsScreen(
+    gameId: Int,
+    leagueViewModel: LeagueViewModel,
+    onTeamClick: (TeamEntity, LeagueEntity) -> Unit = { _, _ -> }
+) {
     val standings by leagueViewModel.standings.collectAsState()
 
     LaunchedEffect(gameId) {
@@ -54,17 +59,22 @@ fun LeagueStandingsScreen(gameId: Int, leagueViewModel: LeagueViewModel) {
             Text(text = "L", modifier = Modifier.width(40.dp), fontWeight = FontWeight.Bold)
             Text(text = "PTS", modifier = Modifier.width(60.dp), fontWeight = FontWeight.Bold)
         }
-        Divider()
+        HorizontalDivider()
 
         LazyColumn(modifier = Modifier.fillMaxWidth()) {
             items(standings) { (team, league) ->
-                Row(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onTeamClick(team, league) }
+                        .padding(16.dp)
+                ) {
                     Text(text = team.name, modifier = Modifier.weight(1f))
                     Text(text = league.gamesWon.toString(), modifier = Modifier.width(40.dp))
                     Text(text = league.gamesLost.toString(), modifier = Modifier.width(40.dp))
                     Text(text = "${league.pointsScored - league.pointsAllowed}", modifier = Modifier.width(60.dp))
                 }
-                Divider(modifier = Modifier.padding(horizontal = 16.dp))
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
             }
         }
     }

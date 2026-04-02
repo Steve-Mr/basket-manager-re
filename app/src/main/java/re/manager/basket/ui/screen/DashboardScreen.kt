@@ -14,18 +14,22 @@ import androidx.compose.ui.unit.dp
 import re.manager.basket.ui.viewmodel.GameViewModel
 
 @Composable
-fun DashboardScreen(viewModel: GameViewModel) {
+fun DashboardScreen(
+    viewModel: GameViewModel,
+    onShowCalendar: () -> Unit = {}
+) {
     val gameState by viewModel.gameState.collectAsState()
     val nextMatch by viewModel.nextMatch.collectAsState()
     val news by viewModel.news.collectAsState()
-    DashboardContent(gameState, nextMatch, news)
+    DashboardContent(gameState, nextMatch, news, onShowCalendar)
 }
 
 @Composable
 fun DashboardContent(
     gameState: re.manager.basket.data.entity.GameEntity?,
     nextMatch: Pair<re.manager.basket.data.entity.MatchEntity, re.manager.basket.data.entity.TeamEntity>?,
-    news: List<re.manager.basket.data.entity.NewsEntity>
+    news: List<re.manager.basket.data.entity.NewsEntity>,
+    onShowCalendar: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -40,7 +44,8 @@ fun DashboardContent(
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                onClick = onShowCalendar
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(text = "Next Event", style = MaterialTheme.typography.titleMedium)

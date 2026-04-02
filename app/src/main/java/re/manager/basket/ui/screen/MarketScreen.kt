@@ -15,6 +15,10 @@ import androidx.compose.ui.unit.dp
 import re.manager.basket.ui.viewmodel.MarketViewModel
 import re.manager.basket.util.CurrencyUtils
 import re.manager.basket.domain.model.Constants
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 
 @Composable
 fun MarketScreen(
@@ -66,8 +70,20 @@ fun MarketScreen(
                         }
                         Column(horizontalAlignment = Alignment.End) {
                             Text(text = CurrencyUtils.formatCurrency(player.salary), style = MaterialTheme.typography.titleSmall)
+                            var showNegotiation by remember { mutableStateOf(false) }
+                            if (showNegotiation) {
+                                NegotiationDialog(
+                                    player = player,
+                                    currentCapSpace = salaryCap - teamSalary,
+                                    onDismiss = { showNegotiation = false },
+                                    onConfirm = { salary, years ->
+                                        marketViewModel.signPlayer(player.copy(salary = salary, yearsContract = years), userTeamId)
+                                        showNegotiation = false
+                                    }
+                                )
+                            }
                             Button(
-                                onClick = { marketViewModel.signPlayer(player, userTeamId) },
+                                onClick = { showNegotiation = true },
                                 enabled = (teamSalary + player.salary <= salaryCap)
                             ) {
                                 Text("Sign")
