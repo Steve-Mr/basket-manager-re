@@ -19,4 +19,7 @@ interface TeamDao {
 
     @Query("SELECT COUNT(*) FROM teams")
     suspend fun getCount(): Int
+
+    @Query("SELECT * FROM teams WHERE id = :teamId AND gameId = :gameId")
+    suspend fun getTeamById(teamId: Int, gameId: Int): TeamEntity?
 }

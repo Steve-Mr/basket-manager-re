@@ -24,7 +24,7 @@ fun MarketScreen(
 ) {
     val freeAgents by marketViewModel.freeAgents.collectAsState()
     val teamSalary by marketViewModel.teamSalary.collectAsState()
-    val salaryCap = Constants.SALARY_CAP_MED // Centralized default
+    val salaryCap by marketViewModel.salaryCap.collectAsState()
 
     LaunchedEffect(gameId, userTeamId) {
         marketViewModel.loadMarketData(gameId, userTeamId)
