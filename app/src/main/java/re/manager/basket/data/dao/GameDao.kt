@@ -20,6 +20,6 @@ interface GameDao {
     @Query("SELECT COUNT(*) FROM games")
     suspend fun getCount(): Int
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAndReturnId(game: GameEntity): Long
 }

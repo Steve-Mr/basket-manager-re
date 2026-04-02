@@ -21,7 +21,7 @@ import androidx.room.PrimaryKey
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index("gameId"), Index("teamId")]
+    indices = [Index("gameId"), Index("teamId", "gameId")]
 )
 data class TacticEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
