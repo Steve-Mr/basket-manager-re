@@ -27,7 +27,11 @@ import androidx.room.PrimaryKey
             onDelete = ForeignKey.CASCADE
         )
     ],
-    indices = [Index("gameId"), Index("teamLocalId"), Index("teamVisitorId")]
+    indices = [
+        Index("gameId"),
+        Index("teamLocalId", "gameId"),
+        Index("teamVisitorId", "gameId")
+    ]
 )
 data class MatchEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,

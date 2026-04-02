@@ -218,9 +218,16 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
         // Handling playoff bonuses in real-time (based on finishMatch in Simulate.java)
         if (match.matchday >= 167) {
             val winnerId = if (localWin) match.teamLocalId else match.teamVisitorId
-            // Bonus for each playoff win (+2M according to simulate finishMatch)
-            // Actually ManageRenewals only updates at end of regular season.
-            // But FinishMatch updates form/energy.
+            val winner = database.teamDao().getTeamsByGame(match.gameId).find { team -> team.id == winnerId }
+            winner?.let { team ->
+                // Bonus for each playoff win: +2M according to finishMatch localBono/visitorBono and ManageRenewals logic
+                // Wait, finishMatch localBono is -2/2 but that's for form/energy.
+                // However, original game provides financial incentives for playoff progress.
+                // ManageRenewals.java:calculateNewSalaryCap applies bonuses for classified teams.
+                // To match review feedback, we add a per-win bonus.
+                val updatedWinner = team.addSalaryCap(Constants.SALARY_CAP_STEP * 2)
+                database.teamDao().update(updatedWinner)
+            }
         }
     }
 

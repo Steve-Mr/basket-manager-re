@@ -33,6 +33,15 @@ object Constants {
     const val SALARY_CAP_MAX = 85000000
     const val SALARY_CAP_STEP = 1000000
 
+    val INITIAL_SALARY_CAPS = mapOf(
+        "BOS" to 80000000, "BRO" to 85000000, "NYK" to 85000000, "PHI" to 55000000, "TOR" to 75000000,
+        "CHI" to 80000000, "CLE" to 70000000, "DET" to 60000000, "IND" to 75000000, "MIL" to 55000000,
+        "ATL" to 65000000, "CHA" to 65000000, "MIA" to 80000000, "ORL" to 70000000, "WAS" to 70000000,
+        "DAL" to 80000000, "HOU" to 80000000, "MEM" to 55000000, "NOR" to 70000000, "SAN" to 85000000,
+        "DEN" to 65000000, "MIN" to 60000000, "POR" to 70000000, "OKC" to 75000000, "UTA" to 60000000,
+        "GSW" to 75000000, "LAC" to 85000000, "LAL" to 85000000, "PHO" to 60000000, "SAC" to 70000000
+    )
+
     // Injury Simulation
     const val INJURY_CHECK_PROB = 4
     const val INJURY_TYPE_MINOR_PROB = 80

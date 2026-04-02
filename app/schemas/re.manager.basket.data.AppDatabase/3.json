@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 3,
-    "identityHash": "eaff4e80e2776752f2cafd8bc5684dd0",
+    "identityHash": "3d96cbe739ce72db3edc590e51eccfa0",
     "entities": [
       {
         "tableName": "games",
@@ -388,13 +388,14 @@
             "createSql": "CREATE INDEX IF NOT EXISTS `index_leagues_gameId` ON `${TABLE_NAME}` (`gameId`)"
           },
           {
-            "name": "index_leagues_teamId",
+            "name": "index_leagues_teamId_gameId",
             "unique": false,
             "columnNames": [
-              "teamId"
+              "teamId",
+              "gameId"
             ],
             "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_leagues_teamId` ON `${TABLE_NAME}` (`teamId`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_leagues_teamId_gameId` ON `${TABLE_NAME}` (`teamId`, `gameId`)"
           }
         ],
         "foreignKeys": [
@@ -542,22 +543,24 @@
             "createSql": "CREATE INDEX IF NOT EXISTS `index_matches_gameId` ON `${TABLE_NAME}` (`gameId`)"
           },
           {
-            "name": "index_matches_teamLocalId",
+            "name": "index_matches_teamLocalId_gameId",
             "unique": false,
             "columnNames": [
-              "teamLocalId"
+              "teamLocalId",
+              "gameId"
             ],
             "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_matches_teamLocalId` ON `${TABLE_NAME}` (`teamLocalId`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_matches_teamLocalId_gameId` ON `${TABLE_NAME}` (`teamLocalId`, `gameId`)"
           },
           {
-            "name": "index_matches_teamVisitorId",
+            "name": "index_matches_teamVisitorId_gameId",
             "unique": false,
             "columnNames": [
-              "teamVisitorId"
+              "teamVisitorId",
+              "gameId"
             ],
             "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_matches_teamVisitorId` ON `${TABLE_NAME}` (`teamVisitorId`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_matches_teamVisitorId_gameId` ON `${TABLE_NAME}` (`teamVisitorId`, `gameId`)"
           }
         ],
         "foreignKeys": [
@@ -956,13 +959,14 @@
             "createSql": "CREATE INDEX IF NOT EXISTS `index_tactics_gameId` ON `${TABLE_NAME}` (`gameId`)"
           },
           {
-            "name": "index_tactics_teamId",
+            "name": "index_tactics_teamId_gameId",
             "unique": false,
             "columnNames": [
-              "teamId"
+              "teamId",
+              "gameId"
             ],
             "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_tactics_teamId` ON `${TABLE_NAME}` (`teamId`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_tactics_teamId_gameId` ON `${TABLE_NAME}` (`teamId`, `gameId`)"
           }
         ],
         "foreignKeys": [
@@ -1068,7 +1072,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'eaff4e80e2776752f2cafd8bc5684dd0')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '3d96cbe739ce72db3edc590e51eccfa0')"
     ]
   }
 }

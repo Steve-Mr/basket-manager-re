@@ -197,11 +197,6 @@ class MatchSimulator(
                     }
                 } else if (defRebPair != null) {
                     defRebPair.second.copy(rebounds = defRebPair.second.rebounds + 1).also { updateResult(it, !isLocalAttacking) }
-
-                    // Recursive possession logic from Simulate.java
-                    if (loseManyPoints(!isLocalAttacking)) {
-                        playPossession(pos, !isVisitorAttacking)
-                    }
                 }
             }
         }

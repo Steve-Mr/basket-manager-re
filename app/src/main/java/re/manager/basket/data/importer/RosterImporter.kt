@@ -40,7 +40,7 @@ class RosterImporter(private val context: Context, private val database: AppData
                         color = "#FFFFFF",
                         conference = conference,
                         division = division,
-                        salaryCap = 70000000, // Default MED Salary Cap
+                        salaryCap = re.manager.basket.domain.model.Constants.INITIAL_SALARY_CAPS[name] ?: 70000000,
                         gameId = gameId
                     )
                 )
