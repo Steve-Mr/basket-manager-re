@@ -491,7 +491,7 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
                 else -> 234
             }
             val toDelete = matches.filter { it.matchday <= roundEndDay }
-            toDelete.forEach { database.matchDao().delete(it) }
+            database.matchDao().deleteMatches(toDelete)
         }
     }
 
@@ -627,21 +627,6 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
         // 171: same as 169 (T)
         // 172: E8-E1, E7-E2, W8-W1, W7-W2 (F)
         // ...
-
-        fun addSeries(p1: Int, p2: Int, conf: Int) {
-            val t1 = (if (conf == 1) eastStandings else westStandings)[p1].teamId
-            val t2 = (if (conf == 1) eastStandings else westStandings)[p2].teamId
-
-            // 2-2-1-1-1 format in BM2015
-            listOf(168, 170, 178, 180).forEach { d -> matches.add(MatchEntity(gameId = gameId, matchday = d, teamLocalId = t1, teamVisitorId = t2)) }
-            listOf(172, 174, 176).forEach { d -> matches.add(MatchEntity(gameId = gameId, matchday = d, teamLocalId = t2, teamVisitorId = t1)) }
-
-            // Adjust days for seeds 3,4,5,6
-            if (p1 == 2 || p1 == 3) {
-                // Shift days 168->169, 170->171 etc as per original
-                // Actually let's just use the exact days from ManagePlayoffs.java
-            }
-        }
 
         // Correcting to exact days from Simulate.java
         val schedule = listOf(
