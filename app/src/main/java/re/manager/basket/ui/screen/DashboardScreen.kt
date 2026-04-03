@@ -10,6 +10,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import re.manager.basket.ui.viewmodel.GameViewModel
 
@@ -74,9 +75,28 @@ fun DashboardContent(
             ) {
                 items(news) { item ->
                     Card(modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text(text = "Day ${item.matchday}: ${item.title}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                            Text(text = item.body, style = MaterialTheme.typography.bodySmall)
+                        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            val iconName = when(item.type) {
+                                "MATCH" -> if (item.title.contains("Victory")) "news_won" else "news_lost"
+                                "PLAYER" -> "news_mvp"
+                                "INFO" -> "news_info"
+                                else -> "news_info"
+                            }
+                            val context = androidx.compose.ui.platform.LocalContext.current
+                            val resId = context.resources.getIdentifier(iconName, "drawable", context.packageName)
+                            if (resId != 0) {
+                                Icon(
+                                    painter = painterResource(id = resId),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(40.dp).padding(end = 12.dp),
+                                    tint = androidx.compose.ui.graphics.Color.Unspecified
+                                )
+                            }
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(text = "Day ${item.matchday}: ${item.title}", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                                Text(text = item.body, style = MaterialTheme.typography.bodySmall)
+                            }
                         }
                     }
                 }

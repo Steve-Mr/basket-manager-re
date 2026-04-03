@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Star
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import re.manager.basket.data.entity.PlayerEntity
@@ -70,35 +71,15 @@ fun TacticScreen(
         }
 
         item {
-            Text("Star Players (Max 3)", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Text("Star players receive more minutes and scoring priority.", style = MaterialTheme.typography.bodySmall)
+            Text("Star Players", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text("Assigned stars receive significant priority in rotation and scoring.", style = MaterialTheme.typography.bodySmall)
         }
 
-        items(players.size) { index ->
-            val player = players[index]
-            val isStar1 = tactic.star1 == player.id
-            val isStar2 = tactic.star2 == player.id
-            val isStar3 = tactic.star3 == player.id
-            val isAnyStar = isStar1 || isStar2 || isStar3
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = if (isAnyStar) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
-                )
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(player.name, fontWeight = if (isAnyStar) FontWeight.Bold else FontWeight.Normal)
-                    Row {
-                        StarToggle(isStar1, "Star 1") { if (it) onUpdate(tactic.copy(star1 = player.id)) else onUpdate(tactic.copy(star1 = null)) }
-                        StarToggle(isStar2, "Star 2") { if (it) onUpdate(tactic.copy(star2 = player.id)) else onUpdate(tactic.copy(star2 = null)) }
-                        StarToggle(isStar3, "Star 3") { if (it) onUpdate(tactic.copy(star3 = player.id)) else onUpdate(tactic.copy(star3 = null)) }
-                    }
-                }
+        item {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                StarSlot("Star 1", tactic.star1, players, Modifier.weight(1f)) { onUpdate(tactic.copy(star1 = it)) }
+                StarSlot("Star 2", tactic.star2, players, Modifier.weight(1f)) { onUpdate(tactic.copy(star2 = it)) }
+                StarSlot("Star 3", tactic.star3, players, Modifier.weight(1f)) { onUpdate(tactic.copy(star3 = it)) }
             }
         }
     }
@@ -127,12 +108,60 @@ fun StrategySlider(
 }
 
 @Composable
-fun StarToggle(active: Boolean, label: String, onToggle: (Boolean) -> Unit) {
-    IconButton(onClick = { onToggle(!active) }) {
-        Icon(
-            imageVector = if (active) Icons.Filled.Star else Icons.Outlined.Star,
-            contentDescription = label,
-            tint = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+fun StarSlot(
+    label: String,
+    playerId: Int?,
+    players: List<PlayerEntity>,
+    modifier: Modifier = Modifier,
+    onSelect: (Int?) -> Unit
+) {
+    var showDialog by remember { mutableStateOf(false) }
+    val player = players.find { it.id == playerId }
+
+    if (showDialog) {
+        AlertDialog(
+            onDismissRequest = { showDialog = false },
+            title = { Text("Select $label") },
+            text = {
+                LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
+                    item {
+                        DropdownMenuItem(
+                            text = { Text("None", color = Color.Gray) },
+                            onClick = { onSelect(null); showDialog = false }
+                        )
+                    }
+                    items(players.size) { index ->
+                        val p = players[index]
+                        DropdownMenuItem(
+                            text = { Text("${p.name} (Avg: ${p.getAverageSkillAll().toInt()})") },
+                            onClick = { onSelect(p.id); showDialog = false }
+                        )
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showDialog = false }) { Text("Close") } }
         )
+    }
+
+    OutlinedCard(
+        onClick = { showDialog = true },
+        modifier = modifier.height(100.dp),
+        colors = if (player != null) CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer) else CardDefaults.cardColors()
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(Icons.Filled.Star, contentDescription = null, tint = if (player != null) MaterialTheme.colorScheme.primary else Color.LightGray)
+            Text(label, style = MaterialTheme.typography.labelSmall)
+            Text(
+                player?.name ?: "Empty",
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Bold,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                maxLines = 1
+            )
+        }
     }
 }

@@ -46,6 +46,9 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
     private val _userTactic = MutableStateFlow<re.manager.basket.data.entity.TacticEntity?>(null)
     val userTactic: StateFlow<re.manager.basket.data.entity.TacticEntity?> = _userTactic
 
+    private val _activePlayer = MutableStateFlow<re.manager.basket.data.entity.PlayerEntity?>(null)
+    val activePlayer: StateFlow<re.manager.basket.data.entity.PlayerEntity?> = _activePlayer
+
     private val _selectedPlayerStats = MutableStateFlow<List<re.manager.basket.data.entity.MatchResultEntity>>(emptyList())
     val selectedPlayerStats: StateFlow<List<re.manager.basket.data.entity.MatchResultEntity>> = _selectedPlayerStats
 
@@ -55,11 +58,17 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
     private val _selectedTeamLeague = MutableStateFlow<re.manager.basket.data.entity.LeagueEntity?>(null)
     val selectedTeamLeague: StateFlow<re.manager.basket.data.entity.LeagueEntity?> = _selectedTeamLeague
 
+    private val _selectedTeamTactic = MutableStateFlow<re.manager.basket.data.entity.TacticEntity?>(null)
+    val selectedTeamTactic: StateFlow<re.manager.basket.data.entity.TacticEntity?> = _selectedTeamTactic
+
     private val _selectedMatchDetail = MutableStateFlow<re.manager.basket.data.entity.MatchEntity?>(null)
     val selectedMatchDetail: StateFlow<re.manager.basket.data.entity.MatchEntity?> = _selectedMatchDetail
 
     private val _selectedMatchResults = MutableStateFlow<List<re.manager.basket.data.entity.MatchResultEntity>>(emptyList())
     val selectedMatchResults: StateFlow<List<re.manager.basket.data.entity.MatchResultEntity>> = _selectedMatchResults
+
+    private val _selectedTeamStats = MutableStateFlow<List<re.manager.basket.data.entity.MatchResultEntity>>(emptyList())
+    val selectedTeamStats: StateFlow<List<re.manager.basket.data.entity.MatchResultEntity>> = _selectedTeamStats
 
     private val _isSimulating = MutableStateFlow(false)
     val isSimulating: StateFlow<Boolean> = _isSimulating
@@ -103,19 +112,25 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
                 val updated = player.copy(primaryPositionActive = !player.primaryPositionActive)
                 database.playerDao().update(updated)
                 // Refresh data
-                loadPlayerStats(player.id)
+                loadPlayerDetails(player.id)
                 player.teamId?.let { loadTeamRoster(it) }
             }
         }
     }
 
-    fun loadPlayerStats(playerId: Int) {
+    fun loadPlayerDetails(playerId: Int) {
         val gameId = _gameState.value?.id ?: return
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
+                _activePlayer.value = database.playerDao().getPlayersByGame(gameId).find { it.id == playerId }
                 _selectedPlayerStats.value = database.matchResultDao().getResultsByPlayer(playerId, gameId)
             }
         }
+    }
+
+    fun closePlayerDetails() {
+        _activePlayer.value = null
+        _selectedPlayerStats.value = emptyList()
     }
 
     fun loadTeamRoster(teamId: Int) {
@@ -124,6 +139,14 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
             withContext(Dispatchers.IO) {
                 _selectedTeamRoster.value = database.playerDao().getPlayersByTeam(teamId, gameId)
                 _selectedTeamLeague.value = database.leagueDao().getLeagueForTeam(teamId, gameId)
+                _selectedTeamTactic.value = database.tacticDao().getTacticForTeam(teamId, gameId)
+
+                // Load all stats for the team's players to calculate averages
+                val stats = mutableListOf<re.manager.basket.data.entity.MatchResultEntity>()
+                _selectedTeamRoster.value.forEach { player ->
+                    stats.addAll(database.matchResultDao().getResultsByPlayer(player.id, gameId))
+                }
+                _selectedTeamStats.value = stats
             }
         }
     }
@@ -435,8 +458,15 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
             val winnerTeam = if (localScore > visitorScore) localTeam else visitorTeam
             val isUserWin = winnerId == currentUserId
 
+            val maxPts = result.playerResults.filter { it.playerId in result.playerResults.map { pr -> pr.playerId } }.maxByOrNull { it.points }
+            val maxReb = result.playerResults.maxByOrNull { it.rebounds }
+            val maxAst = result.playerResults.maxByOrNull { it.assists }
+
             val title = if (isUserWin) "Victory! ${winnerTeam?.name} wins" else "Defeat: ${localTeam?.name} vs ${visitorTeam?.name}"
-            val body = "Final Score: $localScore - $visitorScore. Top Scorer: ${result.playerResults.maxByOrNull { it.points }?.name}"
+            val body = "Final Score: $localScore - $visitorScore.\n" +
+                       "Top Scorer: ${maxPts?.name} (${maxPts?.points} pts)\n" +
+                       "Top Rebounder: ${maxReb?.name} (${maxReb?.rebounds} reb)\n" +
+                       "Top Passer: ${maxAst?.name} (${maxAst?.assists} ast)"
 
             database.newsDao().insert(
                 re.manager.basket.data.entity.NewsEntity(

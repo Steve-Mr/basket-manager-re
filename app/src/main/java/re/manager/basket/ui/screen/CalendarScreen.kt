@@ -54,33 +54,77 @@ fun CalendarScreen(
         }
     ) { padding ->
         Row(modifier = Modifier.fillMaxSize().padding(padding)) {
-            // Left Column: Days
+            // Left Column: Days (Increased width to show more detail)
             LazyColumn(
                 state = listState,
-                modifier = Modifier.width(80.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surfaceVariant),
+                modifier = Modifier.width(100.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surfaceVariant),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 items(sortedDays) { day ->
                     val isSelected = day == selectedDay
-                    val hasUserMatch = matchesByDay[day]?.any { (it as MatchEntity).teamLocalId == userTeamId || it.teamVisitorId == userTeamId } ?: false
+                    val userMatch = matchesByDay[day]?.find { it.teamLocalId == userTeamId || it.teamVisitorId == userTeamId }
+                    val opponent = userMatch?.let { if (it.teamLocalId == userTeamId) teamsMap[it.teamVisitorId] else teamsMap[it.teamLocalId] }
+                    val isHome = userMatch?.teamLocalId == userTeamId
+
+                    val isPlayed = userMatch != null && userMatch.localQ1 + userMatch.visitorQ1 > 0
+                    val isWin = if (isPlayed) {
+                        val localTotal = userMatch!!.localQ1 + userMatch.localQ2 + userMatch.localQ3 + userMatch.localQ4
+                        val visitorTotal = userMatch.visitorQ1 + userMatch.visitorQ2 + userMatch.visitorQ3 + userMatch.visitorQ4
+                        (isHome && localTotal > visitorTotal) || (!isHome && visitorTotal > localTotal)
+                    } else false
+
+                    val phase = when {
+                        day > 233 -> "End"
+                        day == 233 -> "FA"
+                        day > 230 -> "Draft"
+                        day > 225 -> "Renw"
+                        day > 212 -> "Final"
+                        day > 198 -> "Conf F"
+                        day > 182 -> "Semi"
+                        day > 166 -> "R1"
+                        else -> ""
+                    }
 
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { selectedDay = day }
-                            .background(if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
-                            .padding(vertical = 12.dp),
+                            .background(
+                                when {
+                                    isSelected -> MaterialTheme.colorScheme.primaryContainer
+                                    isPlayed && isWin -> Color(0xFFE8F5E9)
+                                    isPlayed && !isWin -> Color(0xFFFFEBEE)
+                                    else -> Color.Transparent
+                                }
+                            )
+                            .padding(vertical = 8.dp, horizontal = 4.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
                                 text = "D$day",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                color = if (hasUserMatch) MaterialTheme.colorScheme.primary else Color.Unspecified
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Gray
                             )
-                            if (hasUserMatch) {
-                                Box(modifier = Modifier.size(4.dp).background(MaterialTheme.colorScheme.primary, shape = androidx.compose.foundation.shape.CircleShape))
+                            if (userMatch != null) {
+                                Text(
+                                    text = (if (isHome) "vs " else "@ ") + (opponent?.name ?: "???"),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = when {
+                                        isPlayed && isWin -> Color(0xFF2E7D32)
+                                        isPlayed && !isWin -> Color(0xFFC62828)
+                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                    }
+                                )
+                            }
+                            if (phase.isNotEmpty()) {
+                                Text(
+                                    text = phase,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = MaterialTheme.colorScheme.secondary
+                                )
                             }
                         }
                     }
@@ -101,11 +145,25 @@ fun CalendarScreen(
                         val isUserMatch = match.teamLocalId == userTeamId || match.teamVisitorId == userTeamId
                         val isPlayed = match.localQ1 + match.visitorQ1 > 0
 
+                        val localTotal = match.localQ1 + match.localQ2 + match.localQ3 + match.localQ4
+                        val visitorTotal = match.visitorQ1 + match.visitorQ2 + match.visitorQ3 + match.visitorQ4
+                        val isUserWin = isUserMatch && isPlayed && (
+                            (match.teamLocalId == userTeamId && localTotal > visitorTotal) ||
+                            (match.teamVisitorId == userTeamId && visitorTotal > localTotal)
+                        )
+                        val isUserLoss = isUserMatch && isPlayed && !isUserWin
+
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             onClick = { onMatchClick(match) },
-                            colors = if (isUserMatch) CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-                                     else CardDefaults.cardColors()
+                            colors = CardDefaults.cardColors(
+                                containerColor = when {
+                                    isUserWin -> Color(0xFFE8F5E9)
+                                    isUserLoss -> Color(0xFFFFEBEE)
+                                    isUserMatch -> MaterialTheme.colorScheme.primaryContainer
+                                    else -> MaterialTheme.colorScheme.surface
+                                }
+                            )
                         ) {
                             Row(
                                 modifier = Modifier.padding(16.dp).fillMaxWidth(),

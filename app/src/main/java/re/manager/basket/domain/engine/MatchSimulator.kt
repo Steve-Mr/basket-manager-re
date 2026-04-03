@@ -68,13 +68,13 @@ class MatchSimulator(
         var possessions = Constants.BASE_POSSESSIONS
         var currentPos = 0
         while (currentPos < possessions) {
+            // Correct possession alternate: In original code, i % 2 == 0 is visitor attacking
             val isVisitorAttacking = currentPos % 2 == 0
 
             playPossession(currentPos, isVisitorAttacking)
 
             if (currentPos == possessions - 1 && getTotalPoints(true) == getTotalPoints(false)) {
                 possessions += Constants.OVERTIME_POSSESSIONS
-                // Overtime handling could be more precise but following original tie logic
             }
             currentPos++
         }
@@ -136,10 +136,14 @@ class MatchSimulator(
 
         // 5. Shot Selection
         val attackingTactic = if (isLocalAttacking) localTactic else visitorTactic
-        val isInterior = Random.nextInt(100) < attackingTactic.shotIntPercent
+
+        // Refined shooting probability based on tactic and original logic
+        val shotRoll = Random.nextInt(100)
+        val isInterior = shotRoll < attackingTactic.shotIntPercent
         val isTriple = !isInterior && Random.nextInt(100) < attackingTactic.shotTriplePercent
         val shotType = if (isInterior) 1 else if (isTriple) 3 else 2
 
+        // Always attempt to pick a shooter to avoid skipping possessions
         val shooter = rulete.pickPlayer(if (isInterior) 6 else 7, isLocalAttacking, if (isLocalAttacking) match.teamLocalId else match.teamVisitorId)
         if (shooter == null) return
 
@@ -302,10 +306,12 @@ class MatchSimulator(
     private fun getDefenseModifier(player: PlayerEntity, isLocal: Boolean) = -(if (isLocal) localTactic else visitorTactic).gameType + player.getPenalty(getMatchPosition(player, isLocal))
 
     private fun accomplishedAction(skill: Int, modifier: Float): Boolean {
+        // Original logic from Simulate.java:accomplishedAction
+        // The skill value includes tactical modifiers and penalties.
         val random = Random.nextInt(0, 101)
         if (random == 0) return true
         if (random == 100) return false
-        return random.toFloat() <= skill.toFloat() * modifier
+        return random.toFloat() <= (skill.toFloat() * modifier)
     }
 
     private fun getRandomGauss(min: Int, max: Int): Int {

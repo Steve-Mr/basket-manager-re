@@ -7,6 +7,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import re.manager.basket.data.entity.PlayerEntity
@@ -43,27 +44,53 @@ fun PlayerDetailScreen(
                 Text("Basic Information", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            Text("Age: ${player.age}")
-                            Text("Exp: ${player.yearsExperience}y")
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                            Column {
+                                Text("Age: ${player.age}")
+                                Text("Exp: ${player.yearsExperience}y")
+                            }
+
+                            val starIcon = when {
+                                player.potential >= 9 -> "star6"
+                                player.potential >= 7 -> "star5"
+                                player.potential >= 5 -> "star4"
+                                player.potential >= 3 -> "star3"
+                                player.potential >= 1 -> "star2"
+                                else -> "star1"
+                            }
+                            val context = androidx.compose.ui.platform.LocalContext.current
+                            val resId = context.resources.getIdentifier(starIcon, "drawable", context.packageName)
+                            if (resId != 0) {
+                                Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
+                                    Icon(
+                                        painter = painterResource(id = resId),
+                                        contentDescription = "Potential",
+                                        modifier = Modifier.size(48.dp),
+                                        tint = androidx.compose.ui.graphics.Color.Unspecified
+                                    )
+                                    Text("Potential", style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
                         }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
                         ) {
                             val activePos = if (player.primaryPositionActive) player.positionFirst else player.positionSecond
-                            Text("Position: $activePos (Active)")
+                            Text("Position: $activePos (Active)", fontWeight = FontWeight.Bold)
                             if (player.positionSecond != re.manager.basket.domain.model.Position.NONE) {
-                                TextButton(onClick = onTogglePosition) {
-                                    Text("Switch to ${if (player.primaryPositionActive) player.positionSecond else player.positionFirst}")
+                                FilledTonalButton(onClick = onTogglePosition) {
+                                    Text("Switch Position")
                                 }
                             }
                         }
-                        Text("Potential: ${player.potential}")
 
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("Average Skill: ${player.getAverageSkillAll().toInt()}", fontWeight = FontWeight.Bold)
+                        Text("Rating: ${player.getAverageSkillAll().toInt()}", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
                     }
                 }
             }

@@ -33,11 +33,14 @@ fun MainScaffold(
     val allMatches by gameViewModel.allMatches.collectAsState()
     val availableTeams by gameViewModel.availableTeams.collectAsState()
     val userTactic by gameViewModel.userTactic.collectAsState()
+    val activePlayer by gameViewModel.activePlayer.collectAsState()
     val selectedPlayerStats by gameViewModel.selectedPlayerStats.collectAsState()
     val selectedTeamRoster by gameViewModel.selectedTeamRoster.collectAsState()
     val selectedTeamLeague by gameViewModel.selectedTeamLeague.collectAsState()
+    val selectedTeamTactic by gameViewModel.selectedTeamTactic.collectAsState()
     val selectedMatchDetail by gameViewModel.selectedMatchDetail.collectAsState()
     val selectedMatchResults by gameViewModel.selectedMatchResults.collectAsState()
+    val selectedTeamStats by gameViewModel.selectedTeamStats.collectAsState()
 
     MainScaffoldContent(
         selectedItemInitial = 0,
@@ -55,9 +58,13 @@ fun MainScaffold(
         selectedPlayerStats = selectedPlayerStats,
         selectedTeamRoster = selectedTeamRoster,
         selectedTeamLeague = selectedTeamLeague,
+        selectedTeamTactic = selectedTeamTactic,
         selectedMatchDetail = selectedMatchDetail,
         selectedMatchResults = selectedMatchResults,
-        onLoadPlayerStats = { gameViewModel.loadPlayerStats(it) },
+        selectedTeamStats = selectedTeamStats,
+        activePlayer = activePlayer,
+        onLoadPlayerDetails = { gameViewModel.loadPlayerDetails(it) },
+        onClosePlayerDetails = { gameViewModel.closePlayerDetails() },
         onLoadTeamRoster = { gameViewModel.loadTeamRoster(it) },
         onLoadMatchDetail = { gameViewModel.loadMatchDetail(it.id) },
         onCloseMatchDetail = { gameViewModel.closeMatchDetail() },
@@ -89,9 +96,13 @@ fun MainScaffoldContent(
     selectedPlayerStats: List<re.manager.basket.data.entity.MatchResultEntity>,
     selectedTeamRoster: List<re.manager.basket.data.entity.PlayerEntity>,
     selectedTeamLeague: re.manager.basket.data.entity.LeagueEntity?,
+    selectedTeamTactic: re.manager.basket.data.entity.TacticEntity?,
+    activePlayer: re.manager.basket.data.entity.PlayerEntity?,
     selectedMatchDetail: re.manager.basket.data.entity.MatchEntity?,
     selectedMatchResults: List<re.manager.basket.data.entity.MatchResultEntity>,
-    onLoadPlayerStats: (Int) -> Unit,
+    selectedTeamStats: List<re.manager.basket.data.entity.MatchResultEntity>,
+    onLoadPlayerDetails: (Int) -> Unit,
+    onClosePlayerDetails: () -> Unit,
     onLoadTeamRoster: (Int) -> Unit,
     onLoadMatchDetail: (re.manager.basket.data.entity.MatchEntity) -> Unit,
     onCloseMatchDetail: () -> Unit,
@@ -111,6 +122,7 @@ fun MainScaffoldContent(
     var detailPlayerId by remember { mutableStateOf<Int?>(null) }
     var detailTeamId by remember { mutableIntStateOf(-1) }
     var showCalendar by remember { mutableStateOf(false) }
+    var showTeamStats by remember { mutableStateOf(false) }
     var teamSubTab by remember { mutableIntStateOf(0) } // 0: Squad, 1: Lineup, 2: Tactic, 3: Finance
 
     Scaffold(
@@ -193,18 +205,27 @@ fun MainScaffoldContent(
                         onBack = onCloseMatchDetail
                     )
                 } else if (detailPlayerId != null) {
-                    val player = players.find { it.id == detailPlayerId }?.originalEntity ?:
-                                 selectedTeamRoster.find { it.id == detailPlayerId }
-                    if (player != null) {
-                        LaunchedEffect(detailPlayerId) { onLoadPlayerStats(detailPlayerId!!) }
+                    LaunchedEffect(detailPlayerId) { onLoadPlayerDetails(detailPlayerId!!) }
+                    if (activePlayer != null) {
                         PlayerDetailScreen(
-                            player = player,
+                            player = activePlayer!!,
                             stats = selectedPlayerStats,
-                            onTogglePosition = { onTogglePosition(player) },
-                            onBack = { detailPlayerId = null }
+                            onTogglePosition = { onTogglePosition(activePlayer!!) },
+                            onBack = {
+                                detailPlayerId = null
+                                onClosePlayerDetails()
+                            }
                         )
-                    } else {
-                        detailPlayerId = null
+                    }
+                } else if (showTeamStats && detailTeamId != -1) {
+                    val team = availableTeams.find { it.id == detailTeamId }
+                    if (team != null) {
+                        TeamStatsScreen(
+                            team = team,
+                            players = selectedTeamRoster,
+                            allStats = selectedTeamStats,
+                            onBack = { showTeamStats = false }
+                        )
                     }
                 } else if (detailTeamId != -1) {
                     val team = availableTeams.find { it.id == detailTeamId }
@@ -214,7 +235,9 @@ fun MainScaffoldContent(
                             team = team,
                             league = selectedTeamLeague,
                             players = selectedTeamRoster,
+                            tactic = selectedTeamTactic,
                             onPlayerClick = { detailPlayerId = it },
+                            onStatsClick = { showTeamStats = true },
                             onBack = { detailTeamId = -1 }
                         )
                     } else {
@@ -242,7 +265,7 @@ fun MainScaffoldContent(
                                 Tab(selected = teamSubTab == 3, onClick = { teamSubTab = 3 }) { Text("Finance", modifier = Modifier.padding(16.dp)) }
                             }
                             when (teamSubTab) {
-                                0 -> TeamSquadContent(players, onPlayerClick = { detailPlayerId = it })
+                                0 -> TeamSquadContent(players, tactic = userTactic, onPlayerClick = { detailPlayerId = it })
                                 1 -> {
                                     val teamPlayers = players.map { it.originalEntity }
                                     if (userTactic != null) {
