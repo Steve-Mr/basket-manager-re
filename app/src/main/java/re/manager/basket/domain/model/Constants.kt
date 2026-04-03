@@ -4,6 +4,10 @@ object Constants {
     // Season Matchdays
     const val REGULAR_SEASON_DAYS = 166
     const val PLAYOFFS_DAYS = 225
+    const val PLAYOFFS_ROUND_1_START = 168
+    const val PLAYOFFS_ROUND_2_START = 183
+    const val PLAYOFFS_ROUND_3_START = 198
+    const val PLAYOFFS_ROUND_4_START = 213
     const val OFFSEASON_RENEWALS_DAYS = 230
     const val OFFSEASON_DRAFT_DAYS = 232
     const val OFFSEASON_FREE_AGENCY_DAY = 233

@@ -48,7 +48,7 @@ class Rulete(
     }
 
     private fun getTotalRulete(player: PlayerEntity, result: MatchResultEntity, ruleteSkill: Int): Int {
-        if (player.stateInjury > 0 || result.foulsMade >= 6) return 0
+        if (player.stateInjury > 0 || result.foulsMade >= 6 || result.minutesPlayed <= 0) return 0
 
         val minutesPlayed = result.minutesPlayed
         var minutesPlayedForPoints = minutesPlayed

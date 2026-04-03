@@ -70,6 +70,9 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
     private val _selectedTeamStats = MutableStateFlow<List<re.manager.basket.data.entity.MatchResultEntity>>(emptyList())
     val selectedTeamStats: StateFlow<List<re.manager.basket.data.entity.MatchResultEntity>> = _selectedTeamStats
 
+    private val _playoffs = MutableStateFlow<List<re.manager.basket.data.entity.PlayoffEntity>>(emptyList())
+    val playoffs: StateFlow<List<re.manager.basket.data.entity.PlayoffEntity>> = _playoffs
+
     private val _isSimulating = MutableStateFlow(false)
     val isSimulating: StateFlow<Boolean> = _isSimulating
 
@@ -129,8 +132,12 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
         val gameId = _gameState.value?.id ?: return
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
-                _activePlayer.value = database.playerDao().getPlayersByGame(gameId).find { it.id == playerId }
-                _selectedPlayerStats.value = database.matchResultDao().getResultsByPlayer(playerId, gameId)
+                val player = database.playerDao().getPlayersByGame(gameId).find { it.id == playerId }
+                _activePlayer.value = player
+                val stats = database.matchResultDao().getResultsByPlayer(playerId, gameId)
+                // Filter stats where the player actually played minutes to avoid cluttering with 0-min games
+                _selectedPlayerStats.value = stats.filter { it.minutesPlayed > 0 }
+                Log.d("GameViewModel", "Loaded details for player $playerId, found ${stats.size} stats, ${_selectedPlayerStats.value.size} with minutes")
             }
         }
     }
@@ -151,7 +158,7 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
                 // Load all stats for the team's players to calculate averages
                 val stats = mutableListOf<re.manager.basket.data.entity.MatchResultEntity>()
                 _selectedTeamRoster.value.forEach { player ->
-                    stats.addAll(database.matchResultDao().getResultsByPlayer(player.id, gameId))
+                    stats.addAll(database.matchResultDao().getResultsByPlayer(player.id, gameId).filter { it.minutesPlayed > 0 })
                 }
                 _selectedTeamStats.value = stats
             }
@@ -230,6 +237,7 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
                 _news.value = database.newsDao().getNewsByGame(gameId)
                 _allMatches.value = database.matchDao().getAllMatchesForGame(gameId)
                 _availableTeams.value = database.teamDao().getTeamsByGame(gameId)
+                _playoffs.value = database.playoffDao().getPlayoffsByGame(gameId)
                 if (game?.userTeamId != null) {
                     _userTactic.value = database.tacticDao().getTacticForTeam(game.userTeamId, gameId)
                 }
@@ -324,7 +332,8 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
                                 val result = simulator.simulate()
 
                                 database.matchDao().update(result.match)
-                                database.matchResultDao().insertAll(result.playerResults)
+                                // Filter out results for players who didn't play to save space, but keep minutesPlayed > 0
+                                database.matchResultDao().insertAll(result.playerResults.filter { it.minutesPlayed > 0 })
 
                                 if (result.injuries.isNotEmpty()) {
                                     database.playerDao().insertAll(result.injuries)
@@ -346,7 +355,10 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
                         val evolvedPlayers = re.manager.basket.domain.engine.StateEvolver().evolveAllPlayersDaily(allPlayers)
                         database.playerDao().insertAll(evolvedPlayers)
 
-                        // 3. Move to next day
+                        // 3. Playoff Management
+                        re.manager.basket.domain.engine.PlayoffManager(database).managePlayoffs(activeGame.id, currentDay)
+
+                        // 4. Move to next day
                         val seasonManager = SeasonManager(activeGame)
                         val nextDayVal = seasonManager.getNextMatchday()
 
@@ -376,6 +388,7 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
                     _recentMatches.value = database.matchDao().getRecentMatches(current.id)
                     _allMatches.value = database.matchDao().getAllMatchesForGame(current.id)
                     _news.value = database.newsDao().getNewsByGame(current.id)
+                    _playoffs.value = database.playoffDao().getPlayoffsByGame(current.id)
                     finalGame?.let { updateNextMatch(it) }
                 }
             } catch (e: Exception) {
@@ -415,6 +428,12 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
                 // Bonus for each playoff win: +2M according to original game's financial balance
                 val updatedWinner = team.addSalaryCap(Constants.SALARY_CAP_STEP * 2)
                 database.teamDao().update(updatedWinner)
+            }
+
+            // Update PlayoffEntity wins
+            val playoffRec = database.playoffDao().getPlayoffsByGame(match.gameId).find { it.teamId == winnerId }
+            playoffRec?.let {
+                database.playoffDao().update(it.copy(seriesGamesWon = it.seriesGamesWon + 1))
             }
         }
     }
