@@ -7,6 +7,7 @@ import androidx.room.PrimaryKey
 
 @Entity(
     tableName = "match_results",
+    primaryKeys = ["matchId", "playerId"],
     foreignKeys = [
         ForeignKey(
             entity = GameEntity::class,
@@ -30,7 +31,6 @@ import androidx.room.PrimaryKey
     indices = [Index("gameId"), Index("matchId"), Index("playerId")]
 )
 data class MatchResultEntity(
-    @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val gameId: Int,
     val matchId: Int,
     val matchday: Int,

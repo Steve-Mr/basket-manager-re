@@ -13,10 +13,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.*
 import re.manager.basket.data.AppDatabase
 import re.manager.basket.data.entity.LeagueEntity
 import re.manager.basket.data.entity.TeamEntity
@@ -26,17 +24,21 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.Color
 
 class LeagueViewModel(private val database: AppDatabase) : ViewModel() {
-    private val _standings = MutableStateFlow<List<Pair<TeamEntity, LeagueEntity>>>(emptyList())
-    val standings: StateFlow<List<Pair<TeamEntity, LeagueEntity>>> = _standings.asStateFlow()
+    private val _gameId = MutableStateFlow<Int?>(null)
 
-    fun loadStandings(gameId: Int) {
-        viewModelScope.launch {
-            val teams = database.teamDao().getTeamsByGame(gameId).associateBy { it.id }
-            val stats = database.leagueDao().getStandings(gameId)
-            _standings.value = stats.mapNotNull {
-                teams[it.teamId]?.let { team -> team to it }
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val standings: StateFlow<List<Pair<TeamEntity, LeagueEntity>>> = _gameId.flatMapLatest { gameId ->
+        if (gameId == null) flowOf(emptyList())
+        else {
+            database.leagueDao().getStandingsFlow(gameId).map { stats ->
+                val teams = database.teamDao().getTeamsByGame(gameId).associateBy { it.id }
+                stats.mapNotNull { teams[it.teamId]?.let { team -> team to it } }
             }
         }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun loadStandings(gameId: Int) {
+        _gameId.value = gameId
     }
 }
 
