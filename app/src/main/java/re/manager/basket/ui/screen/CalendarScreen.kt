@@ -38,10 +38,10 @@ fun CalendarScreen(
 
     val listState = rememberLazyListState()
 
-    // Scroll to the selected day initially
-    LaunchedEffect(selectedDayInitial) {
-        val index = sortedDays.indexOf(selectedDayInitial).coerceAtLeast(0)
-        listState.animateScrollToItem(index)
+    // Scroll to the current matchday initially only once
+    LaunchedEffect(Unit) {
+        val index = sortedDays.indexOf(currentMatchday).coerceAtLeast(0)
+        listState.scrollToItem(index)
     }
 
     Scaffold(
@@ -77,14 +77,14 @@ fun CalendarScreen(
                     } else false
 
                     val phase = when {
-                        day > 233 -> "End"
-                        day == 233 -> "FA"
-                        day > 230 -> "Draft"
-                        day > 225 -> "Renw"
-                        day > 212 -> "Final"
+                        day > re.manager.basket.domain.model.Constants.TOTAL_SEASON_DAYS -> "End"
+                        day == re.manager.basket.domain.model.Constants.OFFSEASON_FREE_AGENCY_DAY -> "FA"
+                        day > re.manager.basket.domain.model.Constants.OFFSEASON_DRAFT_DAYS - 2 -> "Draft" // Approximation
+                        day > re.manager.basket.domain.model.Constants.OFFSEASON_RENEWALS_DAYS - 5 -> "Renw"
+                        day > 212 -> "Final" // Playoffs phases are usually dynamic but BM2015 uses fixed ranges
                         day > 198 -> "Conf F"
                         day > 182 -> "Semi"
-                        day > 166 -> "R1"
+                        day > re.manager.basket.domain.model.Constants.REGULAR_SEASON_DAYS -> "R1"
                         else -> ""
                     }
 

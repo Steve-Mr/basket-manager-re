@@ -374,6 +374,7 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
                     val finalGame = database.gameDao().getGameById(current.id)
                     _gameState.value = finalGame
                     _recentMatches.value = database.matchDao().getRecentMatches(current.id)
+                    _allMatches.value = database.matchDao().getAllMatchesForGame(current.id)
                     _news.value = database.newsDao().getNewsByGame(current.id)
                     finalGame?.let { updateNextMatch(it) }
                 }
