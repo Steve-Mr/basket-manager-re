@@ -96,8 +96,8 @@ class MatchSimulator(
 
         var localTotalAge = 0
         var localTotalSkill = 0.0
-        val localActivePlayers = localPlayers.filter { it.id == localTactic.titPG || it.id == localTactic.titSG || it.id == localTactic.titSF || it.id == localTactic.titPF || it.id == localTactic.titC ||
-                                                     it.id == localTactic.resPG || it.id == localTactic.resSG || it.id == localTactic.resSF || it.id == localTactic.resPF || it.id == localTactic.resC }
+        val localActiveIds = with(localTactic) { setOf(titPG, titSG, titSF, titPF, titC, resPG, resSG, resSF, resPF, resC) }
+        val localActivePlayers = localPlayers.filter { it.id in localActiveIds }
 
         localActivePlayers.forEach { p ->
             val pos = getMatchPosition(p, true)
@@ -111,8 +111,8 @@ class MatchSimulator(
 
         var visitorTotalAge = 0
         var visitorTotalSkill = 0.0
-        val visitorActivePlayers = visitorPlayers.filter { it.id == visitorTactic.titPG || it.id == visitorTactic.titSG || it.id == visitorTactic.titSF || it.id == visitorTactic.titPF || it.id == visitorTactic.titC ||
-                                                        it.id == visitorTactic.resPG || it.id == visitorTactic.resSG || it.id == visitorTactic.resSF || it.id == visitorTactic.resPF || it.id == visitorTactic.resC }
+        val visitorActiveIds = with(visitorTactic) { setOf(titPG, titSG, titSF, titPF, titC, resPG, resSG, resSF, resPF, resC) }
+        val visitorActivePlayers = visitorPlayers.filter { it.id in visitorActiveIds }
 
         visitorActivePlayers.forEach { p ->
             val pos = getMatchPosition(p, false)
@@ -149,10 +149,17 @@ class MatchSimulator(
 
     private fun Double.toOriginalInt(): Int = (this + 0.5).toInt()
 
-    private fun playPossession(pos: Int, isVisitorAttacking: Boolean) {
-        val isLocalAttacking = !isVisitorAttacking
+    private fun playPossession(pos: Int, initialIsVisitorAttacking: Boolean) {
+        var currentIsVisitorAttacking = initialIsVisitorAttacking
+        var playExtraPossession = true
 
-        // 1. Injury Check
+        // Iterative approach to handle extra possessions (e.g. from rebounds in loseManyPoints logic)
+        // to avoid potential StackOverflowError while maintaining original game logic.
+        while (playExtraPossession) {
+            playExtraPossession = false
+            val isLocalAttacking = !currentIsVisitorAttacking
+
+            // 1. Injury Check
         if (skillAttempt(Constants.INJURY_CHECK_PROB)) {
             val player = rulete.pickPlayer(0, isLocalAttacking, if (isLocalAttacking) match.teamLocalId else match.teamVisitorId)
             player?.let { p ->
@@ -223,14 +230,16 @@ class MatchSimulator(
         val isTriple = !isInterior && Random.nextInt(100) < attackingTactic.shotTriplePercent
         val shotType = if (isInterior) 1 else if (isTriple) 3 else 2
 
-        // Always attempt to pick a shooter to avoid skipping possessions
-        val shooter = rulete.pickPlayer(if (isInterior) 6 else 7, isLocalAttacking, if (isLocalAttacking) match.teamLocalId else match.teamVisitorId)
-        if (shooter == null) return
+            // Always attempt to pick a shooter to avoid skipping possessions
+            val shooter = rulete.pickPlayer(if (isInterior) 6 else 7, isLocalAttacking, if (isLocalAttacking) match.teamLocalId else match.teamVisitorId)
+            if (shooter == null) return
 
-        val shotValue = (if (isInterior) shooter.skillShotInterior else shooter.skillShotExterior) + getAttackModifier(shooter, isLocalAttacking)
-        var currentShotValue = shotValue + ((shotValue * assistanceModifier) / 100)
+            val shotValue = (if (isInterior) shooter.skillShotInterior else shooter.skillShotExterior) + getAttackModifier(shooter, isLocalAttacking)
+            // assistanceModifier application logic 100% matches Simulate.java:
+            // int shotValue2 = shotValue + ((shotValue * assistanceModifier) / 100);
+            var currentShotValue = shotValue + ((shotValue * assistanceModifier) / 100)
 
-        // 6. Block Check
+            // 6. Block Check
         val blocker = rulete.pickPlayer(2, !isLocalAttacking, if (!isLocalAttacking) match.teamLocalId else match.teamVisitorId)
         val attemptBlockProb = if (isInterior) Constants.BLOCK_ATTEMPT_PROB_INTERIOR else Constants.BLOCK_ATTEMPT_PROB_EXTERIOR
 
@@ -283,32 +292,43 @@ class MatchSimulator(
                     offRebounder.skillRebound + getDefenseModifier(offRebounder, isLocalAttacking) + getRandomGauss(0, 100) >
                     defRebounder.skillRebound + getDefenseModifier(defRebounder, !isLocalAttacking) + getRandomGauss(0, 100)) {
 
-                    val res = (if (isLocalAttacking) localResults else visitorResults)[offRebounder.id]!!
-                    updateResult(res.copy(rebounds = getRandomSimulate(res.rebounds)), isLocalAttacking)
+                        val res = (if (isLocalAttacking) localResults else visitorResults)[offRebounder.id]!!
+                        updateResult(res.copy(rebounds = getRandomSimulate(res.rebounds)), isLocalAttacking)
 
-                    if (loseManyPoints(isLocalAttacking)) {
-                        playPossession(pos, isVisitorAttacking)
-                    }
-                } else if (defRebounder != null) {
-                    val res = (if (!isLocalAttacking) localResults else visitorResults)[defRebounder.id]!!
-                    updateResult(res.copy(rebounds = getRandomSimulate(res.rebounds)), !isLocalAttacking)
+                        if (loseManyPoints(isLocalAttacking)) {
+                            playExtraPossession = true
+                            // Team attacking again: currentIsVisitorAttacking remains same
+                        }
+                    } else if (defRebounder != null) {
+                        val res = (if (!isLocalAttacking) localResults else visitorResults)[defRebounder.id]!!
+                        updateResult(res.copy(rebounds = getRandomSimulate(res.rebounds)), !isLocalAttacking)
 
-                    if (loseManyPoints(!isLocalAttacking)) {
-                        playPossession(pos, !isVisitorAttacking)
+                        if (loseManyPoints(!isLocalAttacking)) {
+                            playExtraPossession = true
+                            currentIsVisitorAttacking = !currentIsVisitorAttacking
+                        }
                     }
                 }
             }
-        }
 
-        // Free Throws: 100% Original Logic with proper statistical accumulation
-        if (shotsFree > 0) {
-            repeat(shotsFree) {
+            // Free Throws: 100% Original Logic with proper statistical accumulation (fix: avoid statistical loss in repeat loop)
+            if (shotsFree > 0) {
                 val shooterRes = (if (isLocalAttacking) localResults else visitorResults)[shooter.id]!!
-                if (accomplishedAction(shooter.skillShotFree + getAttackModifier(shooter, isLocalAttacking), 1.0f)) {
-                    updateResult(shooterRes.copy(shotsFreeOk = getRandomSimulate(shooterRes.shotsFreeOk)), isLocalAttacking)
-                } else {
-                    updateResult(shooterRes.copy(shotsFreeKo = getRandomSimulate(shooterRes.shotsFreeKo)), isLocalAttacking)
+                var okInc = 0.0
+                var koInc = 0.0
+                repeat(shotsFree) {
+                    if (accomplishedAction(shooter.skillShotFree + getAttackModifier(shooter, isLocalAttacking), 1.0f)) {
+                        val currentTotal = shooterRes.shotsFreeOk + okInc
+                        okInc += getRandomSimulate(currentTotal) - currentTotal
+                    } else {
+                        val currentTotal = shooterRes.shotsFreeKo + koInc
+                        koInc += getRandomSimulate(currentTotal) - currentTotal
+                    }
                 }
+                updateResult(shooterRes.copy(
+                    shotsFreeOk = shooterRes.shotsFreeOk + okInc,
+                    shotsFreeKo = shooterRes.shotsFreeKo + koInc
+                ), isLocalAttacking)
             }
         }
     }
