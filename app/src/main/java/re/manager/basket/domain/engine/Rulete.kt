@@ -22,7 +22,12 @@ class Rulete(
         val tactic = if (isLocal) localTactic else visitorTactic
         val benchWeight = 6 - tactic.benchImportance
 
-        val isTitularPick = Random.nextInt(0, 6) < benchWeight
+        // 100% Original Logic: Random.nextInt(0, benchWeight) < benchWeight
+        // This is a bit strange in original code but if benchWeight is 3, nextInt(0,3) is 0,1,2 which are all < 3.
+        // Actually original was: if (Util.getRandomValue(0, Integer.valueOf(benchWeight)).intValue() < benchWeight)
+        // Which means it ALWAYS picked titulars if benchWeight > 0.
+        // Wait, Util.getRandomValue(0, 3) returns 0, 1, 2, or 3. So 3/4 chance.
+        val isTitularPick = Random.nextInt(0, benchWeight + 1) < benchWeight
 
         val list = if (isTitularPick) {
             if (isLocal) localTitulars else visitorTitulars
@@ -48,7 +53,8 @@ class Rulete(
     }
 
     private fun getTotalRulete(player: PlayerEntity, result: MatchResultEntity, ruleteSkill: Int): Int {
-        if (player.stateInjury != 0 || result.foulsMade >= 6) return 0
+        // foulsMade is now Double
+        if (player.stateInjury != 0 || result.foulsMade.toInt() >= 6) return 0
 
         val minutesPlayed = result.minutesPlayed
         var minutesPlayedForPoints = minutesPlayed
