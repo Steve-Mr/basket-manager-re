@@ -333,7 +333,7 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
                                 if (result.injuries.isNotEmpty()) {
                                     database.playerDao().insertAll(result.injuries)
                                     // Check if user team had an injury
-                                    if (result.injuries.any { it.teamId == userTeamId && (it.stateInjury > 0 || it.stateInjury == -1) }) {
+                                    if (result.injuries.any { it.teamId == userTeamId && it.stateInjury > 0 }) {
                                         injuryOccurred = true
                                     }
                                 }
@@ -365,6 +365,7 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
 
                         val updated = activeGame.copy(currentMatchday = nextDayVal)
                         database.gameDao().update(updated)
+                        // Important: Refresh activeGame reference for next iteration of multi-day loop
                         _selectedCalendarDay.value = nextDayVal
 
                         simulatedCount++
@@ -509,6 +510,8 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
         // We'll trigger it when nextDay moves from 166 to 167
     }
 
+    private fun Double.toOriginalInt(): Int = (this + 0.5).toInt()
+
     private suspend fun generateMatchNews(result: re.manager.basket.domain.engine.MatchFullResult) {
         val match = result.match
         val localScore = match.getTotalLocal()
@@ -521,8 +524,12 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
 
         // 1. Awesome Performance News (All teams)
         result.playerResults.forEach { pResult ->
-            val isTripleDouble = pResult.points >= 10 && pResult.rebounds >= 10 && pResult.assists >= 10
-            val isHighPer = pResult.points >= 40 // Simplified original awesome logic
+            val pts = pResult.points
+            val reb = pResult.rebounds.toOriginalInt()
+            val ast = pResult.assists.toOriginalInt()
+
+            val isTripleDouble = pts >= 10 && reb >= 10 && ast >= 10
+            val isHighPer = pts >= 40 // Simplified original awesome logic
 
             if (isTripleDouble || isHighPer) {
                 database.newsDao().insert(
@@ -530,7 +537,7 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
                         gameId = match.gameId,
                         matchday = match.matchday,
                         title = "Awesome Performance: ${pResult.name}",
-                        body = "${pResult.name} recorded ${pResult.points} pts, ${pResult.rebounds} reb, ${pResult.assists} ast in the game ${localTeam?.name} vs ${visitorTeam?.name}.",
+                        body = "${pResult.name} recorded $pts pts, $reb reb, $ast ast in the game ${localTeam?.name} vs ${visitorTeam?.name}.",
                         type = "PLAYER"
                     )
                 )
@@ -543,7 +550,7 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
             val winnerTeam = if (localScore > visitorScore) localTeam else visitorTeam
             val isUserWin = winnerId == currentUserId
 
-            val maxPts = result.playerResults.filter { it.playerId in result.playerResults.map { pr -> pr.playerId } }.maxByOrNull { it.points }
+            val maxPts = result.playerResults.maxByOrNull { it.points }
             val maxReb = result.playerResults.maxByOrNull { it.rebounds }
             val maxAst = result.playerResults.maxByOrNull { it.assists }
 
@@ -553,10 +560,10 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
 
             val body = "Final Score: $localScore - $visitorScore.\n" +
                        "Top Scorer: ${maxPts?.name} (${maxPts?.points} pts)\n" +
-                       "Top Rebounder: ${maxReb?.name} (${maxReb?.rebounds} reb)\n" +
-                       "Top Passer: ${maxAst?.name} (${maxAst?.assists} ast)\n" +
-                       "Top Steals: ${maxStl?.name} (${maxStl?.steals ?: 0})\n" +
-                       "Top Blocks: ${maxBlk?.name} (${maxBlk?.blocks ?: 0})"
+                       "Top Rebounder: ${maxReb?.name} (${maxReb?.rebounds?.toOriginalInt()} reb)\n" +
+                       "Top Passer: ${maxAst?.name} (${maxAst?.assists?.toOriginalInt()} ast)\n" +
+                       "Top Steals: ${maxStl?.name} (${maxStl?.steals?.toOriginalInt() ?: 0})\n" +
+                       "Top Blocks: ${maxBlk?.name} (${maxBlk?.blocks?.toOriginalInt() ?: 0})"
 
             database.newsDao().insert(
                 re.manager.basket.data.entity.NewsEntity(

@@ -54,16 +54,18 @@ data class MatchResultEntity(
     val passesOk: Double = 0.0,
     val passesKo: Double = 0.0
 ) {
+    private fun Double.toOriginalInt(): Int = (this + 0.5).toInt()
+
     fun getPer(): Double {
         if (minutesPlayed == 0) return -100.0
 
-        val per = (((steals.toInt() * 54) + (shotsExt3Ok.toInt() * 52) +
-                   ((shotsIntOk.toInt() + shotsExt2Ok.toInt()) * 85) +
-                   (shotsFreeOk.toInt() * 47) + (blocks.toInt() * 39) +
-                   (passesOk.toInt() * 35) + (rebounds.toInt() * 27)) -
-                   (foulsMade.toInt() * 17) - (shotsFreeKo.toInt() * 20) -
-                   ((shotsIntKo.toInt() + shotsExt2Ko.toInt()) * 39) -
-                   (shotsExt3Ko.toInt() * 39) - (passesKo.toInt() * 54)).toDouble() / minutesPlayed
+        val per = (((steals.toOriginalInt() * 54) + (shotsExt3Ok.toOriginalInt() * 52) +
+                   ((shotsIntOk.toOriginalInt() + shotsExt2Ok.toOriginalInt()) * 85) +
+                   (shotsFreeOk.toOriginalInt() * 47) + (blocks.toOriginalInt() * 39) +
+                   (passesOk.toOriginalInt() * 35) + (rebounds.toOriginalInt() * 27)) -
+                   (foulsMade.toOriginalInt() * 17) - (shotsFreeKo.toOriginalInt() * 20) -
+                   ((shotsIntKo.toOriginalInt() + shotsExt2Ko.toOriginalInt()) * 39) -
+                   (shotsExt3Ko.toOriginalInt() * 39) - (passesKo.toOriginalInt() * 54)).toDouble() / minutesPlayed
 
         return Math.round(per * 100.0) / 100.0
     }

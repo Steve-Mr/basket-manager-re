@@ -96,10 +96,10 @@ fun MatchDetailScreen(
                         Spacer(modifier = Modifier.height(4.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             StatTag("PTS", stat.points.toString())
-                            StatTag("REB", stat.rebounds.toString())
-                            StatTag("AST", stat.assists.toString())
-                            StatTag("STL", stat.steals.toString())
-                            StatTag("BLK", stat.blocks.toString())
+                            StatTag("REB", (stat.rebounds + 0.5).toInt().toString())
+                            StatTag("AST", (stat.assists + 0.5).toInt().toString())
+                            StatTag("STL", (stat.steals + 0.5).toInt().toString())
+                            StatTag("BLK", (stat.blocks + 0.5).toInt().toString())
                         }
                     }
                 }

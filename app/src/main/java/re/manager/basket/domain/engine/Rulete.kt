@@ -7,6 +7,13 @@ import re.manager.basket.data.entity.MatchResultEntity
 import re.manager.basket.data.entity.TacticEntity
 import re.manager.basket.domain.model.Position
 
+data class MatchModifiers(
+    val localBase: Int,
+    val visitorBase: Int,
+    val ageBono: Int,
+    val allBono: Int
+)
+
 class Rulete(
     private val localTitulars: List<PlayerEntity>,
     private val localReserves: List<PlayerEntity>,
@@ -15,7 +22,8 @@ class Rulete(
     private val localTactic: TacticEntity,
     private val visitorTactic: TacticEntity,
     private val localTeamId: Int,
-    private val resultsProvider: (Int) -> MatchResultEntity?
+    private val resultsProvider: (Int) -> MatchResultEntity?,
+    private val matchModifiers: MatchModifiers
 ) {
 
     fun pickPlayer(skillIndex: Int, isLocal: Boolean, teamId: Int): PlayerEntity? {
@@ -93,14 +101,16 @@ class Rulete(
         }
     }
 
-    // These modifiers should be calculated once per match and stored, but for now we re-calc
+    // Restore 100% legacy modifier logic in Rulete weights
     private fun getAttackModifier(player: PlayerEntity, tactic: TacticEntity): Int {
         val isLocal = player.teamId == localTeamId
-        return tactic.gameType + player.getPenalty(getMatchPosition(player, isLocal))
+        val base = tactic.gameType + (if (isLocal) matchModifiers.localBase else matchModifiers.visitorBase) + player.getPenalty(getMatchPosition(player, isLocal))
+        return if (isLocal) base + matchModifiers.ageBono + matchModifiers.allBono else base
     }
 
     private fun getDefenseModifier(player: PlayerEntity, tactic: TacticEntity): Int {
         val isLocal = player.teamId == localTeamId
-        return -tactic.gameType + player.getPenalty(getMatchPosition(player, isLocal))
+        val base = -tactic.gameType + (if (isLocal) matchModifiers.localBase else matchModifiers.visitorBase) + player.getPenalty(getMatchPosition(player, isLocal))
+        return if (isLocal) base + matchModifiers.ageBono + matchModifiers.allBono else base
     }
 }

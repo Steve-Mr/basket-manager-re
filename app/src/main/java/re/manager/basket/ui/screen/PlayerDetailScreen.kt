@@ -120,10 +120,10 @@ fun PlayerDetailScreen(
                     val games = filteredStats.size
                     // We sum the inflated doubles then divide by games to get true season averages
                     val avgPts = filteredStats.sumOf { it.points }.toFloat() / games
-                    val avgReb = filteredStats.sumOf { it.rebounds }.toFloat() / games
-                    val avgAst = filteredStats.sumOf { it.assists }.toFloat() / games
-                    val avgStl = filteredStats.sumOf { it.steals }.toFloat() / games
-                    val avgBlk = filteredStats.sumOf { it.blocks }.toFloat() / games
+                    val avgReb = filteredStats.sumOf { (it.rebounds + 0.5).toInt() }.toFloat() / games
+                    val avgAst = filteredStats.sumOf { (it.assists + 0.5).toInt() }.toFloat() / games
+                    val avgStl = filteredStats.sumOf { (it.steals + 0.5).toInt() }.toFloat() / games
+                    val avgBlk = filteredStats.sumOf { (it.blocks + 0.5).toInt() }.toFloat() / games
                     val avgPer = filteredStats.sumOf { it.getPer() }.toFloat() / games
 
                     Card(modifier = Modifier.fillMaxWidth()) {

@@ -69,7 +69,8 @@ class MatchSimulator(
             localTactic = effectiveLocalTactic,
             visitorTactic = effectiveVisitorTactic,
             localTeamId = match.teamLocalId,
-            resultsProvider = { id -> localResults[id] ?: visitorResults[id] }
+            resultsProvider = { id -> localResults[id] ?: visitorResults[id] },
+            matchModifiers = MatchModifiers(localBaseMatchModifier, visitorBaseMatchModifier, bonoAverageAge, bonoAverageAll)
         )
 
         var possessions = Constants.BASE_POSSESSIONS
@@ -130,14 +131,21 @@ class MatchSimulator(
     private fun getRandomSimulate(base: Double): Double {
         val minValue = if (base == 0.0) 10 else 15
         val maxValue = if (base == 0.0) 20 else 25
+
+        // Ensure Random.nextInt range is valid
+        val low = minValue
+        val high = (maxValue + 1).coerceAtLeast(low + 1)
+
         val rolls = listOf(
-            Random.nextInt(minValue, maxValue + 1),
-            Random.nextInt(minValue, maxValue + 1),
-            Random.nextInt(minValue, maxValue + 1)
+            Random.nextInt(low, high),
+            Random.nextInt(low, high),
+            Random.nextInt(low, high)
         ).sorted()
         val result = rolls[1] / 10.0
         return base + result
     }
+
+    private fun Double.toOriginalInt(): Int = (this + 0.5).toInt()
 
     private fun playPossession(pos: Int, isVisitorAttacking: Boolean) {
         val isLocalAttacking = !isVisitorAttacking
@@ -376,7 +384,7 @@ class MatchSimulator(
                 }
                 r.copy(
                     name = starPrefix + r.name,
-                    points = (r.shotsFreeOk.toInt() * 1) + (r.shotsIntOk.toInt() * 2) + (r.shotsExt2Ok.toInt() * 2) + (r.shotsExt3Ok.toInt() * 3)
+                    points = (r.shotsFreeOk.toOriginalInt() * 1) + (r.shotsIntOk.toOriginalInt() * 2) + (r.shotsExt2Ok.toOriginalInt() * 2) + (r.shotsExt3Ok.toOriginalInt() * 3)
                 )
             }
         }
@@ -412,14 +420,14 @@ class MatchSimulator(
 
     private fun getTotalPoints(isLocal: Boolean): Int {
         val results = if (isLocal) localResults.values else visitorResults.values
-        var total = 0.0
+        var total = 0
         results.forEach { r ->
-            total += r.shotsFreeOk.toInt() * 1.0
-            total += r.shotsIntOk.toInt() * 2.0
-            total += r.shotsExt2Ok.toInt() * 2.0
-            total += r.shotsExt3Ok.toInt() * 3.0
+            total += r.shotsFreeOk.toOriginalInt() * 1
+            total += r.shotsIntOk.toOriginalInt() * 2
+            total += r.shotsExt2Ok.toOriginalInt() * 2
+            total += r.shotsExt3Ok.toOriginalInt() * 3
         }
-        return total.toInt()
+        return total
     }
 
     private fun isTitular(player: PlayerEntity, tactic: TacticEntity) =
