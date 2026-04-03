@@ -113,15 +113,16 @@ fun PlayerDetailScreen(
 
             item {
                 Text("Season Statistics", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                if (stats.isEmpty()) {
+                val filteredStats = stats.filter { it.minutesPlayed > 0 }
+                if (filteredStats.isEmpty()) {
                     Text("No games played yet.", style = MaterialTheme.typography.bodyMedium)
                 } else {
-                    val games = stats.size
-                    val avgPts = stats.sumOf { it.points }.toFloat() / games
-                    val avgReb = stats.sumOf { it.rebounds }.toFloat() / games
-                    val avgAst = stats.sumOf { it.assists }.toFloat() / games
-                    val avgStl = stats.sumOf { it.steals }.toFloat() / games
-                    val avgBlk = stats.sumOf { it.blocks }.toFloat() / games
+                    val games = filteredStats.size
+                    val avgPts = filteredStats.sumOf { it.points }.toFloat() / games
+                    val avgReb = filteredStats.sumOf { it.rebounds }.toFloat() / games
+                    val avgAst = filteredStats.sumOf { it.assists }.toFloat() / games
+                    val avgStl = filteredStats.sumOf { it.steals }.toFloat() / games
+                    val avgBlk = filteredStats.sumOf { it.blocks }.toFloat() / games
 
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.padding(16.dp)) {

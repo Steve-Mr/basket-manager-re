@@ -48,7 +48,7 @@ class Rulete(
     }
 
     private fun getTotalRulete(player: PlayerEntity, result: MatchResultEntity, ruleteSkill: Int): Int {
-        if (player.stateInjury > 0 || result.foulsMade >= 6) return 0
+        if (player.stateInjury != 0 || result.foulsMade >= 6) return 0
 
         val minutesPlayed = result.minutesPlayed
         var minutesPlayedForPoints = minutesPlayed
@@ -58,7 +58,8 @@ class Rulete(
         if (player.id == tactic.star2) minutesPlayedForPoints += 6
         if (player.id == tactic.star3) minutesPlayedForPoints += 3
 
-        val pos = getMatchPosition(player, tactic)
+        val isLocal = player.teamId == localTeamId
+        val pos = getMatchPosition(player, isLocal)
 
         return when (ruleteSkill) {
             0 -> minutesPlayed
@@ -74,7 +75,8 @@ class Rulete(
         }
     }
 
-    private fun getMatchPosition(player: PlayerEntity, tactic: TacticEntity): Position {
+    private fun getMatchPosition(player: PlayerEntity, isLocal: Boolean): Position {
+        val tactic = if (isLocal) localTactic else visitorTactic
         return when (player.id) {
             tactic.titPG, tactic.resPG -> Position.PG
             tactic.titSG, tactic.resSG -> Position.SG
@@ -86,12 +88,13 @@ class Rulete(
     }
 
     // These modifiers should be calculated once per match and stored, but for now we re-calc
-    // In original code, they are temp fields on Player object
     private fun getAttackModifier(player: PlayerEntity, tactic: TacticEntity): Int {
-        return tactic.gameType + player.getPenalty(getMatchPosition(player, tactic))
+        val isLocal = player.teamId == localTeamId
+        return tactic.gameType + player.getPenalty(getMatchPosition(player, isLocal))
     }
 
     private fun getDefenseModifier(player: PlayerEntity, tactic: TacticEntity): Int {
-        return -tactic.gameType + player.getPenalty(getMatchPosition(player, tactic))
+        val isLocal = player.teamId == localTeamId
+        return -tactic.gameType + player.getPenalty(getMatchPosition(player, isLocal))
     }
 }

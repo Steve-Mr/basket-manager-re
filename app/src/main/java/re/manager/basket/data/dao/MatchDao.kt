@@ -22,4 +22,7 @@ interface MatchDao {
 
     @Query("SELECT * FROM matches WHERE gameId = :gameId ORDER BY matchday ASC")
     suspend fun getAllMatchesForGame(gameId: Int): List<MatchEntity>
+
+    @Delete
+    suspend fun delete(match: MatchEntity)
 }
