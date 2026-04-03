@@ -68,9 +68,9 @@ class Rulete(
         var minutesPlayedForPoints = minutesPlayed
 
         val tactic = if (player.teamId == localTeamId) localTactic else visitorTactic
-        if (player.id == tactic.star1) minutesPlayedForPoints += 9
-        if (player.id == tactic.star2) minutesPlayedForPoints += 6
-        if (player.id == tactic.star3) minutesPlayedForPoints += 3
+        if (player.id == tactic.star1) minutesPlayedForPoints += 6
+        if (player.id == tactic.star2) minutesPlayedForPoints += 4
+        if (player.id == tactic.star3) minutesPlayedForPoints += 2
 
         val isLocal = player.teamId == localTeamId
         val pos = getMatchPosition(player, isLocal)

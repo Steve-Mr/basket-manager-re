@@ -10,8 +10,8 @@ object Constants {
     const val TOTAL_SEASON_DAYS = 234
 
     // Match Simulation
-    const val BASE_POSSESSIONS = 120
-    const val OVERTIME_POSSESSIONS = 5
+    const val BASE_POSSESSIONS = 200
+    const val OVERTIME_POSSESSIONS = 20
     const val STEAL_CHECK_PROB = 14
     const val TURNOVER_CHECK_PROB = 17
     const val FOUL_CHECK_PROB = 10
@@ -21,9 +21,9 @@ object Constants {
     const val TURNOVER_SKILL_MODIFIER = 0.6f
     const val BLOCK_ATTEMPT_PROB_INTERIOR = 11
     const val BLOCK_ATTEMPT_PROB_EXTERIOR = 9
-    const val SHOT_MODIFIER_INTERIOR = 0.65f
-    const val SHOT_MODIFIER_EXTERIOR = 0.55f
-    const val SHOT_MODIFIER_TRIPLE = 0.45f
+    const val SHOT_MODIFIER_INTERIOR = 0.70f
+    const val SHOT_MODIFIER_EXTERIOR = 0.60f
+    const val SHOT_MODIFIER_TRIPLE = 0.50f
     const val REBOUND_TRIGGER_PROB = 76
 
     // Player Stats
