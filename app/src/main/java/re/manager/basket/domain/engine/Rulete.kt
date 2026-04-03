@@ -105,7 +105,12 @@ class Rulete(
     private fun getAttackModifier(player: PlayerEntity, tactic: TacticEntity): Int {
         val isLocal = player.teamId == localTeamId
         val base = tactic.gameType + (if (isLocal) matchModifiers.localBase else matchModifiers.visitorBase) + player.getPenalty(getMatchPosition(player, isLocal))
-        return if (isLocal) base + matchModifiers.ageBono + matchModifiers.allBono else base
+
+        return if (isLocal) {
+            val isTitular = player.id == tactic.titPG || player.id == tactic.titSG || player.id == tactic.titSF || player.id == tactic.titPF || player.id == tactic.titC
+            val allBono = if (isTitular) matchModifiers.allBono else 0
+            base + matchModifiers.ageBono + allBono
+        } else base
     }
 
     private fun getDefenseModifier(player: PlayerEntity, tactic: TacticEntity): Int {

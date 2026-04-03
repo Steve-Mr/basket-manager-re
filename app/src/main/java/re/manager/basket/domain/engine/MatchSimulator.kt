@@ -129,18 +129,20 @@ class MatchSimulator(
     }
 
     private fun getRandomSimulate(base: Double): Double {
+        // 100% Original Logic from Util.java: getRandomSimulate(Double base)
+        // if (base == 0.0) { minValue = 10; maxValue = 20 } else { minValue = 15; maxValue = 25 }
         val minValue = if (base == 0.0) 10 else 15
         val maxValue = if (base == 0.0) 20 else 25
 
-        // Ensure Random.nextInt range is valid
-        val low = minValue
-        val high = (maxValue + 1).coerceAtLeast(low + 1)
+        // getRandomValue(minValue, maxValue) in original was inclusive: Math.random() * (max - min + 1) + min
+        fun getRandomInclusive(min: Int, max: Int) = Random.nextInt(min, max + 1)
 
         val rolls = listOf(
-            Random.nextInt(low, high),
-            Random.nextInt(low, high),
-            Random.nextInt(low, high)
+            getRandomInclusive(minValue, maxValue),
+            getRandomInclusive(minValue, maxValue),
+            getRandomInclusive(minValue, maxValue)
         ).sorted()
+
         val result = rolls[1] / 10.0
         return base + result
     }
@@ -298,24 +300,16 @@ class MatchSimulator(
             }
         }
 
-        // Free Throws
+        // Free Throws: 100% Original Logic with proper statistical accumulation
         if (shotsFree > 0) {
-            val shooterRes = (if (isLocalAttacking) localResults else visitorResults)[shooter.id]!!
-            var okInc = 0.0
-            var koInc = 0.0
             repeat(shotsFree) {
+                val shooterRes = (if (isLocalAttacking) localResults else visitorResults)[shooter.id]!!
                 if (accomplishedAction(shooter.skillShotFree + getAttackModifier(shooter, isLocalAttacking), 1.0f)) {
-                    val oldOk = shooterRes.shotsFreeOk + okInc
-                    okInc = getRandomSimulate(oldOk) - oldOk
+                    updateResult(shooterRes.copy(shotsFreeOk = getRandomSimulate(shooterRes.shotsFreeOk)), isLocalAttacking)
                 } else {
-                    val oldKo = shooterRes.shotsFreeKo + koInc
-                    koInc = getRandomSimulate(oldKo) - oldKo
+                    updateResult(shooterRes.copy(shotsFreeKo = getRandomSimulate(shooterRes.shotsFreeKo)), isLocalAttacking)
                 }
             }
-            updateResult(shooterRes.copy(
-                shotsFreeOk = shooterRes.shotsFreeOk + okInc,
-                shotsFreeKo = shooterRes.shotsFreeKo + koInc
-            ), isLocalAttacking)
         }
     }
 
@@ -471,12 +465,19 @@ class MatchSimulator(
     }
 
     private fun getAttackModifier(player: PlayerEntity, isLocal: Boolean): Int {
-        val base = (if (isLocal) localTactic else visitorTactic).gameType + (if (isLocal) localBaseMatchModifier else visitorBaseMatchModifier) + player.getPenalty(getMatchPosition(player, isLocal))
-        return if (isLocal) base + bonoAverageAge + bonoAverageAll else base
+        val tactic = if (isLocal) localTactic else visitorTactic
+        val base = tactic.gameType + (if (isLocal) localBaseMatchModifier else visitorBaseMatchModifier) + player.getPenalty(getMatchPosition(player, isLocal))
+
+        return if (isLocal) {
+            val allBono = if (isTitular(player, tactic)) bonoAverageAll else 0
+            base + bonoAverageAge + allBono
+        } else base
     }
 
     private fun getDefenseModifier(player: PlayerEntity, isLocal: Boolean): Int {
-        val base = -(if (isLocal) localTactic else visitorTactic).gameType + (if (isLocal) localBaseMatchModifier else visitorBaseMatchModifier) + player.getPenalty(getMatchPosition(player, isLocal))
+        val tactic = if (isLocal) localTactic else visitorTactic
+        val base = -tactic.gameType + (if (isLocal) localBaseMatchModifier else visitorBaseMatchModifier) + player.getPenalty(getMatchPosition(player, isLocal))
+
         return if (isLocal) base + bonoAverageAge + bonoAverageAll else base
     }
 
