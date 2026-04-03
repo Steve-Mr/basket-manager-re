@@ -41,6 +41,7 @@ fun MainScaffold(
     val selectedMatchDetail by gameViewModel.selectedMatchDetail.collectAsState()
     val selectedMatchResults by gameViewModel.selectedMatchResults.collectAsState()
     val selectedTeamStats by gameViewModel.selectedTeamStats.collectAsState()
+    val selectedCalendarDay by gameViewModel.selectedCalendarDay.collectAsState()
 
     MainScaffoldContent(
         selectedItemInitial = 0,
@@ -62,12 +63,14 @@ fun MainScaffold(
         selectedMatchDetail = selectedMatchDetail,
         selectedMatchResults = selectedMatchResults,
         selectedTeamStats = selectedTeamStats,
+        selectedCalendarDay = selectedCalendarDay,
         activePlayer = activePlayer,
         onLoadPlayerDetails = { gameViewModel.loadPlayerDetails(it) },
         onClosePlayerDetails = { gameViewModel.closePlayerDetails() },
         onLoadTeamRoster = { gameViewModel.loadTeamRoster(it) },
         onLoadMatchDetail = { gameViewModel.loadMatchDetail(it.id) },
         onCloseMatchDetail = { gameViewModel.closeMatchDetail() },
+        onDayClick = { gameViewModel.selectCalendarDay(it) },
         onTogglePosition = { gameViewModel.togglePlayerPosition(it) },
         onUpdateTactic = { gameViewModel.updateTactic(it) },
         onNextDay = { gameViewModel.onNextDayClick(1) },
@@ -101,11 +104,13 @@ fun MainScaffoldContent(
     selectedMatchDetail: re.manager.basket.data.entity.MatchEntity?,
     selectedMatchResults: List<re.manager.basket.data.entity.MatchResultEntity>,
     selectedTeamStats: List<re.manager.basket.data.entity.MatchResultEntity>,
+    selectedCalendarDay: Int,
     onLoadPlayerDetails: (Int) -> Unit,
     onClosePlayerDetails: () -> Unit,
     onLoadTeamRoster: (Int) -> Unit,
     onLoadMatchDetail: (re.manager.basket.data.entity.MatchEntity) -> Unit,
     onCloseMatchDetail: () -> Unit,
+    onDayClick: (Int) -> Unit,
     onTogglePosition: (re.manager.basket.data.entity.PlayerEntity) -> Unit,
     onUpdateTactic: (re.manager.basket.data.entity.TacticEntity) -> Unit,
     onNextDay: () -> Unit,
@@ -249,7 +254,9 @@ fun MainScaffoldContent(
                             matches = allMatches,
                             teams = availableTeams,
                             currentMatchday = game.currentMatchday,
+                            selectedDayInitial = selectedCalendarDay,
                             userTeamId = game.userTeamId,
+                            onDayClick = onDayClick,
                             onMatchClick = onLoadMatchDetail,
                             onBack = { showCalendar = false }
                         )

@@ -36,7 +36,7 @@ fun TacticScreen(
             StrategySlider(
                 label = "Interior Shot Preference",
                 value = tactic.shotIntPercent,
-                range = 0f..100f,
+                range = 10f..90f,
                 onValueChange = { onUpdate(tactic.copy(shotIntPercent = it)) }
             )
         }
@@ -45,7 +45,7 @@ fun TacticScreen(
             StrategySlider(
                 label = "Triple Shot Preference",
                 value = tactic.shotTriplePercent,
-                range = 0f..100f,
+                range = 10f..90f,
                 onValueChange = { onUpdate(tactic.copy(shotTriplePercent = it)) }
             )
         }
@@ -119,27 +119,13 @@ fun StarSlot(
     val player = players.find { it.id == playerId }
 
     if (showDialog) {
-        AlertDialog(
-            onDismissRequest = { showDialog = false },
-            title = { Text("Select $label") },
-            text = {
-                LazyColumn(modifier = Modifier.heightIn(max = 400.dp)) {
-                    item {
-                        DropdownMenuItem(
-                            text = { Text("None", color = Color.Gray) },
-                            onClick = { onSelect(null); showDialog = false }
-                        )
-                    }
-                    items(players.size) { index ->
-                        val p = players[index]
-                        DropdownMenuItem(
-                            text = { Text("${p.name} (Avg: ${p.getAverageSkillAll().toInt()})") },
-                            onClick = { onSelect(p.id); showDialog = false }
-                        )
-                    }
-                }
-            },
-            confirmButton = { TextButton(onClick = { showDialog = false }) { Text("Close") } }
+        PlayerSelectionDialog(
+            title = "Select $label",
+            players = players,
+            occupiedIds = emptySet(), // Stars can be any player
+            targetPosition = re.manager.basket.domain.model.Position.NONE, // No grouping for stars
+            onDismiss = { showDialog = false },
+            onSelect = { onSelect(it); showDialog = false }
         )
     }
 

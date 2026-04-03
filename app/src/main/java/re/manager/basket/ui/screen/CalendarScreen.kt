@@ -24,21 +24,24 @@ fun CalendarScreen(
     matches: List<MatchEntity>,
     teams: List<TeamEntity>,
     currentMatchday: Int,
+    selectedDayInitial: Int,
     userTeamId: Int?,
+    onDayClick: (Int) -> Unit = {},
     onMatchClick: (MatchEntity) -> Unit = {},
     onBack: () -> Unit = {}
 ) {
     val teamsMap = teams.associateBy { it.id }
     val matchesByDay = remember(matches) { matches.groupBy { it.matchday } }
-    val sortedDays = remember(matchesByDay) { matchesByDay.keys.sorted() }
 
-    var selectedDay by remember { mutableIntStateOf(currentMatchday.coerceIn(1, 234)) }
+    // Show all 234 days regardless of whether they have matches
+    val sortedDays = (1..234).toList()
+
     val listState = rememberLazyListState()
 
-    // Scroll to current day initially
-    LaunchedEffect(Unit) {
-        val index = sortedDays.indexOf(currentMatchday).coerceAtLeast(0)
-        listState.scrollToItem(index)
+    // Scroll to the selected day initially
+    LaunchedEffect(selectedDayInitial) {
+        val index = sortedDays.indexOf(selectedDayInitial).coerceAtLeast(0)
+        listState.animateScrollToItem(index)
     }
 
     Scaffold(
@@ -61,7 +64,7 @@ fun CalendarScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 items(sortedDays) { day ->
-                    val isSelected = day == selectedDay
+                    val isSelected = day == selectedDayInitial
                     val userMatch = matchesByDay[day]?.find { it.teamLocalId == userTeamId || it.teamVisitorId == userTeamId }
                     val opponent = userMatch?.let { if (it.teamLocalId == userTeamId) teamsMap[it.teamVisitorId] else teamsMap[it.teamLocalId] }
                     val isHome = userMatch?.teamLocalId == userTeamId
@@ -88,7 +91,7 @@ fun CalendarScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { selectedDay = day }
+                            .clickable { onDayClick(day) }
                             .background(
                                 when {
                                     isSelected -> MaterialTheme.colorScheme.primaryContainer
@@ -133,10 +136,10 @@ fun CalendarScreen(
 
             // Right Column: Matches
             Column(modifier = Modifier.weight(1f).fillMaxHeight().padding(16.dp)) {
-                Text("Matchday $selectedDay", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text("Matchday $selectedDayInitial", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(16.dp))
 
-                val dayMatches = matchesByDay[selectedDay] ?: emptyList()
+                val dayMatches = matchesByDay[selectedDayInitial] ?: emptyList()
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     items(dayMatches) { matchItem ->
                         val match = matchItem as MatchEntity

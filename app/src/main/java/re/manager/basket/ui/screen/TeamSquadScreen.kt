@@ -86,11 +86,18 @@ fun TeamSquadContent(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
+                        Column {
                             Text(
                                 text = player.name,
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold
                             )
+                            Text(
+                                text = player.positionText,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.secondary
+                            )
+                        }
                             val roleText = when {
                                 tactic?.titPG == player.id || tactic?.titSG == player.id || tactic?.titSF == player.id || tactic?.titPF == player.id || tactic?.titC == player.id -> "Starter"
                                 tactic?.resPG == player.id || tactic?.resSG == player.id || tactic?.resSF == player.id || tactic?.resPF == player.id || tactic?.resC == player.id -> "Reserve"

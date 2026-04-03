@@ -79,6 +79,13 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
     private val _simProgress = MutableStateFlow(0f)
     val simProgress: StateFlow<Float> = _simProgress
 
+    private val _selectedCalendarDay = MutableStateFlow(1)
+    val selectedCalendarDay: StateFlow<Int> = _selectedCalendarDay
+
+    fun selectCalendarDay(day: Int) {
+        _selectedCalendarDay.value = day
+    }
+
     fun loadAllGames() {
         Log.d("GameViewModel", "Loading all save games")
         viewModelScope.launch {
@@ -210,6 +217,7 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
             withContext(Dispatchers.IO) {
                 val game = database.gameDao().getGameById(gameId)
                 _gameState.value = game
+                _selectedCalendarDay.value = game?.currentMatchday ?: 1
 
                 // Integrity check: if players for this game are 0, something is wrong
                 val playerCount = database.playerDao().getPlayersByGame(gameId).size
@@ -348,6 +356,7 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
 
                         val updated = activeGame.copy(currentMatchday = nextDayVal)
                         database.gameDao().update(updated)
+                        _selectedCalendarDay.value = nextDayVal
 
                         simulatedCount++
                         if (daysToSimulate > 1) {
@@ -463,10 +472,15 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
             val maxAst = result.playerResults.maxByOrNull { it.assists }
 
             val title = if (isUserWin) "Victory! ${winnerTeam?.name} wins" else "Defeat: ${localTeam?.name} vs ${visitorTeam?.name}"
+            val maxStl = result.playerResults.maxByOrNull { it.steals }
+            val maxBlk = result.playerResults.maxByOrNull { it.blocks }
+
             val body = "Final Score: $localScore - $visitorScore.\n" +
                        "Top Scorer: ${maxPts?.name} (${maxPts?.points} pts)\n" +
                        "Top Rebounder: ${maxReb?.name} (${maxReb?.rebounds} reb)\n" +
-                       "Top Passer: ${maxAst?.name} (${maxAst?.assists} ast)"
+                       "Top Passer: ${maxAst?.name} (${maxAst?.assists} ast)\n" +
+                       "Top Steals: ${maxStl?.name} (${maxStl?.steals ?: 0})\n" +
+                       "Top Blocks: ${maxBlk?.name} (${maxBlk?.blocks ?: 0})"
 
             database.newsDao().insert(
                 re.manager.basket.data.entity.NewsEntity(

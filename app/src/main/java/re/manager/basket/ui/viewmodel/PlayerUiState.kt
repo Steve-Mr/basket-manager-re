@@ -14,11 +14,17 @@ data class PlayerUiState(
     val hasContract: Boolean,
     val form: Int,
     val energy: Int,
+    val positionText: String,
     val starIcon: String,
     val originalEntity: PlayerEntity
 )
 
 fun PlayerEntity.toUiState(isStarter: Boolean = false): PlayerUiState {
+    val posText = if (positionSecond != re.manager.basket.domain.model.Position.NONE) {
+        "$positionFirst/$positionSecond"
+    } else {
+        "$positionFirst"
+    }
     val starIcon = when {
         potential >= 9 -> "star6"
         potential >= 7 -> "star5"
@@ -40,6 +46,7 @@ fun PlayerEntity.toUiState(isStarter: Boolean = false): PlayerUiState {
         hasContract = yearsContract > 0,
         form = stateForm,
         energy = stateEnergy,
+        positionText = posText,
         starIcon = starIcon,
         originalEntity = this
     )

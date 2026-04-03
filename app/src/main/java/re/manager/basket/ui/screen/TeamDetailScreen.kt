@@ -68,17 +68,21 @@ fun TeamDetailScreen(
                 Text("Roster", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             }
 
-            val grouped = if (tactic == null) mapOf("Roster" to players) else {
-                val map = mutableMapOf<String, List<PlayerEntity>>()
-                map["Point Guard (PG)"] = players.filter { it.id == tactic.titPG || it.id == tactic.resPG }
-                map["Shooting Guard (SG)"] = players.filter { it.id == tactic.titSG || it.id == tactic.resSG }
-                map["Small Forward (SF)"] = players.filter { it.id == tactic.titSF || it.id == tactic.resSF }
-                map["Power Forward (PF)"] = players.filter { it.id == tactic.titPF || it.id == tactic.resPF }
-                map["Center (C)"] = players.filter { it.id == tactic.titC || it.id == tactic.resC }
-                val assigned = setOf(tactic.titPG, tactic.titSG, tactic.titSF, tactic.titPF, tactic.titC, tactic.resPG, tactic.resSG, tactic.resSF, tactic.resPF, tactic.resC)
-                val remains = players.filter { it.id !in assigned }
-                if (remains.isNotEmpty()) map["Others"] = remains
-                map
+            val grouped = if (tactic == null) listOf("Roster" to players) else {
+                val starterIds = listOf(tactic.titPG, tactic.titSG, tactic.titSF, tactic.titPF, tactic.titC)
+                val reserveIds = listOf(tactic.resPG, tactic.resSG, tactic.resSF, tactic.resPF, tactic.resC)
+
+                val starters = starterIds.mapNotNull { id -> players.find { it.id == id } }
+                val reserves = reserveIds.mapNotNull { id -> players.find { it.id == id } }
+
+                val assignedIds = (starterIds + reserveIds).toSet()
+                val inactive = players.filter { it.id !in assignedIds }
+
+                listOf(
+                    "Starters (1-5)" to starters,
+                    "Reserves (1-5)" to reserves,
+                    "Inactive" to inactive
+                ).filter { it.second.isNotEmpty() }
             }
 
             grouped.forEach { (groupName, groupList) ->
