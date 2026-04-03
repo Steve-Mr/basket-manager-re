@@ -13,7 +13,12 @@ object Constants {
     const val BASE_POSSESSIONS = 120
     const val OVERTIME_POSSESSIONS = 5
     const val STEAL_CHECK_PROB = 14
+    const val TURNOVER_CHECK_PROB = 17
+    const val FOUL_CHECK_PROB = 10
+    const val ASSISTANCE_CHECK_PROB = 34
+    const val FOUL_ON_SHOT_PROB = 15
     const val STEAL_SKILL_MODIFIER = 0.5f
+    const val TURNOVER_SKILL_MODIFIER = 0.6f
     const val BLOCK_ATTEMPT_PROB_INTERIOR = 11
     const val BLOCK_ATTEMPT_PROB_EXTERIOR = 9
     const val SHOT_MODIFIER_INTERIOR = 0.65f
@@ -32,6 +37,8 @@ object Constants {
     const val SALARY_CAP_MED = 70000000
     const val SALARY_CAP_MAX = 85000000
     const val SALARY_CAP_STEP = 1000000
+
+    const val PLAYOFF_WIN_SALARY_CAP_BONUS = 2000000
 
     val INITIAL_SALARY_CAPS = mapOf(
         "BOS" to 80000000, "BRO" to 85000000, "NYK" to 85000000, "PHI" to 55000000, "TOR" to 75000000,

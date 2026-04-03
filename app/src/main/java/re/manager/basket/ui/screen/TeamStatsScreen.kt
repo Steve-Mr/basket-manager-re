@@ -57,10 +57,11 @@ fun TeamStatsScreen(
             }.sortedByDescending { it.second.sumOf { s -> s.points }.toFloat() / it.second.size.coerceAtLeast(1) }
 
             items(playersWithStats) { (player, stats) ->
-                val gp = stats.size
-                val ppg = if (gp > 0) stats.sumOf { it.points }.toFloat() / gp else 0f
-                val rpg = if (gp > 0) stats.sumOf { it.rebounds }.toFloat() / gp else 0f
-                val apg = if (gp > 0) stats.sumOf { it.assists }.toFloat() / gp else 0f
+                val filteredStats = stats.filter { it.minutesPlayed > 0 }
+                val gp = filteredStats.size
+                val ppg = if (gp > 0) filteredStats.sumOf { it.points }.toFloat() / gp else 0f
+                val rpg = if (gp > 0) filteredStats.sumOf { (it.rebounds + 0.5).toInt() }.toFloat() / gp else 0f
+                val apg = if (gp > 0) filteredStats.sumOf { (it.assists + 0.5).toInt() }.toFloat() / gp else 0f
 
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(12.dp),

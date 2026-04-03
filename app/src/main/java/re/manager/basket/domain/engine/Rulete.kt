@@ -7,6 +7,13 @@ import re.manager.basket.data.entity.MatchResultEntity
 import re.manager.basket.data.entity.TacticEntity
 import re.manager.basket.domain.model.Position
 
+data class MatchModifiers(
+    val localBase: Int,
+    val visitorBase: Int,
+    val ageBono: Int,
+    val allBono: Int
+)
+
 class Rulete(
     private val localTitulars: List<PlayerEntity>,
     private val localReserves: List<PlayerEntity>,
@@ -15,14 +22,20 @@ class Rulete(
     private val localTactic: TacticEntity,
     private val visitorTactic: TacticEntity,
     private val localTeamId: Int,
-    private val resultsProvider: (Int) -> MatchResultEntity?
+    private val resultsProvider: (Int) -> MatchResultEntity?,
+    private val matchModifiers: MatchModifiers
 ) {
 
     fun pickPlayer(skillIndex: Int, isLocal: Boolean, teamId: Int): PlayerEntity? {
         val tactic = if (isLocal) localTactic else visitorTactic
         val benchWeight = 6 - tactic.benchImportance
 
-        val isTitularPick = Random.nextInt(0, 6) < benchWeight
+        // 100% Original Logic: Random.nextInt(0, benchWeight) < benchWeight
+        // This is a bit strange in original code but if benchWeight is 3, nextInt(0,3) is 0,1,2 which are all < 3.
+        // Actually original was: if (Util.getRandomValue(0, Integer.valueOf(benchWeight)).intValue() < benchWeight)
+        // Which means it ALWAYS picked titulars if benchWeight > 0.
+        // Wait, Util.getRandomValue(0, 3) returns 0, 1, 2, or 3. So 3/4 chance.
+        val isTitularPick = Random.nextInt(0, benchWeight + 1) < benchWeight
 
         val list = if (isTitularPick) {
             if (isLocal) localTitulars else visitorTitulars
@@ -48,7 +61,8 @@ class Rulete(
     }
 
     private fun getTotalRulete(player: PlayerEntity, result: MatchResultEntity, ruleteSkill: Int): Int {
-        if (player.stateInjury > 0 || result.foulsMade >= 6) return 0
+        // foulsMade is now Double
+        if (player.stateInjury != 0 || result.foulsMade.toInt() >= 6) return 0
 
         val minutesPlayed = result.minutesPlayed
         var minutesPlayedForPoints = minutesPlayed
@@ -58,7 +72,8 @@ class Rulete(
         if (player.id == tactic.star2) minutesPlayedForPoints += 6
         if (player.id == tactic.star3) minutesPlayedForPoints += 3
 
-        val pos = getMatchPosition(player, tactic)
+        val isLocal = player.teamId == localTeamId
+        val pos = getMatchPosition(player, isLocal)
 
         return when (ruleteSkill) {
             0 -> minutesPlayed
@@ -74,7 +89,8 @@ class Rulete(
         }
     }
 
-    private fun getMatchPosition(player: PlayerEntity, tactic: TacticEntity): Position {
+    private fun getMatchPosition(player: PlayerEntity, isLocal: Boolean): Position {
+        val tactic = if (isLocal) localTactic else visitorTactic
         return when (player.id) {
             tactic.titPG, tactic.resPG -> Position.PG
             tactic.titSG, tactic.resSG -> Position.SG
@@ -85,13 +101,21 @@ class Rulete(
         }
     }
 
-    // These modifiers should be calculated once per match and stored, but for now we re-calc
-    // In original code, they are temp fields on Player object
+    // Restore 100% legacy modifier logic in Rulete weights
     private fun getAttackModifier(player: PlayerEntity, tactic: TacticEntity): Int {
-        return tactic.gameType + player.getPenalty(getMatchPosition(player, tactic))
+        val isLocal = player.teamId == localTeamId
+        val base = tactic.gameType + (if (isLocal) matchModifiers.localBase else matchModifiers.visitorBase) + player.getPenalty(getMatchPosition(player, isLocal))
+
+        return if (isLocal) {
+            val isTitular = player.id == tactic.titPG || player.id == tactic.titSG || player.id == tactic.titSF || player.id == tactic.titPF || player.id == tactic.titC
+            val allBono = if (isTitular) matchModifiers.allBono else 0
+            base + matchModifiers.ageBono + allBono
+        } else base
     }
 
     private fun getDefenseModifier(player: PlayerEntity, tactic: TacticEntity): Int {
-        return -tactic.gameType + player.getPenalty(getMatchPosition(player, tactic))
+        val isLocal = player.teamId == localTeamId
+        val base = -tactic.gameType + (if (isLocal) matchModifiers.localBase else matchModifiers.visitorBase) + player.getPenalty(getMatchPosition(player, isLocal))
+        return if (isLocal) base + matchModifiers.ageBono + matchModifiers.allBono else base
     }
 }

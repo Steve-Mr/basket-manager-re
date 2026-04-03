@@ -21,7 +21,7 @@ class LineupOptimizer {
             return best.id
         }
 
-        return tactic.copy(
+        val optimized = tactic.copy(
             titPG = pickBestFor(Position.PG),
             titSG = pickBestFor(Position.SG),
             titSF = pickBestFor(Position.SF),
@@ -32,6 +32,22 @@ class LineupOptimizer {
             resSF = pickBestFor(Position.SF),
             resPF = pickBestFor(Position.PF),
             resC = pickBestFor(Position.C)
+        )
+
+        // 100% Original Logic: Identify top 3 players in the lineup as Stars
+        val lineupIds = listOf(
+            optimized.titPG, optimized.titSG, optimized.titSF, optimized.titPF, optimized.titC,
+            optimized.resPG, optimized.resSG, optimized.resSF, optimized.resPF, optimized.resC
+        ).toSet()
+
+        val stars = players.filter { it.id in lineupIds }
+            .sortedByDescending { it.getValue() }
+            .take(3)
+
+        return optimized.copy(
+            star1 = stars.getOrNull(0)?.id,
+            star2 = stars.getOrNull(1)?.id,
+            star3 = stars.getOrNull(2)?.id
         )
     }
 }

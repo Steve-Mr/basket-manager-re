@@ -324,7 +324,11 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
                                 val result = simulator.simulate()
 
                                 database.matchDao().update(result.match)
-                                database.matchResultDao().insertAll(result.playerResults)
+                                // Only save results for players who actually played to keep DB lean and fix averaging
+                                database.matchResultDao().insertAll(result.playerResults.filter { it.minutesPlayed > 0 })
+
+                                // Update evolved player states
+                                database.playerDao().insertAll(result.evolvedPlayers)
 
                                 if (result.injuries.isNotEmpty()) {
                                     database.playerDao().insertAll(result.injuries)
@@ -341,7 +345,7 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
                             }
                         }
 
-                        // 2. Evolve states
+                        // 2. Evolve states (Daily evolution for ALL players, including free agents)
                         val allPlayers = database.playerDao().getPlayersByGame(activeGame.id)
                         val evolvedPlayers = re.manager.basket.domain.engine.StateEvolver().evolveAllPlayersDaily(allPlayers)
                         database.playerDao().insertAll(evolvedPlayers)
@@ -352,10 +356,16 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
 
                         if (currentDay == 166 && nextDayVal == 167) {
                             updateAllSalaryCaps(activeGame.id)
+                            generatePlayoffSeeding(activeGame.id)
+                        }
+
+                        if (nextDayVal in listOf(182, 197, 212)) {
+                            generateNextPlayoffRound(activeGame.id, nextDayVal)
                         }
 
                         val updated = activeGame.copy(currentMatchday = nextDayVal)
                         database.gameDao().update(updated)
+                        // Important: Refresh activeGame reference for next iteration of multi-day loop
                         _selectedCalendarDay.value = nextDayVal
 
                         simulatedCount++
@@ -401,21 +411,87 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
 
     private suspend fun updateLeagueStandings(result: re.manager.basket.domain.engine.MatchFullResult) {
         val match = result.match
-        val localWin = match.localQ1 + match.localQ2 + match.localQ3 + match.localQ4 >
-                       match.visitorQ1 + match.visitorQ2 + match.visitorQ3 + match.visitorQ4
+        val localWin = match.getTotalLocal() > match.getTotalVisitor()
 
-        updateTeamStanding(match.teamLocalId, match.gameId, localWin, result.match.getTotalLocal(), result.match.getTotalVisitor())
-        updateTeamStanding(match.teamVisitorId, match.gameId, !localWin, result.match.getTotalVisitor(), result.match.getTotalLocal())
-
-        // Handling playoff bonuses in real-time (based on finishMatch in Simulate.java)
-        if (match.matchday >= 167) {
+        if (match.matchday < 167) {
+            updateTeamStanding(match.teamLocalId, match.gameId, localWin, result.match.getTotalLocal(), result.match.getTotalVisitor())
+            updateTeamStanding(match.teamVisitorId, match.gameId, !localWin, result.match.getTotalVisitor(), result.match.getTotalLocal())
+        } else {
+            // Playoff Logic (based on finishMatch in Simulate.java)
             val winnerId = if (localWin) match.teamLocalId else match.teamVisitorId
-            val winner = database.teamDao().getTeamById(winnerId, match.gameId)
-            winner?.let { team ->
-                // Bonus for each playoff win: +2M according to original game's financial balance
-                val updatedWinner = team.addSalaryCap(Constants.SALARY_CAP_STEP * 2)
-                database.teamDao().update(updatedWinner)
+            val loserId = if (localWin) match.teamVisitorId else match.teamLocalId
+
+            val playoffWinner = database.playoffDao().getPlayoffForTeam(match.gameId, winnerId)
+            if (playoffWinner != null) {
+                val updatedWinnerPlayoff = playoffWinner.copy(seriesGamesWon = playoffWinner.seriesGamesWon + 1)
+                database.playoffDao().update(updatedWinnerPlayoff)
+
+                // Check for milestone news
+                handlePlayoffMilestones(match.gameId, match.matchday, updatedWinnerPlayoff, loserId)
             }
+
+            // Salary Cap Bonus for Playoff Win (+2M)
+            val winnerTeam = database.teamDao().getTeamById(winnerId, match.gameId)
+            winnerTeam?.let { team ->
+                val updatedWinnerTeam = team.addSalaryCap(Constants.PLAYOFF_WIN_SALARY_CAP_BONUS)
+                database.teamDao().update(updatedWinnerTeam)
+            }
+
+            // Manage redundancy: Delete matches if series is over
+            checkSeriesOver(match.gameId, match.matchday, winnerId)
+        }
+    }
+
+    private suspend fun handlePlayoffMilestones(gameId: Int, day: Int, playoff: re.manager.basket.data.entity.PlayoffEntity, loserId: Int) {
+        val team = database.teamDao().getTeamById(playoff.teamId, gameId) ?: return
+        val opponent = database.teamDao().getTeamById(loserId, gameId) ?: return
+
+        when (playoff.seriesGamesWon) {
+            4, 8, 12 -> {
+                database.newsDao().insert(re.manager.basket.data.entity.NewsEntity(
+                    gameId = gameId,
+                    matchday = day,
+                    title = "Series Won!",
+                    body = "${team.name} has advanced after defeating ${opponent.name}.",
+                    type = "PLAYOFFS"
+                ))
+            }
+            16 -> {
+                database.newsDao().insert(re.manager.basket.data.entity.NewsEntity(
+                    gameId = gameId,
+                    matchday = day,
+                    title = "CHAMPIONS!",
+                    body = "${team.name} are the league champions!",
+                    type = "TROPHY"
+                ))
+            }
+        }
+    }
+
+    private suspend fun checkSeriesOver(gameId: Int, currentDay: Int, winnerId: Int) {
+        val playoff = database.playoffDao().getPlayoffForTeam(gameId, winnerId) ?: return
+        val targetWon = when {
+            currentDay < 182 -> 4
+            currentDay < 197 -> 8
+            currentDay < 212 -> 12
+            else -> 16
+        }
+
+        if (playoff.seriesGamesWon == targetWon) {
+            // Delete future matches for this series
+            val matches = database.matchDao().getAllMatchesForGame(gameId)
+                .filter { it.matchday > currentDay && (it.teamLocalId == winnerId || it.teamVisitorId == winnerId) }
+
+            // We need to be careful not to delete matches for NEXT ROUND.
+            // BM2015 only deletes matches within the same round.
+            val roundEndDay = when {
+                currentDay < 182 -> 181
+                currentDay < 197 -> 196
+                currentDay < 212 -> 211
+                else -> 234
+            }
+            val toDelete = matches.filter { it.matchday <= roundEndDay }
+            database.matchDao().deleteMatches(toDelete)
         }
     }
 
@@ -434,6 +510,8 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
         // We'll trigger it when nextDay moves from 166 to 167
     }
 
+    private fun Double.toOriginalInt(): Int = (this + 0.5).toInt()
+
     private suspend fun generateMatchNews(result: re.manager.basket.domain.engine.MatchFullResult) {
         val match = result.match
         val localScore = match.getTotalLocal()
@@ -446,8 +524,12 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
 
         // 1. Awesome Performance News (All teams)
         result.playerResults.forEach { pResult ->
-            val isTripleDouble = pResult.points >= 10 && pResult.rebounds >= 10 && pResult.assists >= 10
-            val isHighPer = pResult.points >= 40 // Simplified original awesome logic
+            val pts = pResult.points
+            val reb = pResult.rebounds.toOriginalInt()
+            val ast = pResult.assists.toOriginalInt()
+
+            val isTripleDouble = pts >= 10 && reb >= 10 && ast >= 10
+            val isHighPer = pts >= 40 // Simplified original awesome logic
 
             if (isTripleDouble || isHighPer) {
                 database.newsDao().insert(
@@ -455,7 +537,7 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
                         gameId = match.gameId,
                         matchday = match.matchday,
                         title = "Awesome Performance: ${pResult.name}",
-                        body = "${pResult.name} recorded ${pResult.points} pts, ${pResult.rebounds} reb, ${pResult.assists} ast in the game ${localTeam?.name} vs ${visitorTeam?.name}.",
+                        body = "${pResult.name} recorded $pts pts, $reb reb, $ast ast in the game ${localTeam?.name} vs ${visitorTeam?.name}.",
                         type = "PLAYER"
                     )
                 )
@@ -468,7 +550,7 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
             val winnerTeam = if (localScore > visitorScore) localTeam else visitorTeam
             val isUserWin = winnerId == currentUserId
 
-            val maxPts = result.playerResults.filter { it.playerId in result.playerResults.map { pr -> pr.playerId } }.maxByOrNull { it.points }
+            val maxPts = result.playerResults.maxByOrNull { it.points }
             val maxReb = result.playerResults.maxByOrNull { it.rebounds }
             val maxAst = result.playerResults.maxByOrNull { it.assists }
 
@@ -478,10 +560,10 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
 
             val body = "Final Score: $localScore - $visitorScore.\n" +
                        "Top Scorer: ${maxPts?.name} (${maxPts?.points} pts)\n" +
-                       "Top Rebounder: ${maxReb?.name} (${maxReb?.rebounds} reb)\n" +
-                       "Top Passer: ${maxAst?.name} (${maxAst?.assists} ast)\n" +
-                       "Top Steals: ${maxStl?.name} (${maxStl?.steals ?: 0})\n" +
-                       "Top Blocks: ${maxBlk?.name} (${maxBlk?.blocks ?: 0})"
+                       "Top Rebounder: ${maxReb?.name} (${maxReb?.rebounds?.toOriginalInt()} reb)\n" +
+                       "Top Passer: ${maxAst?.name} (${maxAst?.assists?.toOriginalInt()} ast)\n" +
+                       "Top Steals: ${maxStl?.name} (${maxStl?.steals?.toOriginalInt() ?: 0})\n" +
+                       "Top Blocks: ${maxBlk?.name} (${maxBlk?.blocks?.toOriginalInt() ?: 0})"
 
             database.newsDao().insert(
                 re.manager.basket.data.entity.NewsEntity(
@@ -507,6 +589,142 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
                 )
             )
         }
+    }
+
+    private suspend fun generatePlayoffSeeding(gameId: Int) {
+        val standings = database.leagueDao().getStandings(gameId)
+        val teams = database.teamDao().getTeamsByGame(gameId)
+
+        val eastStandings = standings.filter { sid -> teams.find { it.id == sid.teamId }?.conference == re.manager.basket.domain.model.Conference.EAST }.take(8)
+        val westStandings = standings.filter { sid -> teams.find { it.id == sid.teamId }?.conference == re.manager.basket.domain.model.Conference.WEST }.take(8)
+
+        val playoffEntities = mutableListOf<re.manager.basket.data.entity.PlayoffEntity>()
+
+        eastStandings.forEachIndexed { index, sid ->
+            playoffEntities.add(re.manager.basket.data.entity.PlayoffEntity(
+                gameId = gameId, teamId = sid.teamId, conference = 1, position = index + 1,
+                gamesWon = sid.gamesWon, pointsDiff = sid.pointsScored - sid.pointsAllowed, pointsScored = sid.pointsScored
+            ))
+        }
+        westStandings.forEachIndexed { index, sid ->
+            playoffEntities.add(re.manager.basket.data.entity.PlayoffEntity(
+                gameId = gameId, teamId = sid.teamId, conference = 2, position = index + 1,
+                gamesWon = sid.gamesWon, pointsDiff = sid.pointsScored - sid.pointsAllowed, pointsScored = sid.pointsScored
+            ))
+        }
+        database.playoffDao().insertAll(playoffEntities)
+
+        // Generate First Round Matches (Day 168-181)
+        val matches = mutableListOf<MatchEntity>()
+        val pairs = listOf(0 to 7, 1 to 6, 2 to 5, 3 to 4)
+
+        // Days 168, 170, 178, 180: Home 1,2,3,4
+        // Days 169, 171, 179, 181: Home 3,4,1,2 (Original code is slightly different, let's match logic)
+        // Original logic from getPlayoffsSeriesQuarters:
+        // 168: E1-E8, E2-E7, W1-W8, W2-W7 (T)
+        // 169: E3-E6, E4-E5, W3-W6, W4-W5 (T)
+        // 170: same as 168 (T)
+        // 171: same as 169 (T)
+        // 172: E8-E1, E7-E2, W8-W1, W7-W2 (F)
+        // ...
+
+        // Correcting to exact days from Simulate.java
+        val schedule = listOf(
+            Triple(168, listOf(0, 1), true), Triple(169, listOf(2, 3), true),
+            Triple(170, listOf(0, 1), true), Triple(171, listOf(2, 3), true),
+            Triple(172, listOf(0, 1), false), Triple(173, listOf(2, 3), false),
+            Triple(174, listOf(0, 1), false), Triple(175, listOf(2, 3), false),
+            Triple(176, listOf(0, 1), false), Triple(177, listOf(2, 3), false),
+            Triple(178, listOf(0, 1), true), Triple(179, listOf(2, 3), true),
+            Triple(180, listOf(0, 1), true), Triple(181, listOf(2, 3), true)
+        )
+
+        schedule.forEach { (day, indices, t1Home) ->
+            indices.forEach { idx ->
+                val p1 = idx
+                val p2 = 7 - idx
+                listOf(1, 2).forEach { conf ->
+                    val t1 = (if (conf == 1) eastStandings else westStandings)[p1].teamId
+                    val t2 = (if (conf == 1) eastStandings else westStandings)[p2].teamId
+                    matches.add(if (t1Home) MatchEntity(gameId = gameId, matchday = day, teamLocalId = t1, teamVisitorId = t2)
+                                else MatchEntity(gameId = gameId, matchday = day, teamLocalId = t2, teamVisitorId = t1))
+                }
+            }
+        }
+        database.matchDao().insertAll(matches)
+    }
+
+    private suspend fun generateNextPlayoffRound(gameId: Int, day: Int) {
+        val playoffs = database.playoffDao().getPlayoffsForGame(gameId)
+        val matches = mutableListOf<MatchEntity>()
+
+        if (day == 182) { // Semis
+            fun getWinner(conf: Int, s1: Int, s2: Int): Int? {
+                val p1 = playoffs.find { it.conference == conf && it.position == s1 }
+                val p2 = playoffs.find { it.conference == conf && it.position == s2 }
+                return if (p1 != null && p1.seriesGamesWon >= 4) p1.teamId else p2?.teamId
+            }
+
+            listOf(1, 2).forEach { conf ->
+                val w18 = getWinner(conf, 1, 8) ?: return@forEach
+                val w45 = getWinner(conf, 4, 5) ?: return@forEach
+                val w27 = getWinner(conf, 2, 7) ?: return@forEach
+                val w36 = getWinner(conf, 3, 6) ?: return@forEach
+
+                val schedule = listOf(
+                    Triple(183, listOf(w18 to w45, w27 to w36), true),
+                    Triple(185, listOf(w18 to w45, w27 to w36), true),
+                    Triple(187, listOf(w45 to w18, w36 to w27), true),
+                    Triple(189, listOf(w45 to w18, w36 to w27), true),
+                    Triple(191, listOf(w45 to w18, w36 to w27), true),
+                    Triple(193, listOf(w18 to w45, w27 to w36), true),
+                    Triple(195, listOf(w18 to w45, w27 to w36), true)
+                )
+                // Offset West by 1 day
+                val offset = if (conf == 2) 1 else 0
+                schedule.forEach { (d, pairs, _) ->
+                    pairs.forEach { (loc, vis) ->
+                        matches.add(MatchEntity(gameId = gameId, matchday = d + offset, teamLocalId = loc, teamVisitorId = vis))
+                    }
+                }
+            }
+        } else if (day == 197) { // Conf Finals
+            fun getWinner(conf: Int, s1: Int, s2: Int, s3: Int, s4: Int): Int? {
+                val p1 = playoffs.find { it.conference == conf && it.position == s1 }
+                val p2 = playoffs.find { it.conference == conf && it.position == s2 }
+                val p3 = playoffs.find { it.conference == conf && it.position == s3 }
+                val p4 = playoffs.find { it.conference == conf && it.position == s4 }
+                return listOfNotNull(p1, p2, p3, p4).find { it.seriesGamesWon >= 8 }?.teamId
+            }
+
+            listOf(1, 2).forEach { conf ->
+                val w1845 = getWinner(conf, 1, 8, 4, 5) ?: return@forEach
+                val w2736 = getWinner(conf, 2, 7, 3, 6) ?: return@forEach
+
+                val schedule = listOf(
+                    198 to (w1845 to w2736), 200 to (w1845 to w2736),
+                    202 to (w2736 to w1845), 204 to (w2736 to w1845), 206 to (w2736 to w1845),
+                    208 to (w1845 to w2736), 210 to (w1845 to w2736)
+                )
+                val offset = if (conf == 2) 1 else 0
+                schedule.forEach { (d, p) ->
+                    matches.add(MatchEntity(gameId = gameId, matchday = d + offset, teamLocalId = p.first, teamVisitorId = p.second))
+                }
+            }
+        } else if (day == 212) { // Finals
+            val eastWinner = playoffs.filter { it.conference == 1 }.find { it.seriesGamesWon >= 12 }?.teamId ?: return
+            val westWinner = playoffs.filter { it.conference == 2 }.find { it.seriesGamesWon >= 12 }?.teamId ?: return
+
+            val schedule = listOf(
+                213 to (eastWinner to westWinner), 215 to (eastWinner to westWinner),
+                217 to (westWinner to eastWinner), 219 to (westWinner to eastWinner), 221 to (westWinner to eastWinner),
+                223 to (eastWinner to westWinner), 225 to (eastWinner to westWinner)
+            )
+            schedule.forEach { (d, p) ->
+                matches.add(MatchEntity(gameId = gameId, matchday = d, teamLocalId = p.first, teamVisitorId = p.second))
+            }
+        }
+        database.matchDao().insertAll(matches)
     }
 
     private suspend fun updateAllSalaryCaps(gameId: Int) {

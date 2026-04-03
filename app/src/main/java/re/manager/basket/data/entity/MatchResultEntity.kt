@@ -37,20 +37,36 @@ data class MatchResultEntity(
     val playerId: Int,
     val name: String,
     val minutesPlayed: Int = 0,
-    val points: Int = 0,
-    val rebounds: Int = 0,
-    val assists: Int = 0,
-    val blocks: Int = 0,
-    val steals: Int = 0,
-    val foulsMade: Int = 0,
-    val shotsIntOk: Int = 0,
-    val shotsIntKo: Int = 0,
-    val shotsExt2Ok: Int = 0,
-    val shotsExt2Ko: Int = 0,
-    val shotsExt3Ok: Int = 0,
-    val shotsExt3Ko: Int = 0,
-    val shotsFreeOk: Int = 0,
-    val shotsFreeKo: Int = 0,
-    val passesOk: Int = 0,
-    val passesKo: Int = 0
-)
+    val points: Int = 0, // Points are still calculated as Int for final display
+    val rebounds: Double = 0.0,
+    val assists: Double = 0.0,
+    val blocks: Double = 0.0,
+    val steals: Double = 0.0,
+    val foulsMade: Double = 0.0,
+    val shotsIntOk: Double = 0.0,
+    val shotsIntKo: Double = 0.0,
+    val shotsExt2Ok: Double = 0.0,
+    val shotsExt2Ko: Double = 0.0,
+    val shotsExt3Ok: Double = 0.0,
+    val shotsExt3Ko: Double = 0.0,
+    val shotsFreeOk: Double = 0.0,
+    val shotsFreeKo: Double = 0.0,
+    val passesOk: Double = 0.0,
+    val passesKo: Double = 0.0
+) {
+    private fun Double.toOriginalInt(): Int = (this + 0.5).toInt()
+
+    fun getPer(): Double {
+        if (minutesPlayed == 0) return -100.0
+
+        val per = (((steals.toOriginalInt() * 54) + (shotsExt3Ok.toOriginalInt() * 52) +
+                   ((shotsIntOk.toOriginalInt() + shotsExt2Ok.toOriginalInt()) * 85) +
+                   (shotsFreeOk.toOriginalInt() * 47) + (blocks.toOriginalInt() * 39) +
+                   (passesOk.toOriginalInt() * 35) + (rebounds.toOriginalInt() * 27)) -
+                   (foulsMade.toOriginalInt() * 17) - (shotsFreeKo.toOriginalInt() * 20) -
+                   ((shotsIntKo.toOriginalInt() + shotsExt2Ko.toOriginalInt()) * 39) -
+                   (shotsExt3Ko.toOriginalInt() * 39) - (passesKo.toOriginalInt() * 54)).toDouble() / minutesPlayed
+
+        return Math.round(per * 100.0) / 100.0
+    }
+}
