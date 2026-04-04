@@ -251,7 +251,7 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
 
                 _availableTeams.value = database.teamDao().getTeamsByGame(gameId)
                 updateNextMatch(game)
-                Log.d("GameViewModel", "Game loaded, teams: ${_availableTeams.value.size}, matches: ${_allMatches.value.size}")
+                Log.d("GameViewModel", "Game loaded, teams: ${_availableTeams.value.size}, matches: ${allMatches.value.size}")
             }
         }
     }
