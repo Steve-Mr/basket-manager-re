@@ -12,6 +12,9 @@ interface PlayerDao {
     @Update
     suspend fun update(player: PlayerEntity)
 
+    @Update
+    suspend fun updateAll(players: List<PlayerEntity>)
+
     @Query("SELECT * FROM players WHERE teamId = :teamId AND gameId = :gameId")
     fun getPlayersByTeamFlow(teamId: Int, gameId: Int): Flow<List<PlayerEntity>>
 

@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 6,
-    "identityHash": "7f343a1a135dcae0c73e8ce20eeef090",
+    "identityHash": "4c3bb06c9c3ebeb0685837b248da4280",
     "entities": [
       {
         "tableName": "games",
@@ -611,7 +611,7 @@
       },
       {
         "tableName": "match_results",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`gameId` INTEGER NOT NULL, `matchId` INTEGER NOT NULL, `matchday` INTEGER NOT NULL, `playerId` INTEGER NOT NULL, `name` TEXT NOT NULL, `minutesPlayed` INTEGER NOT NULL, `points` INTEGER NOT NULL, `rebounds` REAL NOT NULL, `assists` REAL NOT NULL, `blocks` REAL NOT NULL, `steals` REAL NOT NULL, `foulsMade` REAL NOT NULL, `shotsIntOk` REAL NOT NULL, `shotsIntKo` REAL NOT NULL, `shotsExt2Ok` REAL NOT NULL, `shotsExt2Ko` REAL NOT NULL, `shotsExt3Ok` REAL NOT NULL, `shotsExt3Ko` REAL NOT NULL, `shotsFreeOk` REAL NOT NULL, `shotsFreeKo` REAL NOT NULL, `passesOk` REAL NOT NULL, `passesKo` REAL NOT NULL, PRIMARY KEY(`matchId`, `playerId`), FOREIGN KEY(`gameId`) REFERENCES `games`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`matchId`) REFERENCES `matches`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`playerId`) REFERENCES `players`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`gameId` INTEGER NOT NULL, `matchId` INTEGER NOT NULL, `matchday` INTEGER NOT NULL, `playerId` INTEGER NOT NULL, `name` TEXT NOT NULL, `minutesPlayed` INTEGER NOT NULL, `points` INTEGER NOT NULL, `rebounds` REAL NOT NULL, `assists` REAL NOT NULL, `blocks` REAL NOT NULL, `steals` REAL NOT NULL, `foulsMade` REAL NOT NULL, `shotsIntOk` REAL NOT NULL, `shotsIntKo` REAL NOT NULL, `shotsExt2Ok` REAL NOT NULL, `shotsExt2Ko` REAL NOT NULL, `shotsExt3Ok` REAL NOT NULL, `shotsExt3Ko` REAL NOT NULL, `shotsFreeOk` REAL NOT NULL, `shotsFreeKo` REAL NOT NULL, `passesOk` REAL NOT NULL, `passesKo` REAL NOT NULL, PRIMARY KEY(`matchId`, `playerId`), FOREIGN KEY(`gameId`) REFERENCES `games`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`matchId`) REFERENCES `matches`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`playerId`) REFERENCES `players`(`id`) ON UPDATE NO ACTION ON DELETE NO ACTION )",
         "fields": [
           {
             "fieldPath": "gameId",
@@ -807,7 +807,7 @@
           },
           {
             "table": "players",
-            "onDelete": "CASCADE",
+            "onDelete": "NO ACTION",
             "onUpdate": "NO ACTION",
             "columns": [
               "playerId"
@@ -1186,7 +1186,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '7f343a1a135dcae0c73e8ce20eeef090')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '4c3bb06c9c3ebeb0685837b248da4280')"
     ]
   }
 }

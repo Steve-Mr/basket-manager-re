@@ -87,7 +87,7 @@ class MatchSimulator(
             currentPos++
         }
 
-        return finalizeMatch()
+        return finalizeMatch(effectiveLocalTactic, effectiveVisitorTactic)
     }
 
     private fun calculateMatchBonus(localTactic: TacticEntity, visitorTactic: TacticEntity) {
@@ -312,7 +312,7 @@ class MatchSimulator(
 
     private fun Double.toOriginalInt(): Int = this.toInt()
 
-    private fun finalizeMatch(): MatchFullResult {
+    private fun finalizeMatch(localTactic: TacticEntity, visitorTactic: TacticEntity): MatchFullResult {
         val totalLocal = getTotalPoints(true)
         val totalVisitor = getTotalPoints(false)
 

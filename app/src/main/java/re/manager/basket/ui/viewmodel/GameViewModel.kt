@@ -344,10 +344,10 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
                                 database.matchResultDao().insertAll(result.playerResults.filter { it.minutesPlayed > 0 })
 
                                 // Update evolved player states
-                                database.playerDao().insertAll(result.evolvedPlayers)
+                                database.playerDao().updateAll(result.evolvedPlayers)
 
                                 if (result.injuries.isNotEmpty()) {
-                                    database.playerDao().insertAll(result.injuries)
+                                    database.playerDao().updateAll(result.injuries)
                                     // Check if user team had an injury
                                     if (result.injuries.any { it.teamId == userTeamId && it.stateInjury > 0 }) {
                                         injuryOccurred = true
@@ -363,8 +363,8 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
 
                         // 2. Evolve states (Daily evolution for ALL players, including free agents)
                         val allPlayers = database.playerDao().getPlayersByGame(activeGame.id)
-                        val evolvedPlayers = re.manager.basket.domain.engine.StateEvolver().evolveAllPlayersDaily(allPlayers)
-                        database.playerDao().insertAll(evolvedPlayers)
+                        val evolvedPlayersDaily = re.manager.basket.domain.engine.StateEvolver().evolveAllPlayersDaily(allPlayers)
+                        database.playerDao().updateAll(evolvedPlayersDaily)
 
                         // 3. Move to next day
                         val seasonManager = SeasonManager(activeGame)
