@@ -4,9 +4,11 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import re.manager.basket.util.MathUtils.toOriginalInt
 
 @Entity(
     tableName = "match_results",
+    primaryKeys = ["matchId", "playerId"],
     foreignKeys = [
         ForeignKey(
             entity = GameEntity::class,
@@ -30,7 +32,6 @@ import androidx.room.PrimaryKey
     indices = [Index("gameId"), Index("matchId"), Index("playerId")]
 )
 data class MatchResultEntity(
-    @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val gameId: Int,
     val matchId: Int,
     val matchday: Int,
@@ -54,8 +55,6 @@ data class MatchResultEntity(
     val passesOk: Double = 0.0,
     val passesKo: Double = 0.0
 ) {
-    private fun Double.toOriginalInt(): Int = (this + 0.5).toInt()
-
     fun getPer(): Double {
         if (minutesPlayed == 0) return -100.0
 

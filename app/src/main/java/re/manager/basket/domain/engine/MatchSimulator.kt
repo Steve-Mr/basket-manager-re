@@ -5,6 +5,7 @@ import re.manager.basket.data.entity.MatchResultEntity
 import re.manager.basket.data.entity.PlayerEntity
 import re.manager.basket.data.entity.TacticEntity
 import re.manager.basket.domain.model.Constants
+import re.manager.basket.util.MathUtils.toOriginalInt
 import kotlin.random.Random
 
 import re.manager.basket.domain.model.Position
@@ -87,7 +88,7 @@ class MatchSimulator(
             currentPos++
         }
 
-        return finalizeMatch()
+        return finalizeMatch(effectiveLocalTactic, effectiveVisitorTactic)
     }
 
     private fun calculateMatchBonus(localTactic: TacticEntity, visitorTactic: TacticEntity) {
@@ -310,9 +311,7 @@ class MatchSimulator(
         }
     }
 
-    private fun Double.toOriginalInt(): Int = this.toInt()
-
-    private fun finalizeMatch(): MatchFullResult {
+    private fun finalizeMatch(localTactic: TacticEntity, visitorTactic: TacticEntity): MatchFullResult {
         val totalLocal = getTotalPoints(true)
         val totalVisitor = getTotalPoints(false)
 

@@ -5,8 +5,8 @@ import androidx.lifecycle.viewModelScope
 import android.content.Context
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import re.manager.basket.data.AppDatabase
@@ -16,14 +16,26 @@ import re.manager.basket.data.entity.TeamEntity
 import re.manager.basket.data.importer.RosterImporter
 import re.manager.basket.domain.engine.SeasonManager
 import re.manager.basket.domain.model.Constants
+import re.manager.basket.util.MathUtils.toOriginalInt
 
 class GameViewModel(private val database: AppDatabase) : ViewModel() {
 
-    private val _gameState = MutableStateFlow<GameEntity?>(null)
-    val gameState: StateFlow<GameEntity?> = _gameState
+    private val _currentGameId = MutableStateFlow<Int?>(null)
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val gameState: StateFlow<GameEntity?> = _currentGameId
+        .flatMapLatest { id ->
+            if (id == null) flowOf(null) else database.gameDao().getGameByIdFlow(id)
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    private val _previewPlayers = MutableStateFlow<List<re.manager.basket.data.entity.PlayerEntity>>(emptyList())
-    val previewPlayers: StateFlow<List<re.manager.basket.data.entity.PlayerEntity>> = _previewPlayers
+    private val _previewTeamId = MutableStateFlow<Int?>(null)
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val previewPlayers: StateFlow<List<re.manager.basket.data.entity.PlayerEntity>> = combine(_previewTeamId, _currentGameId) { teamId, gameId ->
+        teamId to gameId
+    }.flatMapLatest { (teamId, gameId) ->
+        if (teamId == null || gameId == null) flowOf(emptyList())
+        else database.playerDao().getPlayersByTeamFlow(teamId, gameId)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _allGames = MutableStateFlow<List<GameEntity>>(emptyList())
     val allGames: StateFlow<List<GameEntity>> = _allGames
@@ -31,44 +43,95 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
     private val _availableTeams = MutableStateFlow<List<re.manager.basket.data.entity.TeamEntity>>(emptyList())
     val availableTeams: StateFlow<List<re.manager.basket.data.entity.TeamEntity>> = _availableTeams
 
-    private val _recentMatches = MutableStateFlow<List<MatchEntity>>(emptyList())
-    val recentMatches: StateFlow<List<MatchEntity>> = _recentMatches
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val recentMatches: StateFlow<List<MatchEntity>> = _currentGameId
+        .flatMapLatest { id ->
+            if (id == null) flowOf(emptyList()) else database.matchDao().getRecentMatchesFlow(id)
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _nextMatch = MutableStateFlow<Pair<MatchEntity, TeamEntity>?>(null)
     val nextMatch: StateFlow<Pair<MatchEntity, TeamEntity>?> = _nextMatch
 
-    private val _news = MutableStateFlow<List<re.manager.basket.data.entity.NewsEntity>>(emptyList())
-    val news: StateFlow<List<re.manager.basket.data.entity.NewsEntity>> = _news
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val news: StateFlow<List<re.manager.basket.data.entity.NewsEntity>> = _currentGameId
+        .flatMapLatest { id ->
+            if (id == null) flowOf(emptyList()) else database.newsDao().getNewsByGameFlow(id)
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val _allMatches = MutableStateFlow<List<MatchEntity>>(emptyList())
-    val allMatches: StateFlow<List<MatchEntity>> = _allMatches
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val allMatches: StateFlow<List<MatchEntity>> = _currentGameId
+        .flatMapLatest { id ->
+            if (id == null) flowOf(emptyList()) else database.matchDao().getAllMatchesForGameFlow(id)
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val _userTactic = MutableStateFlow<re.manager.basket.data.entity.TacticEntity?>(null)
-    val userTactic: StateFlow<re.manager.basket.data.entity.TacticEntity?> = _userTactic
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val userTactic: StateFlow<re.manager.basket.data.entity.TacticEntity?> = gameState
+        .flatMapLatest { game ->
+            if (game?.userTeamId == null) flowOf(null) else database.tacticDao().getTacticForTeamFlow(game.userTeamId, game.id)
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    private val _activePlayer = MutableStateFlow<re.manager.basket.data.entity.PlayerEntity?>(null)
-    val activePlayer: StateFlow<re.manager.basket.data.entity.PlayerEntity?> = _activePlayer
+    private val _activePlayerId = MutableStateFlow<Int?>(null)
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val activePlayer: StateFlow<re.manager.basket.data.entity.PlayerEntity?> = combine(_activePlayerId, _currentGameId) { playerId, gameId ->
+        playerId to gameId
+    }.flatMapLatest { (playerId, gameId) ->
+        if (playerId == null || gameId == null) flowOf(null) else database.playerDao().getPlayerByIdFlow(playerId, gameId)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    private val _selectedPlayerStats = MutableStateFlow<List<re.manager.basket.data.entity.MatchResultEntity>>(emptyList())
-    val selectedPlayerStats: StateFlow<List<re.manager.basket.data.entity.MatchResultEntity>> = _selectedPlayerStats
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val selectedPlayerStats: StateFlow<List<re.manager.basket.data.entity.MatchResultEntity>> = combine(_activePlayerId, _currentGameId) { playerId, gameId ->
+        playerId to gameId
+    }.flatMapLatest { (playerId, gameId) ->
+        if (playerId == null || gameId == null) flowOf(emptyList()) else database.matchResultDao().getResultsByPlayerFlow(playerId, gameId)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val _selectedTeamRoster = MutableStateFlow<List<re.manager.basket.data.entity.PlayerEntity>>(emptyList())
-    val selectedTeamRoster: StateFlow<List<re.manager.basket.data.entity.PlayerEntity>> = _selectedTeamRoster
+    private val _selectedTeamId = MutableStateFlow<Int?>(null)
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val selectedTeamRoster: StateFlow<List<re.manager.basket.data.entity.PlayerEntity>> = combine(_selectedTeamId, _currentGameId) { teamId, gameId ->
+        teamId to gameId
+    }.flatMapLatest { (teamId, gameId) ->
+        if (teamId == null || gameId == null) flowOf(emptyList()) else database.playerDao().getPlayersByTeamFlow(teamId, gameId)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val _selectedTeamLeague = MutableStateFlow<re.manager.basket.data.entity.LeagueEntity?>(null)
-    val selectedTeamLeague: StateFlow<re.manager.basket.data.entity.LeagueEntity?> = _selectedTeamLeague
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val selectedTeamLeague: StateFlow<re.manager.basket.data.entity.LeagueEntity?> = combine(_selectedTeamId, _currentGameId) { teamId, gameId ->
+        teamId to gameId
+    }.flatMapLatest { (teamId, gameId) ->
+        if (teamId == null || gameId == null) flowOf(null) else database.leagueDao().getLeagueForTeamFlow(teamId, gameId)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    private val _selectedTeamTactic = MutableStateFlow<re.manager.basket.data.entity.TacticEntity?>(null)
-    val selectedTeamTactic: StateFlow<re.manager.basket.data.entity.TacticEntity?> = _selectedTeamTactic
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val selectedTeamTactic: StateFlow<re.manager.basket.data.entity.TacticEntity?> = combine(_selectedTeamId, _currentGameId) { teamId, gameId ->
+        teamId to gameId
+    }.flatMapLatest { (teamId, gameId) ->
+        if (teamId == null || gameId == null) flowOf(null) else database.tacticDao().getTacticForTeamFlow(teamId, gameId)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    private val _selectedMatchDetail = MutableStateFlow<re.manager.basket.data.entity.MatchEntity?>(null)
-    val selectedMatchDetail: StateFlow<re.manager.basket.data.entity.MatchEntity?> = _selectedMatchDetail
+    private val _selectedMatchId = MutableStateFlow<Int?>(null)
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val selectedMatchDetail: StateFlow<re.manager.basket.data.entity.MatchEntity?> = _selectedMatchId
+        .flatMapLatest { id ->
+            if (id == null) flowOf(null) else database.matchDao().getMatchByIdFlow(id)
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    private val _selectedMatchResults = MutableStateFlow<List<re.manager.basket.data.entity.MatchResultEntity>>(emptyList())
-    val selectedMatchResults: StateFlow<List<re.manager.basket.data.entity.MatchResultEntity>> = _selectedMatchResults
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val selectedMatchResults: StateFlow<List<re.manager.basket.data.entity.MatchResultEntity>> = _selectedMatchId
+        .flatMapLatest { id ->
+            if (id == null) flowOf(emptyList()) else database.matchResultDao().getResultsByMatchFlow(id)
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val _selectedTeamStats = MutableStateFlow<List<re.manager.basket.data.entity.MatchResultEntity>>(emptyList())
-    val selectedTeamStats: StateFlow<List<re.manager.basket.data.entity.MatchResultEntity>> = _selectedTeamStats
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val selectedTeamStats: StateFlow<List<re.manager.basket.data.entity.MatchResultEntity>> = combine(_selectedTeamId, _currentGameId) { teamId, gameId ->
+        teamId to gameId
+    }.flatMapLatest { (teamId, gameId) ->
+        if (teamId == null || gameId == null) flowOf(emptyList()) else database.matchResultDao().getResultsByTeamFlow(teamId, gameId)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _isSimulating = MutableStateFlow(false)
     val isSimulating: StateFlow<Boolean> = _isSimulating
@@ -98,19 +161,11 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
     }
 
     fun loadMatchDetail(matchId: Int) {
-        val gameId = _gameState.value?.id ?: return
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                val match = database.matchDao().getAllMatchesForGame(gameId).find { it.id == matchId }
-                _selectedMatchDetail.value = match
-                _selectedMatchResults.value = database.matchResultDao().getResultsByMatch(matchId)
-            }
-        }
+        _selectedMatchId.value = matchId
     }
 
     fun closeMatchDetail() {
-        _selectedMatchDetail.value = null
-        _selectedMatchResults.value = emptyList()
+        _selectedMatchId.value = null
     }
 
     fun togglePlayerPosition(player: re.manager.basket.data.entity.PlayerEntity) {
@@ -126,36 +181,15 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
     }
 
     fun loadPlayerDetails(playerId: Int) {
-        val gameId = _gameState.value?.id ?: return
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                _activePlayer.value = database.playerDao().getPlayersByGame(gameId).find { it.id == playerId }
-                _selectedPlayerStats.value = database.matchResultDao().getResultsByPlayer(playerId, gameId)
-            }
-        }
+        _activePlayerId.value = playerId
     }
 
     fun closePlayerDetails() {
-        _activePlayer.value = null
-        _selectedPlayerStats.value = emptyList()
+        _activePlayerId.value = null
     }
 
     fun loadTeamRoster(teamId: Int) {
-        val gameId = _gameState.value?.id ?: return
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                _selectedTeamRoster.value = database.playerDao().getPlayersByTeam(teamId, gameId)
-                _selectedTeamLeague.value = database.leagueDao().getLeagueForTeam(teamId, gameId)
-                _selectedTeamTactic.value = database.tacticDao().getTacticForTeam(teamId, gameId)
-
-                // Load all stats for the team's players to calculate averages
-                val stats = mutableListOf<re.manager.basket.data.entity.MatchResultEntity>()
-                _selectedTeamRoster.value.forEach { player ->
-                    stats.addAll(database.matchResultDao().getResultsByPlayer(player.id, gameId))
-                }
-                _selectedTeamStats.value = stats
-            }
-        }
+        _selectedTeamId.value = teamId
     }
 
     fun createNewGame(context: Context, name: String) {
@@ -171,32 +205,23 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
                 val importer = RosterImporter(context, database)
                 importer.importFromAssets(gameId)
 
-                val createdGame = database.gameDao().getGameById(gameId)
-                _gameState.value = createdGame
+                _currentGameId.value = gameId
                 _availableTeams.value = database.teamDao().getTeamsByGame(gameId)
             }
         }
     }
 
     fun loadPreviewPlayers(teamId: Int) {
-        val gameId = _gameState.value?.id ?: return
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                val players = database.playerDao().getPlayersByGame(gameId)
-                _previewPlayers.value = players.filter { it.teamId == teamId }
-            }
-        }
+        _previewTeamId.value = teamId
     }
 
     fun selectTeam(teamId: Int) {
-        val current = _gameState.value ?: return
+        val current = gameState.value ?: return
         Log.d("GameViewModel", "Selecting teamId: $teamId for gameId: ${current.id}")
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 val updated = current.copy(userTeamId = teamId)
                 database.gameDao().update(updated)
-                _gameState.value = updated
-                _userTactic.value = database.tacticDao().getTacticForTeam(teamId, current.id)
                 updateNextMatch(updated)
                 Log.d("GameViewModel", "userTeamId updated in DB using update()")
             }
@@ -207,7 +232,6 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 database.tacticDao().update(tactic)
-                _userTactic.value = tactic
             }
         }
     }
@@ -216,7 +240,7 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 val game = database.gameDao().getGameById(gameId)
-                _gameState.value = game
+                _currentGameId.value = gameId
                 _selectedCalendarDay.value = game?.currentMatchday ?: 1
 
                 // Integrity check: if players for this game are 0, something is wrong
@@ -226,15 +250,9 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
                     Log.w("GameViewModel", "CRITICAL: Game exists but players are missing! Data might have been wiped.")
                 }
 
-                _recentMatches.value = database.matchDao().getRecentMatches(gameId)
-                _news.value = database.newsDao().getNewsByGame(gameId)
-                _allMatches.value = database.matchDao().getAllMatchesForGame(gameId)
                 _availableTeams.value = database.teamDao().getTeamsByGame(gameId)
-                if (game?.userTeamId != null) {
-                    _userTactic.value = database.tacticDao().getTacticForTeam(game.userTeamId, gameId)
-                }
                 updateNextMatch(game)
-                Log.d("GameViewModel", "Game loaded, teams: ${_availableTeams.value.size}, matches: ${_allMatches.value.size}")
+                Log.d("GameViewModel", "Game loaded, teams: ${_availableTeams.value.size}, matches: ${allMatches.value.size}")
             }
         }
     }
@@ -255,7 +273,7 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
     }
 
     fun onNextDayClick(daysToSimulate: Int = 1) {
-        val current = _gameState.value ?: return
+        val current = gameState.value ?: return
         viewModelScope.launch {
             val userTactic = database.tacticDao().getTacticForTeam(current.userTeamId ?: -1, current.id)
             val isIncomplete = userTactic?.let {
@@ -275,14 +293,13 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
     }
 
     fun autoArrangeAndSimulate(daysToSimulate: Int = 1) {
-        val current = _gameState.value ?: return
+        val current = gameState.value ?: return
         viewModelScope.launch {
             val players = database.playerDao().getPlayersByTeam(current.userTeamId ?: -1, current.id)
             val tactic = database.tacticDao().getTacticForTeam(current.userTeamId ?: -1, current.id)
             if (tactic != null) {
                 val optimized = re.manager.basket.domain.engine.LineupOptimizer().optimize(players, tactic)
                 database.tacticDao().update(optimized)
-                _userTactic.value = optimized
             }
             _showAutoLineupDialog.value = false
             nextDay(daysToSimulate)
@@ -290,7 +307,7 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
     }
 
     fun nextDay(daysToSimulate: Int = 1) {
-        val current = _gameState.value ?: return
+        val current = gameState.value ?: return
         Log.d("GameViewModel", "Triggering nextDay for day: ${current.currentMatchday}, count: $daysToSimulate")
         viewModelScope.launch {
             _isSimulating.value = true
@@ -327,15 +344,17 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
                                 // Only save results for players who actually played to keep DB lean and fix averaging
                                 database.matchResultDao().insertAll(result.playerResults.filter { it.minutesPlayed > 0 })
 
-                                // Update evolved player states
-                                database.playerDao().insertAll(result.evolvedPlayers)
+                                // Update evolved player states, merging injury data to avoid overwriting evolution
+                                val finalEvolved = result.evolvedPlayers.map { evolvedP ->
+                                    result.injuries.findLast { it.id == evolvedP.id }?.let { injury ->
+                                        evolvedP.copy(stateInjury = injury.stateInjury)
+                                    } ?: evolvedP
+                                }
+                                database.playerDao().updateAll(finalEvolved)
 
-                                if (result.injuries.isNotEmpty()) {
-                                    database.playerDao().insertAll(result.injuries)
-                                    // Check if user team had an injury
-                                    if (result.injuries.any { it.teamId == userTeamId && it.stateInjury > 0 }) {
-                                        injuryOccurred = true
-                                    }
+                                // Check if user team had an injury
+                                if (result.injuries.any { it.teamId == userTeamId && it.stateInjury > 0 }) {
+                                    injuryOccurred = true
                                 }
                                 generateMatchNews(result)
                                 updateLeagueStandings(result)
@@ -347,8 +366,8 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
 
                         // 2. Evolve states (Daily evolution for ALL players, including free agents)
                         val allPlayers = database.playerDao().getPlayersByGame(activeGame.id)
-                        val evolvedPlayers = re.manager.basket.domain.engine.StateEvolver().evolveAllPlayersDaily(allPlayers)
-                        database.playerDao().insertAll(evolvedPlayers)
+                        val evolvedPlayersDaily = re.manager.basket.domain.engine.StateEvolver().evolveAllPlayersDaily(allPlayers)
+                        database.playerDao().updateAll(evolvedPlayersDaily)
 
                         // 3. Move to next day
                         val seasonManager = SeasonManager(activeGame)
@@ -382,10 +401,6 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
 
                     // Refresh final state
                     val finalGame = database.gameDao().getGameById(current.id)
-                    _gameState.value = finalGame
-                    _recentMatches.value = database.matchDao().getRecentMatches(current.id)
-                    _allMatches.value = database.matchDao().getAllMatchesForGame(current.id)
-                    _news.value = database.newsDao().getNewsByGame(current.id)
                     finalGame?.let { updateNextMatch(it) }
                 }
             } catch (e: Exception) {
@@ -510,13 +525,11 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
         // We'll trigger it when nextDay moves from 166 to 167
     }
 
-    private fun Double.toOriginalInt(): Int = (this + 0.5).toInt()
-
     private suspend fun generateMatchNews(result: re.manager.basket.domain.engine.MatchFullResult) {
         val match = result.match
         val localScore = match.getTotalLocal()
         val visitorScore = match.getTotalVisitor()
-        val currentUserId = _gameState.value?.userTeamId
+        val currentUserId = gameState.value?.userTeamId
 
         val teams = database.teamDao().getTeamsByGame(match.gameId)
         val localTeam = teams.find { it.id == match.teamLocalId }
@@ -577,7 +590,7 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
         }
 
         // Generate Injury News for User Team
-        val userTeamId = _gameState.value?.userTeamId
+        val userTeamId = gameState.value?.userTeamId
         result.injuries.filter { it.teamId == userTeamId && it.stateInjury > 0 }.forEach { injured ->
             database.newsDao().insert(
                 re.manager.basket.data.entity.NewsEntity(
@@ -730,7 +743,7 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
     private suspend fun updateAllSalaryCaps(gameId: Int) {
         val teams = database.teamDao().getTeamsByGame(gameId)
         val standings = database.leagueDao().getStandings(gameId)
-        val userTeamId = _gameState.value?.userTeamId
+        val userTeamId = gameState.value?.userTeamId
 
         // Group by conference
         val eastTeams = teams.filter { it.conference == re.manager.basket.domain.model.Conference.EAST }

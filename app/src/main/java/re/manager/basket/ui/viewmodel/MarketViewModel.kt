@@ -3,41 +3,44 @@ package re.manager.basket.ui.viewmodel
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import re.manager.basket.data.AppDatabase
 import re.manager.basket.data.entity.PlayerEntity
 
 class MarketViewModel(private val database: AppDatabase) : ViewModel() {
 
-    private val _freeAgents = MutableStateFlow<List<PlayerEntity>>(emptyList())
-    val freeAgents: StateFlow<List<PlayerEntity>> = _freeAgents.asStateFlow()
+    private val _gameId = MutableStateFlow<Int?>(null)
+    private val _userTeamId = MutableStateFlow<Int?>(null)
 
-    private val _teamSalary = MutableStateFlow(0)
-    val teamSalary: StateFlow<Int> = _teamSalary.asStateFlow()
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val freeAgents: StateFlow<List<PlayerEntity>> = _gameId.flatMapLatest { id ->
+        if (id == null) flowOf(emptyList())
+        else database.playerDao().getPlayersByTeamFlow(-1, id) // Assuming -1 or specific query for null teamId
+            .map { list -> list.filter { it.teamId == null }.sortedByDescending { it.getAverageSkillAll() } }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val _salaryCap = MutableStateFlow(re.manager.basket.domain.model.Constants.SALARY_CAP_MED)
-    val salaryCap: StateFlow<Int> = _salaryCap.asStateFlow()
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val teamSalary: StateFlow<Int> = combine(_gameId, _userTeamId) { gameId, teamId ->
+        gameId to teamId
+    }.flatMapLatest { (gameId, teamId) ->
+        if (gameId == null || teamId == null) flowOf(0)
+        else database.playerDao().getPlayersByTeamFlow(teamId, gameId).map { it.sumOf { p -> p.salary } }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val salaryCap: StateFlow<Int> = combine(_gameId, _userTeamId) { gameId, teamId ->
+        gameId to teamId
+    }.flatMapLatest { (gameId, teamId) ->
+        if (gameId == null || teamId == null) flowOf(re.manager.basket.domain.model.Constants.SALARY_CAP_MED)
+        else flow { emit(database.teamDao().getTeamById(teamId, gameId)?.salaryCap ?: re.manager.basket.domain.model.Constants.SALARY_CAP_MED) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), re.manager.basket.domain.model.Constants.SALARY_CAP_MED)
 
     fun loadMarketData(gameId: Int, userTeamId: Int) {
-        Log.d("MarketViewModel", "Loading market data for gameId: $gameId, userTeamId: $userTeamId")
-        viewModelScope.launch {
-            // Free Agents have teamId = null (as per RosterImporter)
-            val players = database.playerDao().getPlayersByGame(gameId)
-            val freeAgents = players.filter { it.teamId == null }.sortedByDescending { it.getAverageSkillAll() }
-            Log.d("MarketViewModel", "Found ${freeAgents.size} free agents")
-            _freeAgents.value = freeAgents
-
-            val teamPlayers = database.playerDao().getPlayersByTeam(userTeamId, gameId)
-            _teamSalary.value = teamPlayers.sumOf { it.salary }
-
-            val team = database.teamDao().getTeamById(userTeamId, gameId)
-            team?.let {
-                _salaryCap.value = it.salaryCap
-            }
-        }
+        Log.d("MarketViewModel", "Setting market load params for gameId: $gameId, userTeamId: $userTeamId")
+        _gameId.value = gameId
+        _userTeamId.value = userTeamId
     }
 
     private val _signingResult = MutableStateFlow<String?>(null)
@@ -56,7 +59,6 @@ class MarketViewModel(private val database: AppDatabase) : ViewModel() {
             } else {
                 _signingResult.value = "Rejected: ${player.name} found the offer insufficient."
             }
-            loadMarketData(player.gameId, teamId)
         }
     }
 

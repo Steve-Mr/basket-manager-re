@@ -102,7 +102,7 @@ class MainActivity : ComponentActivity() {
                     // Make sure player list is loaded when game is loaded
                     LaunchedEffect(gameState?.userTeamId) {
                         gameState?.userTeamId?.let { teamId ->
-                            playerListViewModel.loadPlayers(teamId, gameState?.id ?: 1)
+                            playerListViewModel.loadPlayers(teamId, gameState?.id)
                         }
                     }
 
