@@ -16,6 +16,7 @@ import re.manager.basket.data.entity.TeamEntity
 import re.manager.basket.data.importer.RosterImporter
 import re.manager.basket.domain.engine.SeasonManager
 import re.manager.basket.domain.model.Constants
+import re.manager.basket.util.MathUtils.toOriginalInt
 
 class GameViewModel(private val database: AppDatabase) : ViewModel() {
 
@@ -27,8 +28,14 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    private val _previewPlayers = MutableStateFlow<List<re.manager.basket.data.entity.PlayerEntity>>(emptyList())
-    val previewPlayers: StateFlow<List<re.manager.basket.data.entity.PlayerEntity>> = _previewPlayers
+    private val _previewTeamId = MutableStateFlow<Int?>(null)
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val previewPlayers: StateFlow<List<re.manager.basket.data.entity.PlayerEntity>> = combine(_previewTeamId, _currentGameId) { teamId, gameId ->
+        teamId to gameId
+    }.flatMapLatest { (teamId, gameId) ->
+        if (teamId == null || gameId == null) flowOf(emptyList())
+        else database.playerDao().getPlayersByTeamFlow(teamId, gameId)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _allGames = MutableStateFlow<List<GameEntity>>(emptyList())
     val allGames: StateFlow<List<GameEntity>> = _allGames
@@ -205,13 +212,7 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
     }
 
     fun loadPreviewPlayers(teamId: Int) {
-        val gameId = _currentGameId.value ?: return
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                val players = database.playerDao().getPlayersByGame(gameId)
-                _previewPlayers.value = players.filter { it.teamId == teamId }
-            }
-        }
+        _previewTeamId.value = teamId
     }
 
     fun selectTeam(teamId: Int) {
@@ -343,15 +344,17 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
                                 // Only save results for players who actually played to keep DB lean and fix averaging
                                 database.matchResultDao().insertAll(result.playerResults.filter { it.minutesPlayed > 0 })
 
-                                // Update evolved player states
-                                database.playerDao().updateAll(result.evolvedPlayers)
+                                // Update evolved player states, merging injury data to avoid overwriting evolution
+                                val finalEvolved = result.evolvedPlayers.map { evolvedP ->
+                                    result.injuries.findLast { it.id == evolvedP.id }?.let { injury ->
+                                        evolvedP.copy(stateInjury = injury.stateInjury)
+                                    } ?: evolvedP
+                                }
+                                database.playerDao().updateAll(finalEvolved)
 
-                                if (result.injuries.isNotEmpty()) {
-                                    database.playerDao().updateAll(result.injuries)
-                                    // Check if user team had an injury
-                                    if (result.injuries.any { it.teamId == userTeamId && it.stateInjury > 0 }) {
-                                        injuryOccurred = true
-                                    }
+                                // Check if user team had an injury
+                                if (result.injuries.any { it.teamId == userTeamId && it.stateInjury > 0 }) {
+                                    injuryOccurred = true
                                 }
                                 generateMatchNews(result)
                                 updateLeagueStandings(result)
@@ -521,8 +524,6 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
         // Original logic: manage() in ManageRenewals.java
         // We'll trigger it when nextDay moves from 166 to 167
     }
-
-    private fun Double.toOriginalInt(): Int = (this + 0.5).toInt()
 
     private suspend fun generateMatchNews(result: re.manager.basket.domain.engine.MatchFullResult) {
         val match = result.match

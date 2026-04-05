@@ -10,17 +10,19 @@ import re.manager.basket.data.AppDatabase
 class PlayerListViewModel(private val database: AppDatabase) : ViewModel() {
 
     private val _teamId = MutableStateFlow<Int?>(null)
-    private val _gameId = MutableStateFlow(1)
+    private val _gameId = MutableStateFlow<Int?>(null)
     private val _filterPosition = MutableStateFlow(re.manager.basket.domain.model.Position.NONE)
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val players: StateFlow<List<PlayerUiState>> = combine(_teamId, _gameId, _filterPosition) { teamId, gameId, filter ->
         Triple(teamId, gameId, filter)
     }.flatMapLatest { (teamId, gameId, filter) ->
-        if (teamId == null) flowOf(emptyList())
+        if (teamId == null || gameId == null) flowOf(emptyList())
         else {
-            database.playerDao().getPlayersByTeamFlow(teamId, gameId).map { teamPlayers ->
-                val tactic = database.tacticDao().getTacticForTeam(teamId, gameId)
+            combine(
+                database.playerDao().getPlayersByTeamFlow(teamId, gameId),
+                database.tacticDao().getTacticForTeamFlow(teamId, gameId)
+            ) { teamPlayers, tactic ->
                 val starters = tactic?.let {
                     setOf(it.titPG, it.titSG, it.titSF, it.titPF, it.titC)
                 } ?: emptySet()
@@ -44,7 +46,7 @@ class PlayerListViewModel(private val database: AppDatabase) : ViewModel() {
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    fun loadPlayers(teamId: Int, gameId: Int = 1, filterPosition: re.manager.basket.domain.model.Position = re.manager.basket.domain.model.Position.NONE) {
+    fun loadPlayers(teamId: Int, gameId: Int?, filterPosition: re.manager.basket.domain.model.Position = re.manager.basket.domain.model.Position.NONE) {
         Log.d("PlayerListViewModel", "Setting load params for teamId: $teamId, gameId: $gameId, filter: $filterPosition")
         _teamId.value = teamId
         _gameId.value = gameId

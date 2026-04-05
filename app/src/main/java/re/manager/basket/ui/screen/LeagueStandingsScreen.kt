@@ -30,9 +30,12 @@ class LeagueViewModel(private val database: AppDatabase) : ViewModel() {
     val standings: StateFlow<List<Pair<TeamEntity, LeagueEntity>>> = _gameId.flatMapLatest { gameId ->
         if (gameId == null) flowOf(emptyList())
         else {
-            database.leagueDao().getStandingsFlow(gameId).map { stats ->
-                val teams = database.teamDao().getTeamsByGame(gameId).associateBy { it.id }
-                stats.mapNotNull { teams[it.teamId]?.let { team -> team to it } }
+            combine(
+                database.leagueDao().getStandingsFlow(gameId),
+                database.teamDao().getTeamsByGameFlow(gameId)
+            ) { stats, teams ->
+                val teamMap = teams.associateBy { it.id }
+                stats.mapNotNull { teamMap[it.teamId]?.let { team -> team to it } }
             }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())

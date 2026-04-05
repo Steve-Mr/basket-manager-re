@@ -1,6 +1,7 @@
 package re.manager.basket.data.dao
 
 import androidx.room.*
+import kotlinx.coroutines.flow.Flow
 import re.manager.basket.data.entity.TeamEntity
 
 @Dao
@@ -22,4 +23,7 @@ interface TeamDao {
 
     @Query("SELECT * FROM teams WHERE id = :teamId AND gameId = :gameId")
     suspend fun getTeamById(teamId: Int, gameId: Int): TeamEntity?
+
+    @Query("SELECT * FROM teams WHERE gameId = :gameId")
+    fun getTeamsByGameFlow(gameId: Int): Flow<List<TeamEntity>>
 }

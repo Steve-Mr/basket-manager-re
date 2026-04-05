@@ -26,4 +26,7 @@ interface PlayerDao {
 
     @Query("SELECT * FROM players WHERE id = :playerId AND gameId = :gameId")
     fun getPlayerByIdFlow(playerId: Int, gameId: Int): Flow<PlayerEntity?>
+
+    @Query("SELECT * FROM players WHERE teamId IS NULL AND gameId = :gameId")
+    fun getFreeAgentsFlow(gameId: Int): Flow<List<PlayerEntity>>
 }
