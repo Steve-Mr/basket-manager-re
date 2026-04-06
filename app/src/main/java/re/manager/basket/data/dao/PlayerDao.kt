@@ -29,4 +29,16 @@ interface PlayerDao {
 
     @Query("SELECT * FROM players WHERE teamId IS NULL AND gameId = :gameId")
     fun getFreeAgentsFlow(gameId: Int): Flow<List<PlayerEntity>>
+
+    @Query("SELECT * FROM players WHERE gameId = :gameId")
+    fun getAllPlayersFlow(gameId: Int): Flow<List<PlayerEntity>>
+
+    @Query("SELECT * FROM players WHERE yearsExperience = 0 AND gameId = :gameId")
+    fun getRookiesFlow(gameId: Int): Flow<List<PlayerEntity>>
+
+    @Delete
+    suspend fun delete(player: PlayerEntity)
+
+    @Delete
+    suspend fun deleteAllPlayers(players: List<PlayerEntity>)
 }

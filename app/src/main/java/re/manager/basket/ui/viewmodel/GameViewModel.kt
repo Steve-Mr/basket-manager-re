@@ -111,6 +111,13 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
         if (teamId == null || gameId == null) flowOf(null) else database.tacticDao().getTacticForTeamFlow(teamId, gameId)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val selectedTeamDraftPicks: StateFlow<List<re.manager.basket.data.entity.DraftPickEntity>> = combine(_selectedTeamId, _currentGameId) { teamId, gameId ->
+        teamId to gameId
+    }.flatMapLatest { (teamId, gameId) ->
+        if (teamId == null || gameId == null) flowOf(emptyList()) else database.draftPickDao().getPicksByTeam(teamId, gameId)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     private val _selectedMatchId = MutableStateFlow<Int?>(null)
     @OptIn(ExperimentalCoroutinesApi::class)
     val selectedMatchDetail: StateFlow<re.manager.basket.data.entity.MatchEntity?> = _selectedMatchId
@@ -376,6 +383,7 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
                         if (currentDay == 166 && nextDayVal == 167) {
                             updateAllSalaryCaps(activeGame.id)
                             generatePlayoffSeeding(activeGame.id)
+                            evaluateAwards(activeGame.id, activeGame.currentSeason)
                         }
 
                         if (nextDayVal in listOf(182, 197, 212)) {
@@ -396,7 +404,10 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
                             Log.i("GameViewModel", "Stopping multi-day simulation due to user team injury")
                             break
                         }
-                        if (nextDayVal == 0) break // Season end
+                        if (nextDayVal == 0) {
+                            startNewSeason(activeGame.id, activeGame.currentSeason)
+                            break
+                        }
                     }
 
                     // Refresh final state
@@ -479,6 +490,14 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
                     body = "${team.name} are the league champions!",
                     type = "TROPHY"
                 ))
+                // Record Champion Award
+                val current = gameState.value
+                current?.let {
+                    database.awardDao().insertAward(re.manager.basket.data.entity.AwardEntity(
+                        gameId = gameId, season = it.currentSeason, type = re.manager.basket.data.entity.AwardType.CHAMPION,
+                        teamId = team.id, value = team.fullName
+                    ))
+                }
             }
         }
     }
@@ -740,6 +759,54 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
         database.matchDao().insertAll(matches)
     }
 
+    private suspend fun evaluateAwards(gameId: Int, season: Int) {
+        val allPlayers = database.playerDao().getPlayersByGame(gameId)
+        val standings = database.leagueDao().getStandings(gameId)
+        val teamMap = database.teamDao().getTeamsByGame(gameId).associateBy { it.id }
+
+        val playerResults = database.matchResultDao().getResultsByGame(gameId) // Need to filter by season if multi-season
+            .filter { it.season == season }
+            .groupBy { it.playerId }
+
+        val playerAverages = playerResults.mapValues { (_, results) ->
+            val played = results.size
+            if (played == 0) null
+            else {
+                val per = results.sumOf { it.getPer() } / played
+                per
+            }
+        }.filterValues { it != null }
+
+        // MVP: PER + Team Record Bonus
+        val mvp = playerAverages.map { (pid, avgPer) ->
+            val player = allPlayers.find { it.id == pid }
+            val teamStanding = standings.find { it.teamId == player?.teamId }
+            val winRate = if (teamStanding != null) teamStanding.gamesWon.toDouble() / (teamStanding.gamesWon + teamStanding.gamesLost) else 0.0
+            val score = avgPer!! * (1.0 + winRate * 0.5)
+            pid to score
+        }.maxByOrNull { it.second }
+
+        mvp?.let { (pid, score) ->
+            val player = allPlayers.find { it.id == pid }
+            database.awardDao().insertAward(re.manager.basket.data.entity.AwardEntity(
+                gameId = gameId, season = season, type = re.manager.basket.data.entity.AwardType.MVP,
+                playerId = pid, value = "${player?.name} (PER: ${String.format("%.2f", score)})"
+            ))
+        }
+
+        // ROY: Only rookies, only PER
+        val rookies = allPlayers.filter { it.yearsExperience == 0 }.map { it.id }.toSet()
+        val roy = playerAverages.filter { it.key in rookies }.maxByOrNull { it.value!! }
+
+        roy?.let { (pid, per) ->
+            val player = allPlayers.find { it.id == pid }
+            database.awardDao().insertAward(re.manager.basket.data.entity.AwardEntity(
+                gameId = gameId, season = season, type = re.manager.basket.data.entity.AwardType.ROY,
+                playerId = pid, value = "${player?.name} (PER: ${String.format("%.2f", per)})"
+            ))
+        }
+    }
+
     private suspend fun updateAllSalaryCaps(gameId: Int) {
         val teams = database.teamDao().getTeamsByGame(gameId)
         val standings = database.leagueDao().getStandings(gameId)
@@ -815,6 +882,81 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
         if (updatedTeams.isNotEmpty()) {
             database.teamDao().updateAll(updatedTeams)
         }
+    }
+
+    private suspend fun startNewSeason(gameId: Int, oldSeason: Int) {
+        val newSeason = oldSeason + 1
+        val allPlayers = database.playerDao().getPlayersByGame(gameId)
+        val evolver = re.manager.basket.domain.engine.StateEvolver()
+
+        // 1. Process Retirements and Evolution
+        val updatedPlayers = mutableListOf<re.manager.basket.data.entity.PlayerEntity>()
+        val retiredPlayers = mutableListOf<re.manager.basket.data.entity.PlayerEntity>()
+
+        allPlayers.forEach { player ->
+            if (evolver.shouldPlayerRetire(player)) {
+                retiredPlayers.add(player)
+            } else {
+                updatedPlayers.add(evolver.evolvePlayerEndOfSeason(player))
+            }
+        }
+        database.playerDao().updateAll(updatedPlayers)
+        database.playerDao().deleteAllPlayers(retiredPlayers)
+
+        // 2. Generate New Rookies for Draft
+        val newRookies = mutableListOf<re.manager.basket.data.entity.PlayerEntity>()
+        repeat(90) {
+            newRookies.add(generateRandomPlayer(gameId))
+        }
+        database.playerDao().insertAll(newRookies)
+
+        // 3. Reset League Standings
+        val standings = database.leagueDao().getStandings(gameId)
+        val resetStandings = standings.map { it.copy(gamesWon = 0, gamesLost = 0, pointsScored = 0, pointsAllowed = 0) }
+        database.leagueDao().updateAll(resetStandings)
+
+        // 4. Generate New Calendar
+        val teams = database.teamDao().getTeamsByGame(gameId)
+        val newMatches = re.manager.basket.domain.generator.SeasonCalendar.generateMatches(gameId, teams).map { it.copy(season = newSeason) }
+        database.matchDao().insertAll(newMatches)
+
+        // 5. Generate New Draft Picks
+        val draftPicks = mutableListOf<re.manager.basket.data.entity.DraftPickEntity>()
+        teams.forEach { team ->
+            draftPicks.add(re.manager.basket.data.entity.DraftPickEntity(gameId = gameId, originalTeamId = team.id, currentTeamId = team.id, round = 1, year = newSeason + 1))
+            draftPicks.add(re.manager.basket.data.entity.DraftPickEntity(gameId = gameId, originalTeamId = team.id, currentTeamId = team.id, round = 2, year = newSeason + 1))
+        }
+        database.draftPickDao().insertPicks(draftPicks)
+
+        // Update Game State
+        database.gameDao().update(database.gameDao().getGameById(gameId)!!.copy(currentSeason = newSeason, currentMatchday = 1))
+    }
+
+    private fun generateRandomPlayer(gameId: Int): re.manager.basket.data.entity.PlayerEntity {
+        val pos = re.manager.basket.domain.model.Position.entries.filter { it != re.manager.basket.domain.model.Position.NONE }.random()
+        return re.manager.basket.data.entity.PlayerEntity(
+            name = "Rookie ${kotlin.random.Random.nextInt(1000, 9999)}",
+            age = kotlin.random.Random.nextInt(18, 23),
+            teamId = null,
+            positionFirst = pos,
+            positionSecond = re.manager.basket.domain.model.Position.NONE,
+            potential = kotlin.random.Random.nextInt(1, 11),
+            salary = 0,
+            yearsContract = 0,
+            yearsExperience = 0,
+            skillPhysique = kotlin.random.Random.nextInt(40, 70),
+            skillBlock = kotlin.random.Random.nextInt(40, 70),
+            skillSteal = kotlin.random.Random.nextInt(40, 70),
+            skillRebound = kotlin.random.Random.nextInt(40, 70),
+            skillPass = kotlin.random.Random.nextInt(40, 70),
+            skillShotInterior = kotlin.random.Random.nextInt(40, 70),
+            skillShotExterior = kotlin.random.Random.nextInt(40, 70),
+            skillShotFree = kotlin.random.Random.nextInt(40, 70),
+            stateEnergy = 99,
+            stateForm = kotlin.random.Random.nextInt(30, 71),
+            stateInjury = 0,
+            gameId = gameId
+        )
     }
 
     private fun MatchEntity.getTotalLocal() = localQ1 + localQ2 + localQ3 + localQ4

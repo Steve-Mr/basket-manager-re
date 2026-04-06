@@ -23,4 +23,7 @@ interface MatchResultDao {
 
     @Query("SELECT * FROM match_results WHERE gameId = :gameId AND playerId IN (SELECT id FROM players WHERE teamId = :teamId AND gameId = :gameId)")
     fun getResultsByTeamFlow(teamId: Int, gameId: Int): Flow<List<MatchResultEntity>>
+
+    @Query("SELECT * FROM match_results WHERE gameId = :gameId")
+    suspend fun getResultsByGame(gameId: Int): List<MatchResultEntity>
 }

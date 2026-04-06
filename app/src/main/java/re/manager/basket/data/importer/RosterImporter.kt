@@ -106,6 +106,14 @@ class RosterImporter(private val context: Context, private val database: AppData
             database.playerDao().insertAll(players)
             Log.d("RosterImporter", "Inserted ${players.size} players into database")
 
+            // 2b. Initialize Draft Picks (Next Season)
+            val draftPicks = mutableListOf<DraftPickEntity>()
+            teams.forEach { team ->
+                draftPicks.add(DraftPickEntity(gameId = gameId, originalTeamId = team.id, currentTeamId = team.id, round = 1, year = 2026))
+                draftPicks.add(DraftPickEntity(gameId = gameId, originalTeamId = team.id, currentTeamId = team.id, round = 2, year = 2026))
+            }
+            database.draftPickDao().insertPicks(draftPicks)
+
             // 3. Generate Calendar
             val matches = SeasonCalendar.generateMatches(gameId, teams)
             database.matchDao().insertAll(matches)

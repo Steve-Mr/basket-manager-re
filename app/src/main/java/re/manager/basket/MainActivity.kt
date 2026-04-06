@@ -16,7 +16,7 @@ import re.manager.basket.ui.theme.BasketManagerTheme
 import re.manager.basket.ui.viewmodel.GameViewModel
 import re.manager.basket.ui.viewmodel.PlayerListViewModel
 import re.manager.basket.ui.viewmodel.MarketViewModel
-import re.manager.basket.ui.screen.LeagueViewModel
+import re.manager.basket.ui.viewmodel.LeagueViewModel
 
 class MainActivity : ComponentActivity() {
 

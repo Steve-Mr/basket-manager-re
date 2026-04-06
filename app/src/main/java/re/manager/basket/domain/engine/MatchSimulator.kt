@@ -32,6 +32,7 @@ class MatchSimulator(
                 gameId = match.gameId,
                 matchId = match.id,
                 matchday = match.matchday,
+                season = match.season,
                 playerId = player.id,
                 name = player.name
             )
@@ -41,6 +42,7 @@ class MatchSimulator(
                 gameId = match.gameId,
                 matchId = match.id,
                 matchday = match.matchday,
+                season = match.season,
                 playerId = player.id,
                 name = player.name
             )

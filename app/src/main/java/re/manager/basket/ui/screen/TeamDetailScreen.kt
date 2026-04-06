@@ -21,6 +21,7 @@ fun TeamDetailScreen(
     league: LeagueEntity?,
     players: List<PlayerEntity>,
     tactic: re.manager.basket.data.entity.TacticEntity? = null,
+    draftPicks: List<re.manager.basket.data.entity.DraftPickEntity> = emptyList(),
     onPlayerClick: (Int) -> Unit,
     onStatsClick: () -> Unit = {},
     onBack: () -> Unit
@@ -59,6 +60,21 @@ fun TeamDetailScreen(
                             Text("Record: ${it.gamesWon}W - ${it.gamesLost}L", fontWeight = FontWeight.Bold)
                             Text("Points Scored: ${it.pointsScored}")
                             Text("Points Allowed: ${it.pointsAllowed}")
+                        }
+                    }
+                }
+            }
+
+            if (draftPicks.isNotEmpty()) {
+                item {
+                    Text("Draft Picks", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                }
+                item {
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            draftPicks.sortedBy { it.year }.forEach { pick ->
+                                Text("Round ${pick.round} (${pick.year})", fontWeight = FontWeight.Medium)
+                            }
                         }
                     }
                 }

@@ -15,6 +15,7 @@ import re.manager.basket.ui.viewmodel.GameViewModel
 import re.manager.basket.ui.viewmodel.PlayerListViewModel
 import re.manager.basket.ui.viewmodel.PlayerUiState
 import re.manager.basket.ui.viewmodel.MarketViewModel
+import re.manager.basket.ui.viewmodel.LeagueViewModel
 
 @Composable
 fun MainScaffold(
@@ -38,12 +39,14 @@ fun MainScaffold(
     val selectedTeamRoster by gameViewModel.selectedTeamRoster.collectAsState()
     val selectedTeamLeague by gameViewModel.selectedTeamLeague.collectAsState()
     val selectedTeamTactic by gameViewModel.selectedTeamTactic.collectAsState()
+    val selectedTeamDraftPicks by gameViewModel.selectedTeamDraftPicks.collectAsState()
     val selectedMatchDetail by gameViewModel.selectedMatchDetail.collectAsState()
     val selectedMatchResults by gameViewModel.selectedMatchResults.collectAsState()
     val selectedTeamStats by gameViewModel.selectedTeamStats.collectAsState()
     val selectedCalendarDay by gameViewModel.selectedCalendarDay.collectAsState()
 
     MainScaffoldContent(
+        gameViewModel = gameViewModel,
         selectedItemInitial = 0,
         gameState = gameState,
         players = players,
@@ -60,6 +63,7 @@ fun MainScaffold(
         selectedTeamRoster = selectedTeamRoster,
         selectedTeamLeague = selectedTeamLeague,
         selectedTeamTactic = selectedTeamTactic,
+        selectedTeamDraftPicks = selectedTeamDraftPicks,
         selectedMatchDetail = selectedMatchDetail,
         selectedMatchResults = selectedMatchResults,
         selectedTeamStats = selectedTeamStats,
@@ -84,6 +88,7 @@ fun MainScaffold(
 
 @Composable
 fun MainScaffoldContent(
+    gameViewModel: GameViewModel,
     selectedItemInitial: Int,
     gameState: re.manager.basket.data.entity.GameEntity?,
     players: List<PlayerUiState>,
@@ -100,6 +105,7 @@ fun MainScaffoldContent(
     selectedTeamRoster: List<re.manager.basket.data.entity.PlayerEntity>,
     selectedTeamLeague: re.manager.basket.data.entity.LeagueEntity?,
     selectedTeamTactic: re.manager.basket.data.entity.TacticEntity?,
+    selectedTeamDraftPicks: List<re.manager.basket.data.entity.DraftPickEntity>,
     activePlayer: re.manager.basket.data.entity.PlayerEntity?,
     selectedMatchDetail: re.manager.basket.data.entity.MatchEntity?,
     selectedMatchResults: List<re.manager.basket.data.entity.MatchResultEntity>,
@@ -241,6 +247,7 @@ fun MainScaffoldContent(
                             league = selectedTeamLeague,
                             players = selectedTeamRoster,
                             tactic = selectedTeamTactic,
+                            draftPicks = selectedTeamDraftPicks,
                             onPlayerClick = { detailPlayerId = it },
                             onStatsClick = { showTeamStats = true },
                             onBack = { detailTeamId = -1 }
@@ -294,15 +301,19 @@ fun MainScaffoldContent(
                             }
                         }
                         2 -> gameState?.let {
-                            LeagueStandingsScreen(gameId = it.id, leagueViewModel = leagueViewModel, onTeamClick = { team, _ ->
-                                detailTeamId = team.id
-                            })
-                        }
-                        3 -> gameState?.let {
-                            MarketScreen(
+                            LeagueScreen(
                                 gameId = it.id,
-                                userTeamId = it.userTeamId ?: 1,
-                                marketViewModel = marketViewModel
+                                viewModel = leagueViewModel,
+                                onPlayerClick = { playerId -> detailPlayerId = playerId }
+                            )
+                        }
+                        3 -> gameState?.let { game ->
+                            MarketScreen(
+                                gameId = game.id,
+                                userTeamId = game.userTeamId ?: 1,
+                                marketViewModel = marketViewModel,
+                                userPlayers = players.map { it.originalEntity },
+                                currentMatchday = game.currentMatchday
                             )
                         }
                     }

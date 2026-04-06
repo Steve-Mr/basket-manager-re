@@ -39,6 +39,7 @@ data class MatchEntity(
     val matchday: Int,
     val teamLocalId: Int,
     val teamVisitorId: Int,
+    val season: Int = 0,
     val name: String? = null,
     val localQ1: Int = 0,
     val localQ2: Int = 0,

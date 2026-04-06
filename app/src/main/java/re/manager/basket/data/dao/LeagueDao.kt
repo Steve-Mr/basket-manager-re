@@ -12,6 +12,9 @@ interface LeagueDao {
     @Update
     suspend fun update(league: LeagueEntity)
 
+    @Update
+    suspend fun updateAll(leagues: List<LeagueEntity>)
+
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAll(leagues: List<LeagueEntity>)
 

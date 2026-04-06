@@ -18,14 +18,16 @@ import re.manager.basket.domain.model.Constants
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.getValue
 
 @Composable
 fun MarketScreen(
     gameId: Int,
     userTeamId: Int,
-    marketViewModel: MarketViewModel
+    marketViewModel: MarketViewModel,
+    userPlayers: List<re.manager.basket.data.entity.PlayerEntity> = emptyList(),
+    currentMatchday: Int = 1
 ) {
+    var selectedTab by remember { mutableStateOf(0) } // 0: Free Agency, 1: Trade
     val freeAgents by marketViewModel.freeAgents.collectAsState()
     val teamSalary by marketViewModel.teamSalary.collectAsState()
     val salaryCap by marketViewModel.salaryCap.collectAsState()
@@ -36,6 +38,28 @@ fun MarketScreen(
     }
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        TabRow(selectedTabIndex = selectedTab) {
+            Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }) {
+                Text("Free Agents", modifier = Modifier.padding(16.dp))
+            }
+            Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }) {
+                Text("Trade", modifier = Modifier.padding(16.dp))
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        if (selectedTab == 1) {
+            if (currentMatchday > 87 && currentMatchday < 226) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("Trade deadline has passed (Day 87).", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.error)
+                }
+            } else {
+                TradeScreen(userTeamId = userTeamId, marketViewModel = marketViewModel, userPlayers = userPlayers)
+            }
+            return@Column
+        }
+
         Text(text = "Free Agency Market", style = MaterialTheme.typography.headlineMedium)
         Spacer(modifier = Modifier.height(8.dp))
 

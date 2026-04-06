@@ -35,6 +35,7 @@ data class MatchResultEntity(
     val gameId: Int,
     val matchId: Int,
     val matchday: Int,
+    val season: Int = 0,
     val playerId: Int,
     val name: String,
     val minutesPlayed: Int = 0,

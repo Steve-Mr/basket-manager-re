@@ -113,28 +113,36 @@ fun PlayerDetailScreen(
 
             item {
                 Text("Season Statistics", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                val filteredStats = stats.filter { it.minutesPlayed > 0 }
-                if (filteredStats.isEmpty()) {
-                    Text("No games played yet.", style = MaterialTheme.typography.bodyMedium)
-                } else {
-                    val games = filteredStats.size
-                    // We sum the inflated doubles then divide by games to get true season averages
-                    val avgPts = filteredStats.sumOf { it.points }.toFloat() / games
-                    val avgReb = filteredStats.sumOf { (it.rebounds + 0.5).toInt() }.toFloat() / games
-                    val avgAst = filteredStats.sumOf { (it.assists + 0.5).toInt() }.toFloat() / games
-                    val avgStl = filteredStats.sumOf { (it.steals + 0.5).toInt() }.toFloat() / games
-                    val avgBlk = filteredStats.sumOf { (it.blocks + 0.5).toInt() }.toFloat() / games
-                    val avgPer = filteredStats.sumOf { it.getPer() }.toFloat() / games
+            }
 
-                    Card(modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text("Games Played: $games")
-                            Text("PPG: %.1f".format(avgPts))
-                            Text("RPG: %.1f".format(avgReb))
-                            Text("APG: %.1f".format(avgAst))
-                            Text("SPG: %.1f".format(avgStl))
-                            Text("BPG: %.1f".format(avgBlk))
-                            Text("PER: %.2f".format(avgPer))
+            val statsBySeason = stats.filter { it.minutesPlayed > 0 }.groupBy { it.season }
+            if (statsBySeason.isEmpty()) {
+                item {
+                    Text("No games played yet.", style = MaterialTheme.typography.bodyMedium)
+                }
+            } else {
+                statsBySeason.keys.sortedDescending().forEach { season ->
+                    val filteredStats = statsBySeason[season] ?: emptyList()
+                    item {
+                        Text("Season $season", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                        val games = filteredStats.size
+                        val avgPts = filteredStats.sumOf { it.points }.toFloat() / games
+                        val avgReb = filteredStats.sumOf { (it.rebounds + 0.5).toInt() }.toFloat() / games
+                        val avgAst = filteredStats.sumOf { (it.assists + 0.5).toInt() }.toFloat() / games
+                        val avgStl = filteredStats.sumOf { (it.steals + 0.5).toInt() }.toFloat() / games
+                        val avgBlk = filteredStats.sumOf { (it.blocks + 0.5).toInt() }.toFloat() / games
+                        val avgPer = filteredStats.sumOf { it.getPer() }.toFloat() / games
+
+                        Card(modifier = Modifier.fillMaxWidth()) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text("Games Played: $games")
+                                Text("PPG: %.1f".format(avgPts))
+                                Text("RPG: %.1f".format(avgReb))
+                                Text("APG: %.1f".format(avgAst))
+                                Text("SPG: %.1f".format(avgStl))
+                                Text("BPG: %.1f".format(avgBlk))
+                                Text("PER: %.2f".format(avgPer))
+                            }
                         }
                     }
                 }
