@@ -107,7 +107,7 @@ class RosterImporter(private val context: Context, private val database: AppData
             Log.d("RosterImporter", "Inserted ${players.size} players into database")
 
             // 3. Generate Calendar
-            val matches = SeasonCalendar.generateMatches(gameId)
+            val matches = SeasonCalendar.generateMatches(gameId, teams)
             database.matchDao().insertAll(matches)
             Log.d("RosterImporter", "Generated ${matches.size} matches")
 
