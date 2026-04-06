@@ -12,7 +12,6 @@ object SeasonCalendar {
 
         // 1. Group teams
         val teamsById = teams.associateBy { it.id }
-        val allTeamIds = teams.map { it.id }
         val eastTeams = teams.filter { it.conference == Conference.EAST }.map { it.id }
         val westTeams = teams.filter { it.conference == Conference.WEST }.map { it.id }
 
@@ -96,9 +95,9 @@ object SeasonCalendar {
         pairingsCount.forEach { (pair, count) ->
             val t1 = pair.first
             val t2 = pair.second
-            repeat(count) {
-                // Alternate home/away roughly
-                if (Random.nextBoolean()) gamesPool.add(t1 to t2) else gamesPool.add(t2 to t1)
+            repeat(count) { i ->
+                // Alternate home/away to ensure balance (e.g., 2 home, 2 away for 4 games)
+                if (i % 2 == 0) gamesPool.add(t1 to t2) else gamesPool.add(t2 to t1)
             }
         }
 
@@ -149,6 +148,6 @@ object SeasonCalendar {
             }
         }
 
-        return finalSchedule ?: emptyList() // Should not happen with 166 days and 82 games
+        return finalSchedule ?: throw IllegalStateException("Failed to generate a valid season schedule after $totalAttempts attempts.")
     }
 }
