@@ -12,19 +12,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import re.manager.basket.data.entity.PlayerEntity
 import re.manager.basket.data.entity.MatchResultEntity
-import re.manager.basket.ui.viewmodel.MarketViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlayerDetailScreen(
     player: PlayerEntity,
     stats: List<MatchResultEntity>,
-    marketViewModel: MarketViewModel? = null,
     onTogglePosition: () -> Unit = {},
     onBack: () -> Unit
 ) {
-    val tradeOffers by marketViewModel?.tradeOffers?.collectAsState() ?: remember { mutableStateOf(emptyList()) }
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -52,7 +48,6 @@ fun PlayerDetailScreen(
                             Column {
                                 Text("Age: ${player.age}")
                                 Text("Exp: ${player.yearsExperience}y")
-                                player.teamId?.let { Text("Team ID: $it") }
                             }
 
                             val starIcon = when {
@@ -95,42 +90,7 @@ fun PlayerDetailScreen(
                         }
 
                         Spacer(modifier = Modifier.height(8.dp))
-                        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                            Text("Rating: ${player.getAverageSkillAll().toInt()}", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
-                            Spacer(Modifier.weight(1f))
-                            // ONLY show Shop Player if player belongs to a team (can be traded)
-                            if (player.teamId != null) {
-                                Button(onClick = { marketViewModel?.shopPlayer(player) }) {
-                                    Text("Shop Player")
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (tradeOffers.isNotEmpty()) {
-                item {
-                    Text("Trade Offers (Accept to Trade Away)", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary)
-                    tradeOffers.forEach { offer ->
-                        Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                            Row(modifier = Modifier.padding(16.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(offer.team.name, fontWeight = FontWeight.Bold)
-                                    offer.players.forEach { p -> Text(p.name, style = MaterialTheme.typography.bodySmall) }
-                                    offer.picks.forEach { p -> Text("R${p.round} (${p.year})", style = MaterialTheme.typography.bodySmall) }
-                                }
-                                Button(onClick = {
-                                    marketViewModel?.acceptShopOffer(offer, player)
-                                    onBack()
-                                }) {
-                                    Text("Accept Deal")
-                                }
-                            }
-                        }
-                    }
-                    TextButton(onClick = { marketViewModel?.clearShopOffers() }, modifier = Modifier.fillMaxWidth()) {
-                        Text("Clear Offers")
+                        Text("Rating: ${player.getAverageSkillAll().toInt()}", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
                     }
                 }
             }
