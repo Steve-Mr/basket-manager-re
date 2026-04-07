@@ -17,8 +17,11 @@ class MarketViewModel(private val database: AppDatabase) : ViewModel() {
     @OptIn(ExperimentalCoroutinesApi::class)
     val freeAgents: StateFlow<List<PlayerEntity>> = _gameId.flatMapLatest { id ->
         if (id == null) flowOf(emptyList())
-        else database.playerDao().getPlayersByTeamFlow(-1, id) // Assuming -1 or specific query for null teamId
-            .map { list -> list.filter { it.teamId == null }.sortedByDescending { it.getAverageSkillAll() } }
+        else database.playerDao().getFreeAgentsFlow(id)
+            .map { list ->
+                Log.d("MarketViewModel", "Found ${list.size} free agents for game $id")
+                list.sortedByDescending { it.getAverageSkillAll() }
+            }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -36,15 +39,6 @@ class MarketViewModel(private val database: AppDatabase) : ViewModel() {
         if (gameId == null || teamId == null) flowOf(re.manager.basket.domain.model.Constants.SALARY_CAP_MED)
         else flow { emit(database.teamDao().getTeamById(teamId, gameId)?.salaryCap ?: re.manager.basket.domain.model.Constants.SALARY_CAP_MED) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), re.manager.basket.domain.model.Constants.SALARY_CAP_MED)
-
-    fun loadMarketData(gameId: Int, userTeamId: Int) {
-        Log.d("MarketViewModel", "Setting market load params for gameId: $gameId, userTeamId: $userTeamId")
-        _gameId.value = gameId
-        _userTeamId.value = userTeamId
-        viewModelScope.launch {
-            _allTeams.value = database.teamDao().getTeamsByGame(gameId)
-        }
-    }
 
     private val _allTeams = MutableStateFlow<List<re.manager.basket.data.entity.TeamEntity>>(emptyList())
     val allTeams: StateFlow<List<re.manager.basket.data.entity.TeamEntity>> = _allTeams.asStateFlow()
@@ -81,8 +75,19 @@ class MarketViewModel(private val database: AppDatabase) : ViewModel() {
         else database.draftPickDao().getPicksByTeam(teamId, gameId)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    private val _tradeOffers = MutableStateFlow<List<TradeOffer>>(emptyList())
+    val tradeOffers: StateFlow<List<TradeOffer>> = _tradeOffers.asStateFlow()
+
     private val _signingResult = MutableStateFlow<String?>(null)
     val signingResult: StateFlow<String?> = _signingResult.asStateFlow()
+
+    fun loadMarketData(gameId: Int, userTeamId: Int) {
+        _gameId.value = gameId
+        _userTeamId.value = userTeamId
+        viewModelScope.launch {
+            _allTeams.value = database.teamDao().getTeamsByGame(gameId)
+        }
+    }
 
     fun selectTradeTeam(teamId: Int) {
         _selectedTradeTeamId.value = teamId
@@ -90,21 +95,81 @@ class MarketViewModel(private val database: AppDatabase) : ViewModel() {
 
     fun signPlayer(player: PlayerEntity, teamId: Int) {
         viewModelScope.launch {
-            // Logic based on NegotiationDialog's satisfaction check
             val expectedSalary = (player.getValue() * 100000).toInt().coerceAtLeast(500000)
             val satisfaction = (player.salary.toFloat() / expectedSalary.toFloat() * 100).toInt()
-
             if (satisfaction >= 80) {
-                val updated = player.copy(teamId = teamId)
-                database.playerDao().update(updated)
-                _signingResult.value = "Success: ${player.name} has signed with your team!"
+                database.playerDao().update(player.copy(teamId = teamId))
+                _signingResult.value = "Success: ${player.name} has signed!"
             } else {
-                _signingResult.value = "Rejected: ${player.name} found the offer insufficient."
+                _signingResult.value = "Rejected: ${player.name} wants more money."
             }
         }
     }
 
-    fun clearSigningResult() {
-        _signingResult.value = null
+    fun executeTrade(
+        userTeamId: Int,
+        targetTeamId: Int,
+        userPlayers: List<PlayerEntity>,
+        targetPlayers: List<PlayerEntity>,
+        userPicks: List<re.manager.basket.data.entity.DraftPickEntity>,
+        targetPicks: List<re.manager.basket.data.entity.DraftPickEntity>
+    ) {
+        viewModelScope.launch {
+            val pUpdate = userPlayers.map { it.copy(teamId = targetTeamId) } + targetPlayers.map { it.copy(teamId = userTeamId) }
+            val pickUpdate = userPicks.map { it.copy(currentTeamId = targetTeamId) } + targetPicks.map { it.copy(currentTeamId = userTeamId) }
+            if (pUpdate.isNotEmpty()) database.playerDao().updateAll(pUpdate)
+            if (pickUpdate.isNotEmpty()) database.draftPickDao().updatePicks(pickUpdate)
+            Log.d("MarketViewModel", "Trade executed: ${userPlayers.size} <-> ${targetPlayers.size} players")
+        }
     }
+
+    fun shopPlayer(player: PlayerEntity) {
+        viewModelScope.launch {
+            val gameId = _gameId.value ?: return@launch
+            val userTeamId = _userTeamId.value ?: return@launch
+            val teams = database.teamDao().getTeamsByGame(gameId).filter { it.id != userTeamId }.shuffled()
+            val valRef = player.getValue()
+            val offers = mutableListOf<TradeOffer>()
+
+            Log.d("MarketViewModel", "Shopping player: ${player.name}, Value: $valRef")
+
+            for (team in teams) {
+                val tPlayers = database.playerDao().getPlayersByTeam(team.id, gameId)
+                val tPicks = database.draftPickDao().getPicksByTeam(team.id, gameId).firstOrNull() ?: emptyList()
+
+                // Match criteria: Package value 80% to 120% of shopping player
+                val match = tPlayers.find { it.getValue() in (valRef * 0.8)..(valRef * 1.2) }
+                if (match != null) {
+                    offers.add(TradeOffer(team, listOf(match), emptyList()))
+                } else {
+                    val pick = tPicks.find { it.round == 1 }
+                    // A 1st round pick is worth ~15.0 in our valuation
+                    if (pick != null && 15.0 in (valRef * 0.7)..(valRef * 1.3)) {
+                        offers.add(TradeOffer(team, emptyList(), listOf(pick)))
+                    }
+                }
+                if (offers.size >= 5) break
+            }
+            Log.d("MarketViewModel", "Generated ${offers.size} offers for ${player.name}")
+            _tradeOffers.value = offers
+        }
+    }
+
+    fun acceptShopOffer(offer: TradeOffer, playerToTrade: PlayerEntity) {
+        viewModelScope.launch {
+            val userTeamId = _userTeamId.value ?: return@launch
+            executeTrade(userTeamId, offer.team.id, listOf(playerToTrade), offer.players, emptyList(), offer.picks)
+            _tradeOffers.value = emptyList()
+            _signingResult.value = "Trade Finalized with ${offer.team.name}"
+        }
+    }
+
+    fun clearShopOffers() { _tradeOffers.value = emptyList() }
+    fun clearSigningResult() { _signingResult.value = null }
 }
+
+data class TradeOffer(
+    val team: re.manager.basket.data.entity.TeamEntity,
+    val players: List<PlayerEntity>,
+    val picks: List<re.manager.basket.data.entity.DraftPickEntity>
+)

@@ -99,10 +99,14 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                 } else {
-                    // Make sure player list is loaded when game is loaded
-                    LaunchedEffect(gameState?.userTeamId) {
-                        gameState?.userTeamId?.let { teamId ->
-                            playerListViewModel.loadPlayers(teamId, gameState?.id)
+                    // Make sure player list and other modules are loaded when game is loaded
+                    LaunchedEffect(gameState?.id, gameState?.userTeamId) {
+                        gameState?.let { game ->
+                            game.userTeamId?.let { teamId ->
+                                playerListViewModel.loadPlayers(teamId, game.id)
+                                marketViewModel.loadMarketData(game.id, teamId)
+                            }
+                            leagueViewModel.load(game.id)
                         }
                     }
 

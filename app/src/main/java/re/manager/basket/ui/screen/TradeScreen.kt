@@ -114,8 +114,20 @@ fun TradeScreen(
                     val tradeValue = tradeTeamPlayers.filter { selectedTradePlayers.contains(it.id) }.sumOf { it.getValue() } + selectedTradePicks.size * 15.0
 
                     if (userValue >= tradeValue * 1.1) {
+                        marketViewModel.executeTrade(
+                            userTeamId = userTeamId,
+                            targetTeamId = selectedTradeTeamId!!,
+                            userPlayers = userPlayers.filter { selectedUserPlayers.contains(it.id) },
+                            targetPlayers = tradeTeamPlayers.filter { selectedTradePlayers.contains(it.id) },
+                            userPicks = userTeamPicks.filter { selectedUserPicks.contains(it.id) },
+                            targetPicks = tradeTeamPicks.filter { selectedTradePicks.contains(it.id) }
+                        )
                         tradeResult = "Trade Accepted! The deal is finalized."
-                        // In a real impl, we would update DB here.
+                        // Reset selections
+                        selectedUserPlayers = emptySet()
+                        selectedUserPicks = emptySet()
+                        selectedTradePlayers = emptySet()
+                        selectedTradePicks = emptySet()
                     } else {
                         tradeResult = "Trade Rejected. ${selectedTeam?.name} wants more value."
                     }

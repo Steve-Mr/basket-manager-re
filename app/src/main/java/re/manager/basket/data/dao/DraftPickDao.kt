@@ -18,6 +18,9 @@ interface DraftPickDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPicks(picks: List<DraftPickEntity>)
 
+    @androidx.room.Update
+    suspend fun updatePicks(picks: List<DraftPickEntity>)
+
     @Query("DELETE FROM draft_picks WHERE gameId = :gameId")
     suspend fun deletePicksByGame(gameId: Int)
 }
