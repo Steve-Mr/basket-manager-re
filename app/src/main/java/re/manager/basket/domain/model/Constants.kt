@@ -8,6 +8,8 @@ object Constants {
     const val OFFSEASON_DRAFT_DAYS = 232
     const val OFFSEASON_FREE_AGENCY_DAY = 233
     const val TOTAL_SEASON_DAYS = 234
+    const val TRADE_DEADLINE_DAY = 87
+    const val SEASON_FINISH_DAY = 226
 
     // Match Simulation
     const val BASE_POSSESSIONS = 200

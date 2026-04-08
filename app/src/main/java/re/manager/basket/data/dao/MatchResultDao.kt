@@ -26,4 +26,7 @@ interface MatchResultDao {
 
     @Query("SELECT * FROM match_results WHERE gameId = :gameId")
     suspend fun getResultsByGame(gameId: Int): List<MatchResultEntity>
+
+    @Query("SELECT * FROM match_results WHERE gameId = :gameId AND season = :season")
+    suspend fun getResultsBySeason(gameId: Int, season: Int): List<MatchResultEntity>
 }

@@ -127,10 +127,10 @@ fun PlayerDetailScreen(
                         Text("Season $season", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
                         val games = filteredStats.size
                         val avgPts = filteredStats.sumOf { it.points }.toFloat() / games
-                        val avgReb = filteredStats.sumOf { (it.rebounds + 0.5).toInt() }.toFloat() / games
-                        val avgAst = filteredStats.sumOf { (it.assists + 0.5).toInt() }.toFloat() / games
-                        val avgStl = filteredStats.sumOf { (it.steals + 0.5).toInt() }.toFloat() / games
-                        val avgBlk = filteredStats.sumOf { (it.blocks + 0.5).toInt() }.toFloat() / games
+                        val avgReb = filteredStats.sumOf { it.rebounds }.toFloat() / games
+                        val avgAst = filteredStats.sumOf { it.assists }.toFloat() / games
+                        val avgStl = filteredStats.sumOf { it.steals }.toFloat() / games
+                        val avgBlk = filteredStats.sumOf { it.blocks }.toFloat() / games
                         val avgPer = filteredStats.sumOf { it.getPer() }.toFloat() / games
 
                         Card(modifier = Modifier.fillMaxWidth()) {

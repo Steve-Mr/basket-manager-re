@@ -16,4 +16,7 @@ interface PlayoffDao {
 
     @Query("SELECT * FROM playoffs WHERE gameId = :gameId AND teamId = :teamId")
     suspend fun getPlayoffForTeam(gameId: Int, teamId: Int): PlayoffEntity?
+
+    @Query("DELETE FROM playoffs WHERE gameId = :gameId")
+    suspend fun deletePlayoffsByGame(gameId: Int)
 }

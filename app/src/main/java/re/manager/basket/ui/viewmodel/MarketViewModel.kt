@@ -9,6 +9,7 @@ import kotlinx.coroutines.launch
 import re.manager.basket.data.AppDatabase
 import re.manager.basket.data.entity.PlayerEntity
 import re.manager.basket.data.entity.DraftPickEntity
+import androidx.room.withTransaction
 
 class MarketViewModel(private val database: AppDatabase) : ViewModel() {
 
@@ -91,20 +92,27 @@ class MarketViewModel(private val database: AppDatabase) : ViewModel() {
         _selectedTradeTeamId.value = teamId
     }
 
-    fun signPlayer(player: PlayerEntity, teamId: Int) {
+    fun signPlayer(player: PlayerEntity, teamId: Int, negotiatedSalary: Int, negotiatedYears: Int) {
         viewModelScope.launch {
+            // Logic fix: 0 salary indicates free agent rookie or vet. Use negotiated amount for check.
             val expectedSalary = (player.getValue() * 100000).toInt().coerceAtLeast(500000)
-            val satisfaction = (player.salary.toFloat() / expectedSalary.toFloat() * 100).toInt()
+            val satisfaction = (negotiatedSalary.toFloat() / expectedSalary.toFloat() * 100).toInt()
+
             if (satisfaction >= 80) {
-                database.playerDao().update(player.copy(teamId = teamId))
+                val updated = player.copy(
+                    teamId = teamId,
+                    salary = negotiatedSalary,
+                    yearsContract = negotiatedYears
+                )
+                database.playerDao().update(updated)
                 _signingResult.value = "Success: ${player.name} has signed!"
             } else {
-                _signingResult.value = "Rejected: ${player.name} wants more money."
+                _signingResult.value = "Rejected: ${player.name} found the offer insufficient."
             }
         }
     }
 
-    fun executeTrade(
+    suspend fun executeTrade(
         userTeamId: Int,
         targetTeamId: Int,
         userPlayers: List<PlayerEntity>,
@@ -112,9 +120,12 @@ class MarketViewModel(private val database: AppDatabase) : ViewModel() {
         userPicks: List<DraftPickEntity>,
         targetPicks: List<DraftPickEntity>
     ) {
-        viewModelScope.launch {
-            val pUpdate = userPlayers.map { it.copy(teamId = targetTeamId) } + targetPlayers.map { it.copy(teamId = userTeamId) }
-            val pickUpdate = userPicks.map { it.copy(currentTeamId = targetTeamId) } + targetPicks.map { it.copy(currentTeamId = userTeamId) }
+        database.withTransaction {
+            val pUpdate = userPlayers.map { it.copy(teamId = targetTeamId) } +
+                          targetPlayers.map { it.copy(teamId = userTeamId) }
+            val pickUpdate = userPicks.map { it.copy(currentTeamId = targetTeamId) } +
+                             targetPicks.map { it.copy(currentTeamId = userTeamId) }
+
             if (pUpdate.isNotEmpty()) database.playerDao().updateAll(pUpdate)
             if (pickUpdate.isNotEmpty()) database.draftPickDao().updatePicks(pickUpdate)
         }
@@ -128,20 +139,22 @@ class MarketViewModel(private val database: AppDatabase) : ViewModel() {
 
             if (totalUserValue <= 0) return@launch
 
-            val teams = database.teamDao().getTeamsByGame(gameId).filter { it.id != userTeamId }.shuffled()
+            // Solving N+1 problem: fetch all players and picks once
+            val allOtherPlayers = database.playerDao().getPlayersByGame(gameId).filter { it.teamId != userTeamId && it.teamId != null }
+            val allOtherPicks = database.draftPickDao().getAllPicks(gameId).first().filter { it.currentTeamId != userTeamId }
+
+            val otherTeams = _allTeams.value.filter { it.id != userTeamId }
             val offers = mutableListOf<TradeOffer>()
 
-            for (team in teams) {
-                val tPlayers = database.playerDao().getPlayersByTeam(team.id, gameId).sortedByDescending { it.getValue() }
-                val tPicks = database.draftPickDao().getPicksByTeam(team.id, gameId).firstOrNull() ?: emptyList()
+            for (team in otherTeams.shuffled()) {
+                val teamPlayers = allOtherPlayers.filter { it.teamId == team.id }.sortedByDescending { it.getValue() }
+                val teamPicks = allOtherPicks.filter { it.currentTeamId == team.id }
 
-                // Try to build a package that matches 85% - 115% of user value
                 val packagePlayers = mutableListOf<PlayerEntity>()
                 val packagePicks = mutableListOf<DraftPickEntity>()
                 var currentVal = 0.0
 
-                // Pick 1-2 players
-                for (p in tPlayers) {
+                for (p in teamPlayers) {
                     if (currentVal + p.getValue() <= totalUserValue * 1.1) {
                         packagePlayers.add(p)
                         currentVal += p.getValue()
@@ -149,8 +162,7 @@ class MarketViewModel(private val database: AppDatabase) : ViewModel() {
                     if (packagePlayers.size >= 2) break
                 }
 
-                // Fill with picks if still low
-                for (pick in tPicks) {
+                for (pick in teamPicks) {
                     val pVal = if (pick.round == 1) 15.0 else 5.0
                     if (currentVal + pVal <= totalUserValue * 1.15) {
                         packagePicks.add(pick)

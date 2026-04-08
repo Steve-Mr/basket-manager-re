@@ -50,9 +50,10 @@ fun MarketScreen(
         Spacer(modifier = Modifier.height(8.dp))
 
         if (selectedTab == 1) {
-            if (currentMatchday > 87 && currentMatchday < 226) {
+            if (currentMatchday > re.manager.basket.domain.model.Constants.TRADE_DEADLINE_DAY &&
+                currentMatchday < re.manager.basket.domain.model.Constants.SEASON_FINISH_DAY) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Trade deadline has passed (Day 87).", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.error)
+                    Text("Trade deadline has passed (Day ${re.manager.basket.domain.model.Constants.TRADE_DEADLINE_DAY}).", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.error)
                 }
             } else {
                 TradeScreen(userTeamId = userTeamId, marketViewModel = marketViewModel, userPlayers = userPlayers)
@@ -111,7 +112,7 @@ fun MarketScreen(
                                     currentCapSpace = salaryCap - teamSalary,
                                     onDismiss = { showNegotiation = false },
                                     onConfirm = { salary, years ->
-                                        marketViewModel.signPlayer(player.copy(salary = salary, yearsContract = years), userTeamId)
+                                        marketViewModel.signPlayer(player, userTeamId, salary, years)
                                         showNegotiation = false
                                     }
                                 )

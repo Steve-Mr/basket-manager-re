@@ -14,6 +14,7 @@ import re.manager.basket.data.entity.GameEntity
 import re.manager.basket.data.entity.MatchEntity
 import re.manager.basket.data.entity.TeamEntity
 import re.manager.basket.data.importer.RosterImporter
+import androidx.room.withTransaction
 import re.manager.basket.domain.engine.SeasonManager
 import re.manager.basket.domain.model.Constants
 import re.manager.basket.util.MathUtils.toOriginalInt
@@ -764,8 +765,7 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
         val standings = database.leagueDao().getStandings(gameId)
         val teamMap = database.teamDao().getTeamsByGame(gameId).associateBy { it.id }
 
-        val playerResults = database.matchResultDao().getResultsByGame(gameId) // Need to filter by season if multi-season
-            .filter { it.season == season }
+        val playerResults = database.matchResultDao().getResultsBySeason(gameId, season)
             .groupBy { it.playerId }
 
         val playerAverages = playerResults.mapValues { (_, results) ->
@@ -889,47 +889,54 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
         val allPlayers = database.playerDao().getPlayersByGame(gameId)
         val evolver = re.manager.basket.domain.engine.StateEvolver()
 
-        // 1. Process Retirements and Evolution
-        val updatedPlayers = mutableListOf<re.manager.basket.data.entity.PlayerEntity>()
-        val retiredPlayers = mutableListOf<re.manager.basket.data.entity.PlayerEntity>()
+        database.withTransaction {
+            // 1. Process Retirements and Evolution
+            val updatedPlayers = mutableListOf<re.manager.basket.data.entity.PlayerEntity>()
+            val retiredPlayers = mutableListOf<re.manager.basket.data.entity.PlayerEntity>()
 
-        allPlayers.forEach { player ->
-            if (evolver.shouldPlayerRetire(player)) {
-                retiredPlayers.add(player)
-            } else {
-                updatedPlayers.add(evolver.evolvePlayerEndOfSeason(player))
+            allPlayers.forEach { player ->
+                if (evolver.shouldPlayerRetire(player)) {
+                    retiredPlayers.add(player)
+                } else {
+                    updatedPlayers.add(evolver.evolvePlayerEndOfSeason(player))
+                }
+            }
+            database.playerDao().updateAll(updatedPlayers)
+            database.playerDao().deleteAllPlayers(retiredPlayers)
+
+            // 2. Generate New Rookies for Draft
+            val newRookies = mutableListOf<re.manager.basket.data.entity.PlayerEntity>()
+            repeat(90) {
+                newRookies.add(generateRandomPlayer(gameId))
+            }
+            database.playerDao().insertAll(newRookies)
+
+            // 3. Reset League Standings
+            val standings = database.leagueDao().getStandings(gameId)
+            val resetStandings = standings.map { it.copy(gamesWon = 0, gamesLost = 0, pointsScored = 0, pointsAllowed = 0) }
+            database.leagueDao().updateAll(resetStandings)
+
+            // 4. Generate New Calendar
+            val teams = database.teamDao().getTeamsByGame(gameId)
+            val newMatches = re.manager.basket.domain.generator.SeasonCalendar.generateMatches(gameId, teams).map { it.copy(season = newSeason) }
+            database.matchDao().insertAll(newMatches)
+
+            // 5. Generate New Draft Picks
+            val draftPicks = mutableListOf<re.manager.basket.data.entity.DraftPickEntity>()
+            teams.forEach { team ->
+                draftPicks.add(re.manager.basket.data.entity.DraftPickEntity(gameId = gameId, originalTeamId = team.id, currentTeamId = team.id, round = 1, year = newSeason + 1))
+                draftPicks.add(re.manager.basket.data.entity.DraftPickEntity(gameId = gameId, originalTeamId = team.id, currentTeamId = team.id, round = 2, year = newSeason + 1))
+            }
+            database.draftPickDao().insertPicks(draftPicks)
+
+            // 6. Clear Old Playoff Data
+            database.playoffDao().deletePlayoffsByGame(gameId)
+
+            // Update Game State
+            database.gameDao().getGameById(gameId)?.let {
+                database.gameDao().update(it.copy(currentSeason = newSeason, currentMatchday = 1))
             }
         }
-        database.playerDao().updateAll(updatedPlayers)
-        database.playerDao().deleteAllPlayers(retiredPlayers)
-
-        // 2. Generate New Rookies for Draft
-        val newRookies = mutableListOf<re.manager.basket.data.entity.PlayerEntity>()
-        repeat(90) {
-            newRookies.add(generateRandomPlayer(gameId))
-        }
-        database.playerDao().insertAll(newRookies)
-
-        // 3. Reset League Standings
-        val standings = database.leagueDao().getStandings(gameId)
-        val resetStandings = standings.map { it.copy(gamesWon = 0, gamesLost = 0, pointsScored = 0, pointsAllowed = 0) }
-        database.leagueDao().updateAll(resetStandings)
-
-        // 4. Generate New Calendar
-        val teams = database.teamDao().getTeamsByGame(gameId)
-        val newMatches = re.manager.basket.domain.generator.SeasonCalendar.generateMatches(gameId, teams).map { it.copy(season = newSeason) }
-        database.matchDao().insertAll(newMatches)
-
-        // 5. Generate New Draft Picks
-        val draftPicks = mutableListOf<re.manager.basket.data.entity.DraftPickEntity>()
-        teams.forEach { team ->
-            draftPicks.add(re.manager.basket.data.entity.DraftPickEntity(gameId = gameId, originalTeamId = team.id, currentTeamId = team.id, round = 1, year = newSeason + 1))
-            draftPicks.add(re.manager.basket.data.entity.DraftPickEntity(gameId = gameId, originalTeamId = team.id, currentTeamId = team.id, round = 2, year = newSeason + 1))
-        }
-        database.draftPickDao().insertPicks(draftPicks)
-
-        // Update Game State
-        database.gameDao().update(database.gameDao().getGameById(gameId)!!.copy(currentSeason = newSeason, currentMatchday = 1))
     }
 
     private fun generateRandomPlayer(gameId: Int): re.manager.basket.data.entity.PlayerEntity {

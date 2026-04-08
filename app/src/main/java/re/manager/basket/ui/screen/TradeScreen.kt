@@ -41,6 +41,7 @@ fun TradeScreen(
 
     var tradeResult by remember { mutableStateOf<String?>(null) }
     var showShopDialog by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text("Trade Center", style = MaterialTheme.typography.headlineMedium)
@@ -138,18 +139,22 @@ fun TradeScreen(
 
         Button(
             onClick = {
-                val userValue = userPlayers.filter { selectedUserPlayers.contains(it.id) }.sumOf { it.getValue() } + selectedUserPicks.size * 15.0
-                val tradeValue = tradeTeamPlayers.filter { selectedTradePlayers.contains(it.id) }.sumOf { it.getValue() } + selectedTradePicks.size * 15.0
+                    val userValue = userPlayers.filter { selectedUserPlayers.contains(it.id) }.sumOf { it.getValue() } +
+                                   userTeamPicks.filter { selectedUserPicks.contains(it.id) }.sumOf { if (it.round == 1) 15.0 else 5.0 }
+                    val tradeValue = tradeTeamPlayers.filter { selectedTradePlayers.contains(it.id) }.sumOf { it.getValue() } +
+                                    tradeTeamPicks.filter { selectedTradePicks.contains(it.id) }.sumOf { if (it.round == 1) 15.0 else 5.0 }
 
                 if (userValue >= tradeValue * 1.1) {
-                    marketViewModel.executeTrade(
-                        userTeamId = userTeamId,
-                        targetTeamId = selectedTradeTeamId!!,
-                        userPlayers = userPlayers.filter { selectedUserPlayers.contains(it.id) },
-                        targetPlayers = tradeTeamPlayers.filter { selectedTradePlayers.contains(it.id) },
-                        userPicks = userTeamPicks.filter { selectedUserPicks.contains(it.id) },
-                        targetPicks = tradeTeamPicks.filter { selectedTradePicks.contains(it.id) }
-                    )
+                    scope.launch {
+                        marketViewModel.executeTrade(
+                            userTeamId = userTeamId,
+                            targetTeamId = selectedTradeTeamId!!,
+                            userPlayers = userPlayers.filter { selectedUserPlayers.contains(it.id) },
+                            targetPlayers = tradeTeamPlayers.filter { selectedTradePlayers.contains(it.id) },
+                            userPicks = userTeamPicks.filter { selectedUserPicks.contains(it.id) },
+                            targetPicks = tradeTeamPicks.filter { selectedTradePicks.contains(it.id) }
+                        )
+                    }
                     tradeResult = "Trade Accepted!"
                     selectedUserPlayers = emptySet(); selectedUserPicks = emptySet()
                     selectedTradePlayers = emptySet(); selectedTradePicks = emptySet()
@@ -238,7 +243,7 @@ fun AssetList(
         items(picks) { pick ->
             AssetItem(
                 label = "R${pick.round} (${pick.year})",
-                subLabel = "From: ${pick.originalTeamId}",
+                subLabel = "Orig: ${re.manager.basket.domain.model.Constants.INITIAL_SALARY_CAPS.keys.toList().getOrNull(pick.originalTeamId - 1) ?: pick.originalTeamId}",
                 isSelected = selectedPicks.contains(pick.id),
                 onClick = { onPickToggle(pick.id) }
             )
