@@ -22,7 +22,7 @@ import re.manager.basket.data.entity.*
         DraftPickEntity::class,
         AwardEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = true
 )
 @TypeConverters(Converters::class)

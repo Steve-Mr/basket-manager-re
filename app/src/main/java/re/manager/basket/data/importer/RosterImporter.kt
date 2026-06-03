@@ -97,7 +97,8 @@ class RosterImporter(private val context: Context, private val database: AppData
                                 stateEnergy = 99,
                                 stateForm = (30..70).random(), // Match original getRandomValue(30, 70)
                                 stateInjury = 0,
-                                gameId = gameId
+                                gameId = gameId,
+                                loyalty = (3..5).random() // Initial loyalty for players
                             )
                         )
                     }

@@ -49,7 +49,8 @@ data class PlayerEntity(
     val stateForm: Int,
     val stateInjury: Int,
     val gameId: Int,
-    val primaryPositionActive: Boolean = true // True for positionFirst, False for positionSecond
+    val primaryPositionActive: Boolean = true, // True for positionFirst, False for positionSecond
+    val loyalty: Int = 3 // Added loyalty default to 3 as it exists in original ManageRenewals
 ) {
     fun getActivePosition(): Position = if (primaryPositionActive) positionFirst else positionSecond
 
