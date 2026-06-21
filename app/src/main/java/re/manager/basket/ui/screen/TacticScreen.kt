@@ -1,153 +1,181 @@
 package re.manager.basket.ui.screen
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import re.manager.basket.data.entity.TacticEntity
-
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.Star
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
 import re.manager.basket.data.entity.PlayerEntity
+import re.manager.basket.data.entity.TacticEntity
+import re.manager.basket.ui.viewmodel.GameViewModel
+import re.manager.basket.ui.viewmodel.PlayerListViewModel
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TacticScreen(
-    players: List<PlayerEntity>,
-    tactic: TacticEntity,
-    onUpdate: (TacticEntity) -> Unit
+    navController: NavController,
+    gameViewModel: GameViewModel,
+    playerListViewModel: PlayerListViewModel
 ) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        item {
-            Text("Team Strategy", style = MaterialTheme.typography.headlineMedium)
-            Text("Adjust team preferences and focus on key players.", style = MaterialTheme.typography.bodyMedium)
-        }
+    val userTactic by gameViewModel.userTactic.collectAsState()
+    val players by playerListViewModel.players.collectAsState()
+    val gameState by gameViewModel.gameState.collectAsState()
 
-        item {
-            StrategySlider(
-                label = "Interior Shot Preference",
-                value = tactic.shotIntPercent,
-                range = 10f..90f,
-                onValueChange = { onUpdate(tactic.copy(shotIntPercent = it)) }
+    val myPlayers = players.map { it.originalEntity }.filter { it.teamId == gameState?.userTeamId }
+    
+    // Local state for editing before saving
+    var editedTactic by remember(userTactic) { mutableStateOf(userTactic) }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("战术与轮换设置", fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    TextButton(
+                        onClick = { 
+                            editedTactic?.let { gameViewModel.updateTactic(it) }
+                            navController.popBackStack()
+                        }
+                    ) {
+                        Text("保存", fontWeight = FontWeight.Bold)
+                    }
+                }
             )
         }
+    ) { innerPadding ->
+        if (editedTactic == null) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("无法加载战术数据")
+            }
+        } else {
+            val tactic = editedTactic!!
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                item {
+                    Text("首发阵容", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                }
+                
+                item {
+                    PlayerDropdownSelector("控球后卫 (PG)", tactic.titPG, myPlayers) { newId ->
+                        editedTactic = tactic.copy(titPG = newId)
+                    }
+                }
+                item {
+                    PlayerDropdownSelector("得分后卫 (SG)", tactic.titSG, myPlayers) { newId ->
+                        editedTactic = tactic.copy(titSG = newId)
+                    }
+                }
+                item {
+                    PlayerDropdownSelector("小前锋 (SF)", tactic.titSF, myPlayers) { newId ->
+                        editedTactic = tactic.copy(titSF = newId)
+                    }
+                }
+                item {
+                    PlayerDropdownSelector("大前锋 (PF)", tactic.titPF, myPlayers) { newId ->
+                        editedTactic = tactic.copy(titPF = newId)
+                    }
+                }
+                item {
+                    PlayerDropdownSelector("中锋 (C)", tactic.titC, myPlayers) { newId ->
+                        editedTactic = tactic.copy(titC = newId)
+                    }
+                }
+                
+                item {
+                    HorizontalDivider()
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("球队战术倾向", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                }
 
-        item {
-            StrategySlider(
-                label = "Triple Shot Preference",
-                value = tactic.shotTriplePercent,
-                range = 10f..90f,
-                onValueChange = { onUpdate(tactic.copy(shotTriplePercent = it)) }
-            )
-        }
+                item {
+                    Text("内线进攻比例: ${tactic.shotIntPercent}%", style = MaterialTheme.typography.bodyLarge)
+                    Slider(
+                        value = tactic.shotIntPercent.toFloat(),
+                        onValueChange = { editedTactic = tactic.copy(shotIntPercent = it.toInt()) },
+                        valueRange = 0f..100f
+                    )
+                }
 
-        item {
-            StrategySlider(
-                label = "Bench Importance",
-                value = tactic.benchImportance,
-                range = 1f..5f,
-                onValueChange = { onUpdate(tactic.copy(benchImportance = it)) },
-                description = "1: Mostly starters, 5: Heavy rotation"
-            )
-        }
+                item {
+                    Text("三分进攻比例: ${tactic.shotTriplePercent}%", style = MaterialTheme.typography.bodyLarge)
+                    Slider(
+                        value = tactic.shotTriplePercent.toFloat(),
+                        onValueChange = { editedTactic = tactic.copy(shotTriplePercent = it.toInt()) },
+                        valueRange = 0f..100f
+                    )
+                }
 
-        item {
-            StrategySlider(
-                label = "Game Type",
-                value = tactic.gameType,
-                range = -5f..5f,
-                onValueChange = { onUpdate(tactic.copy(gameType = it)) },
-                description = "-5: Defensive focus, +5: Offensive focus"
-            )
-        }
-
-        item {
-            Text("Star Players", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Text("Assigned stars receive significant priority in rotation and scoring.", style = MaterialTheme.typography.bodySmall)
-        }
-
-        item {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StarSlot("Star 1", tactic.star1, players, Modifier.weight(1f)) { onUpdate(tactic.copy(star1 = it)) }
-                StarSlot("Star 2", tactic.star2, players, Modifier.weight(1f)) { onUpdate(tactic.copy(star2 = it)) }
-                StarSlot("Star 3", tactic.star3, players, Modifier.weight(1f)) { onUpdate(tactic.copy(star3 = it)) }
+                item {
+                    Text("替补使用深度 (1-10): ${tactic.benchImportance}", style = MaterialTheme.typography.bodyLarge)
+                    Slider(
+                        value = tactic.benchImportance.toFloat(),
+                        onValueChange = { editedTactic = tactic.copy(benchImportance = it.toInt()) },
+                        valueRange = 1f..10f,
+                        steps = 8
+                    )
+                }
+                
+                item {
+                    Spacer(modifier = Modifier.height(32.dp))
+                }
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun StrategySlider(
+fun PlayerDropdownSelector(
     label: String,
-    value: Int,
-    range: ClosedFloatingPointRange<Float>,
-    onValueChange: (Int) -> Unit,
-    description: String? = null
-) {
-    Column {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(label, fontWeight = FontWeight.Bold)
-            Text(value.toString())
-        }
-        description?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-        Slider(
-            value = value.toFloat(),
-            onValueChange = { onValueChange(it.toInt()) },
-            valueRange = range
-        )
-    }
-}
-
-@Composable
-fun StarSlot(
-    label: String,
-    playerId: Int?,
+    selectedPlayerId: Int,
     players: List<PlayerEntity>,
-    modifier: Modifier = Modifier,
-    onSelect: (Int?) -> Unit
+    onPlayerSelected: (Int) -> Unit
 ) {
-    var showDialog by remember { mutableStateOf(false) }
-    val player = players.find { it.id == playerId }
+    var expanded by remember { mutableStateOf(false) }
+    val selectedPlayer = players.find { it.id == selectedPlayerId }
+    val displayText = selectedPlayer?.let { "${it.name} (OVR: ${it.getAverageSkillAll().toInt()})" } ?: "未选择"
 
-    if (showDialog) {
-        PlayerSelectionDialog(
-            title = "Select $label",
-            players = players,
-            occupiedIds = emptySet(), // Stars can be any player
-            targetPosition = re.manager.basket.domain.model.Position.NONE, // No grouping for stars
-            onDismiss = { showDialog = false },
-            onSelect = { onSelect(it); showDialog = false }
-        )
-    }
-
-    OutlinedCard(
-        onClick = { showDialog = true },
-        modifier = modifier.height(100.dp),
-        colors = if (player != null) CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer) else CardDefaults.cardColors()
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded }
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+        OutlinedTextField(
+            value = displayText,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(label) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier.fillMaxWidth().menuAnchor()
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
         ) {
-            Icon(Icons.Filled.Star, contentDescription = null, tint = if (player != null) MaterialTheme.colorScheme.primary else Color.LightGray)
-            Text(label, style = MaterialTheme.typography.labelSmall)
-            Text(
-                player?.name ?: "Empty",
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.Bold,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                maxLines = 1
-            )
+            players.sortedByDescending { it.getAverageSkillAll() }.forEach { player ->
+                DropdownMenuItem(
+                    text = { Text("${player.name} (OVR: ${player.getAverageSkillAll().toInt()}) - ${player.positionFirst}") },
+                    onClick = {
+                        onPlayerSelected(player.id)
+                        expanded = false
+                    }
+                )
+            }
         }
     }
 }

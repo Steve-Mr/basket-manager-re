@@ -33,7 +33,7 @@ interface PlayerDao {
     @Query("SELECT * FROM players WHERE gameId = :gameId")
     fun getAllPlayersFlow(gameId: Int): Flow<List<PlayerEntity>>
 
-    @Query("SELECT * FROM players WHERE yearsExperience = 0 AND gameId = :gameId")
+    @Query("SELECT * FROM players WHERE yearsExperience = -1 AND gameId = :gameId")
     fun getRookiesFlow(gameId: Int): Flow<List<PlayerEntity>>
 
     @Delete

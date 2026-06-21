@@ -1024,7 +1024,7 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
             potential = kotlin.random.Random.nextInt(1, 11),
             salary = 0,
             yearsContract = 0,
-            yearsExperience = 0,
+            yearsExperience = -1,
             skillPhysique = kotlin.random.Random.nextInt(40, 70),
             skillBlock = kotlin.random.Random.nextInt(40, 70),
             skillSteal = kotlin.random.Random.nextInt(40, 70),

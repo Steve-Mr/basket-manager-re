@@ -36,15 +36,27 @@ fun BasketNavGraph(
         startDestination = startDestination
     ) {
         composable(Screen.Dashboard.route) {
-            DashboardHubScreen(navController = navController, gameViewModel = gameViewModel)
+            DashboardHubScreen(navController = navController, gameViewModel = gameViewModel, leagueViewModel = leagueViewModel)
         }
         
         composable(Screen.FranchiseHub.route) {
-            FranchiseHubScreen(navController = navController, gameViewModel = gameViewModel, playerListViewModel = playerListViewModel)
+            FranchiseHubScreen(navController = navController, gameViewModel = gameViewModel, playerListViewModel = playerListViewModel, leagueViewModel = leagueViewModel)
+        }
+        
+        composable("tactic") {
+            re.manager.basket.ui.screen.TacticScreen(navController = navController, gameViewModel = gameViewModel, playerListViewModel = playerListViewModel)
         }
         
         composable(Screen.FrontOfficeHub.route) {
             FrontOfficeHubScreen(navController = navController, gameViewModel = gameViewModel, marketViewModel = marketViewModel, leagueViewModel = leagueViewModel)
+        }
+
+        composable("league_players") {
+            re.manager.basket.ui.screen.LeaguePlayersScreen(navController = navController, playerListViewModel = playerListViewModel)
+        }
+
+        composable("standings") {
+            re.manager.basket.ui.screen.StandingsScreen(navController = navController, leagueViewModel = leagueViewModel)
         }
 
         composable(Screen.DraftScouting.route) {
