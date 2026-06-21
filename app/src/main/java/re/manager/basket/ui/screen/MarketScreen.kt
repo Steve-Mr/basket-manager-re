@@ -112,7 +112,7 @@ fun MarketScreen(
                                     currentCapSpace = salaryCap - teamSalary,
                                     onDismiss = { showNegotiation = false },
                                     onConfirm = { salary, years ->
-                                        marketViewModel.signPlayer(player, userTeamId, salary, years)
+                                        marketViewModel.signPlayer(player, userTeamId, salary, years, currentMatchday)
                                         showNegotiation = false
                                     }
                                 )

@@ -38,4 +38,6 @@ interface MatchDao {
 
     @Delete
     suspend fun deleteMatches(matches: List<MatchEntity>)
+    @Query("DELETE FROM matches WHERE gameId = :gameId")
+    suspend fun deleteMatchesByGame(gameId: Int)
 }
