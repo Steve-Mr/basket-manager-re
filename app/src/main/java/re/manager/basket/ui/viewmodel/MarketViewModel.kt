@@ -92,22 +92,36 @@ class MarketViewModel(private val database: AppDatabase) : ViewModel() {
         _selectedTradeTeamId.value = teamId
     }
 
-    fun signPlayer(player: PlayerEntity, teamId: Int, negotiatedSalary: Int, negotiatedYears: Int) {
+    fun signPlayer(player: PlayerEntity, teamId: Int, negotiatedSalary: Int, negotiatedYears: Int, currentMatchday: Int) {
         viewModelScope.launch {
-            // Logic fix: 0 salary indicates free agent rookie or vet. Use negotiated amount for check.
-            val expectedSalary = (player.getValue() * 100000).toInt().coerceAtLeast(500000)
-            val satisfaction = (negotiatedSalary.toFloat() / expectedSalary.toFloat() * 100).toInt()
-
-            if (satisfaction >= 80) {
-                val updated = player.copy(
+            val gameId = _gameId.value ?: return@launch
+            
+            // Check if player already has an offer from THIS team
+            val existingOffer = database.offerDao().getOffersForPlayerAll(gameId, player.id).find { it.teamId == teamId }
+            
+            if (existingOffer != null) {
+                // Update existing offer
+                val updated = existingOffer.copy(
+                    salary = negotiatedSalary,
+                    years = negotiatedYears,
+                    responseDay = currentMatchday + 3
+                )
+                database.offerDao().update(updated)
+                _signingResult.value = "Offer updated for ${player.name}. They will consider it for a few days."
+            } else {
+                // Insert new offer
+                val offer = re.manager.basket.data.entity.OfferEntity(
+                    gameId = gameId,
+                    matchday = currentMatchday,
+                    playerId = player.id,
                     teamId = teamId,
                     salary = negotiatedSalary,
-                    yearsContract = negotiatedYears
+                    years = negotiatedYears,
+                    isRenewal = (player.teamId == teamId),
+                    responseDay = currentMatchday + (1..3).random()
                 )
-                database.playerDao().update(updated)
-                _signingResult.value = "Success: ${player.name} has signed!"
-            } else {
-                _signingResult.value = "Rejected: ${player.name} found the offer insufficient."
+                database.offerDao().insert(offer)
+                _signingResult.value = "Offer sent to ${player.name}. They will consider it for a few days."
             }
         }
     }

@@ -78,11 +78,19 @@ class MatchSimulator(
 
         var possessions = Constants.BASE_POSSESSIONS
         var currentPos = 0
+        var localPointsRegulation = 0
+        var visitorPointsRegulation = 0
+
         while (currentPos < possessions) {
             // Correct possession alternate: In original code, i % 2 == 0 is visitor attacking
             val isVisitorAttacking = currentPos % 2 == 0
 
             playPossession(currentPos, isVisitorAttacking)
+
+            if (currentPos == Constants.BASE_POSSESSIONS - 1) {
+                localPointsRegulation = getTotalPoints(true)
+                visitorPointsRegulation = getTotalPoints(false)
+            }
 
             if (currentPos == possessions - 1 && getTotalPoints(true) == getTotalPoints(false)) {
                 possessions += Constants.OVERTIME_POSSESSIONS
@@ -90,7 +98,7 @@ class MatchSimulator(
             currentPos++
         }
 
-        return finalizeMatch(effectiveLocalTactic, effectiveVisitorTactic)
+        return finalizeMatch(effectiveLocalTactic, effectiveVisitorTactic, localPointsRegulation, visitorPointsRegulation)
     }
 
     private fun calculateMatchBonus(localTactic: TacticEntity, visitorTactic: TacticEntity) {
@@ -313,7 +321,7 @@ class MatchSimulator(
         }
     }
 
-    private fun finalizeMatch(localTactic: TacticEntity, visitorTactic: TacticEntity): MatchFullResult {
+    private fun finalizeMatch(localTactic: TacticEntity, visitorTactic: TacticEntity, localPointsRegulation: Int, visitorPointsRegulation: Int): MatchFullResult {
         val totalLocal = getTotalPoints(true)
         val totalVisitor = getTotalPoints(false)
 
@@ -353,18 +361,20 @@ class MatchSimulator(
             return listOf(q1, q2, q3, q4)
         }
 
-        val lq = distribute(totalLocal)
-        val vq = distribute(totalVisitor)
+        val lq = distribute(localPointsRegulation)
+        val vq = distribute(visitorPointsRegulation)
 
         val finalizedMatch = match.copy(
             localQ1 = lq[0],
             localQ2 = lq[1],
             localQ3 = lq[2],
             localQ4 = lq[3],
+            localExtension = totalLocal - localPointsRegulation,
             visitorQ1 = vq[0],
             visitorQ2 = vq[1],
             visitorQ3 = vq[2],
-            visitorQ4 = vq[3]
+            visitorQ4 = vq[3],
+            visitorExtension = totalVisitor - visitorPointsRegulation
         )
 
         // Finalize points and star prefixes for each MatchResultEntity before returning

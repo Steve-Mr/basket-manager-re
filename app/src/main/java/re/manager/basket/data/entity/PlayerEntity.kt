@@ -150,7 +150,7 @@ data class PlayerEntity(
                 3 -> when (position) { 1 -> 30; 4 -> 15; 5 -> 10; else -> 27 }
                 4 -> when (position) { 1 -> 20; 2 -> 20; 3 -> 27; 4 -> 31; else -> 35 }
                 5 -> when (position) { 1 -> 35; 2 -> 30; 3 -> 27; else -> 18 }
-                6 -> when (position) { 1 -> 15; 2 -> 25; 3 -> 28; 4 -> 33; else -> 35 }
+                6 -> when (position) { 1 -> 22; 2 -> 25; 3 -> 28; 4 -> 33; else -> 35 }
                 7 -> when (position) { 1 -> 30; 2 -> 35; 3 -> 28; 4 -> 25; else -> 15 }
                 8 -> if (position == 1 || position == 2) 30 else if (position == 3) 28 else 20
                 else -> 0

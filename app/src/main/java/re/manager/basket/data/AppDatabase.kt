@@ -20,9 +20,11 @@ import re.manager.basket.data.entity.*
         NewsEntity::class,
         PlayoffEntity::class,
         DraftPickEntity::class,
-        AwardEntity::class
+        AwardEntity::class,
+        HistoryEntity::class,
+        OfferEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -38,6 +40,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun playoffDao(): PlayoffDao
     abstract fun draftPickDao(): DraftPickDao
     abstract fun awardDao(): AwardDao
+    abstract fun historyDao(): HistoryDao
+    abstract fun offerDao(): OfferDao
 
     companion object {
         @Volatile

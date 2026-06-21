@@ -19,6 +19,12 @@ class LeagueViewModel(private val database: AppDatabase) : ViewModel() {
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     @OptIn(ExperimentalCoroutinesApi::class)
+    val history: StateFlow<List<re.manager.basket.data.entity.HistoryEntity>> = _gameId.flatMapLatest { id ->
+        if (id == null) flowOf(emptyList())
+        else database.historyDao().getHistoryByGameFlow(id)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    @OptIn(ExperimentalCoroutinesApi::class)
     val standings: StateFlow<List<Pair<re.manager.basket.data.entity.TeamEntity, re.manager.basket.data.entity.LeagueEntity>>> = _gameId.flatMapLatest { gameId ->
         if (gameId == null) flowOf(emptyList())
         else {

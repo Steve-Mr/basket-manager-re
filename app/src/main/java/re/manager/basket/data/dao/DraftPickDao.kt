@@ -15,6 +15,9 @@ interface DraftPickDao {
     @Query("SELECT * FROM draft_picks WHERE currentTeamId = :teamId AND gameId = :gameId")
     fun getPicksByTeam(teamId: Int, gameId: Int): Flow<List<DraftPickEntity>>
 
+    @Query("SELECT * FROM draft_picks WHERE gameId = :gameId AND year = :year")
+    suspend fun getPicksByYear(gameId: Int, year: Int): List<DraftPickEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPicks(picks: List<DraftPickEntity>)
 

@@ -77,6 +77,16 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
 
     private val _activePlayerId = MutableStateFlow<Int?>(null)
     @OptIn(ExperimentalCoroutinesApi::class)
+    val draftPlayers: StateFlow<List<re.manager.basket.data.entity.PlayerEntity>> = _currentGameId.flatMapLatest { gameId ->
+        if (gameId != null) {
+            database.playerDao().getPlayersByTeam(gameId, null).map { players ->
+                players.filter { it.yearsExperience == 0 }.sortedByDescending { it.potential }
+            }
+        } else {
+            flowOf(emptyList())
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     val activePlayer: StateFlow<re.manager.basket.data.entity.PlayerEntity?> = combine(_activePlayerId, _currentGameId) { playerId, gameId ->
         playerId to gameId
     }.flatMapLatest { (playerId, gameId) ->
@@ -377,6 +387,9 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
                         val evolvedPlayersDaily = re.manager.basket.domain.engine.StateEvolver().evolveAllPlayersDaily(allPlayers)
                         database.playerDao().updateAll(evolvedPlayersDaily)
 
+                        // 2.5 Process contract offers
+                        processOffers(activeGame.id, currentDay, userTeamId)
+
                         // 3. Move to next day
                         val seasonManager = SeasonManager(activeGame)
                         val nextDayVal = seasonManager.getNextMatchday()
@@ -420,6 +433,64 @@ class GameViewModel(private val database: AppDatabase) : ViewModel() {
             } finally {
                 _isSimulating.value = false
             }
+        }
+    }
+
+    private suspend fun processOffers(gameId: Int, matchday: Int, userTeamId: Int) {
+        val pendingOffers = database.offerDao().getPendingOffersToProcess(gameId, matchday)
+        if (pendingOffers.isEmpty()) return
+
+        val playersToUpdate = mutableListOf<re.manager.basket.data.entity.PlayerEntity>()
+        
+        // Group by player ID in case of multiple offers for same player
+        pendingOffers.groupBy { it.playerId }.forEach { (playerId, offers) ->
+            val player = database.playerDao().getPlayersByGame(gameId).find { it.id == playerId } ?: return@forEach
+            val expectedSalary = (player.getValue() * 100000).toInt().coerceAtLeast(500000)
+            
+            // Find best offer based on satisfaction
+            val bestOffer = offers.maxByOrNull { (it.salary.toFloat() / expectedSalary.toFloat() * 100).toInt() }
+            if (bestOffer != null) {
+                val satisfaction = (bestOffer.salary.toFloat() / expectedSalary.toFloat() * 100).toInt()
+                if (satisfaction >= 80) {
+                    val updated = player.copy(
+                        teamId = bestOffer.teamId,
+                        salary = bestOffer.salary,
+                        yearsContract = bestOffer.years
+                    )
+                    playersToUpdate.add(updated)
+                    // If user won the bidding
+                    if (bestOffer.teamId == userTeamId) {
+                        database.newsDao().insert(re.manager.basket.data.entity.NewsEntity(
+                            gameId = gameId,
+                            matchday = matchday,
+                            type = "SIGNING",
+                            content = "Success: ${player.name} has accepted your contract offer of $${bestOffer.salary}!"
+                        ))
+                    } else if (offers.any { it.teamId == userTeamId }) {
+                        // User lost the bidding
+                        database.newsDao().insert(re.manager.basket.data.entity.NewsEntity(
+                            gameId = gameId,
+                            matchday = matchday,
+                            type = "SIGNING_FAILED",
+                            content = "Failed: ${player.name} has rejected your offer and signed with another team."
+                        ))
+                    }
+                } else if (offers.any { it.teamId == userTeamId }) {
+                    // All offers rejected
+                    database.newsDao().insert(re.manager.basket.data.entity.NewsEntity(
+                        gameId = gameId,
+                        matchday = matchday,
+                        type = "SIGNING_FAILED",
+                        content = "Rejected: ${player.name} found your offer insufficient."
+                    ))
+                }
+            }
+            // Delete processed offers
+            offers.forEach { database.offerDao().delete(it) }
+        }
+        
+        if (playersToUpdate.isNotEmpty()) {
+            database.playerDao().updateAll(playersToUpdate)
         }
     }
 
