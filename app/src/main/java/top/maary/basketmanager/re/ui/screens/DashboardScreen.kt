@@ -1,5 +1,6 @@
 package top.maary.basketmanager.re.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -20,6 +21,8 @@ import kotlinx.coroutines.launch
 import top.maary.basketmanager.re.domain.model.*
 import top.maary.basketmanager.re.ui.components.MatchBoxScoreDialog
 import top.maary.basketmanager.re.ui.components.PlayerDetailBottomSheet
+import top.maary.basketmanager.re.ui.theme.RatingGreen
+import top.maary.basketmanager.re.ui.theme.RatingRed
 import top.maary.basketmanager.re.ui.viewmodel.GameDashboardViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -27,7 +30,8 @@ import top.maary.basketmanager.re.ui.viewmodel.GameDashboardViewModel
 fun DashboardScreen(
     viewModel: GameDashboardViewModel,
     onNavigateToRoster: () -> Unit,
-    onNavigateToStandings: () -> Unit
+    onNavigateToStandings: () -> Unit,
+    onNavigateToTeamDetail: (Long) -> Unit
 ) {
     val game by viewModel.game.collectAsState()
     val userTeam by viewModel.userTeam.collectAsState()
@@ -65,7 +69,7 @@ fun DashboardScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // Dashboard Overview Card
+        // Main Dashboard Card
         item {
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
@@ -98,18 +102,18 @@ fun DashboardScreen(
                             modifier = Modifier.clickable { onNavigateToStandings() }
                         ) {
                             Text(
-                                text = "Record: ${userStandings?.gamesWon ?: 0}W - ${userStandings?.gamesLost ?: 0}L",
+                                text = "${userStandings?.gamesWon ?: 0}W - ${userStandings?.gamesLost ?: 0}L",
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                                 color = Color.White,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp
+                                fontSize = 14.sp
                             )
                         }
                     }
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // Next Match Spotlight
+                    // Next Match Spotlight Card
                     if (userMatch != null) {
                         val isLocal = (userMatch.teamLocalId == userTeam?.id)
                         val opponentTeam = if (isLocal) teamMap[userMatch.teamVisitorId] else teamMap[userMatch.teamLocalId]
@@ -120,10 +124,14 @@ fun DashboardScreen(
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable(enabled = userMatch.isPlayed) {
-                                    scope.launch {
-                                        boxScoreResults = viewModel.getMatchBoxScores(userMatch.id)
-                                        selectedMatchForBoxScore = userMatch
+                                .clickable {
+                                    if (userMatch.isPlayed) {
+                                        scope.launch {
+                                            boxScoreResults = viewModel.getMatchBoxScores(userMatch.id)
+                                            selectedMatchForBoxScore = userMatch
+                                        }
+                                    } else if (opponentTeam != null) {
+                                        onNavigateToTeamDetail(opponentTeam.id)
                                     }
                                 }
                         ) {
@@ -136,14 +144,14 @@ fun DashboardScreen(
                             ) {
                                 Column {
                                     Text(
-                                        text = if (isLocal) "VS ${opponentTeam?.name ?: "OPP"}" else "@ ${opponentTeam?.name ?: "OPP"}",
+                                        text = if (isLocal) "VS ${opponentTeam?.name ?: "Opponent"}" else "@ ${opponentTeam?.name ?: "Opponent"}",
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold
                                     )
                                     Text(
-                                        text = "Opponent Record: ${oppStandings?.gamesWon ?: 0}W - ${oppStandings?.gamesLost ?: 0}L",
+                                        text = "${oppStandings?.gamesWon ?: 0}W - ${oppStandings?.gamesLost ?: 0}L • Tap for Team Info",
                                         fontSize = 12.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        color = MaterialTheme.colorScheme.primary
                                     )
                                 }
 
@@ -179,7 +187,7 @@ fun DashboardScreen(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // Auto Lineup Quick Indicator
+                    // Auto Lineup Toggle
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -193,14 +201,13 @@ fun DashboardScreen(
                         )
                         Switch(
                             checked = game?.autoLineupEnabled == true,
-                            onCheckedChange = { viewModel.toggleAutoLineup(it) },
-                            modifier = Modifier.scale(0.8f)
+                            onCheckedChange = { viewModel.toggleAutoLineup(it) }
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
-                    // Action Buttons
+                    // Simulation Action Buttons
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -236,97 +243,7 @@ fun DashboardScreen(
             }
         }
 
-        // Today's League Fixtures
-        if (todayMatches.isNotEmpty()) {
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "League Matches (Day ${game?.currentMatchday ?: 1})",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "${todayMatches.size} Games",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            items(todayMatches) { match ->
-                val localTeam = teamMap[match.teamLocalId]
-                val visitorTeam = teamMap[match.teamVisitorId]
-                val lStd = standingsMap[match.teamLocalId]
-                val vStd = standingsMap[match.teamVisitorId]
-                val isUserMatch = (match.teamLocalId == userTeam?.id || match.teamVisitorId == userTeam?.id)
-
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(enabled = match.isPlayed) {
-                            scope.launch {
-                                boxScoreResults = viewModel.getMatchBoxScores(match.id)
-                                selectedMatchForBoxScore = match
-                            }
-                        },
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (isUserMatch) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-                        else MaterialTheme.colorScheme.surfaceVariant
-                    ),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = "${visitorTeam?.name ?: "VIS"} (${vStd?.gamesWon ?: 0}-${vStd?.gamesLost ?: 0}) @ ${localTeam?.name ?: "LOC"} (${lStd?.gamesWon ?: 0}-${lStd?.gamesLost ?: 0})",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            if (match.isPlayed) {
-                                Text(
-                                    text = "Tap to view box score & stats",
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-
-                        if (match.isPlayed) {
-                            Text(
-                                text = "${match.visitorScore ?: 0} - ${match.localScore ?: 0}",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        } else {
-                            Surface(
-                                shape = RoundedCornerShape(4.dp),
-                                color = MaterialTheme.colorScheme.surface
-                            ) {
-                                Text(
-                                    text = "TONIGHT",
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // Recent League News
+        // Recent League News Header
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -339,32 +256,55 @@ fun DashboardScreen(
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "Tap news to inspect player/game",
+                    text = "Tap for Box Scores & Player Profiles",
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
 
-        items(newsList.take(20)) { news ->
+        // News Feed with Visual Color Coding
+        items(newsList.take(30)) { news ->
+            val isWin = news.type == NewsType.WON
+            val isLoss = news.type == NewsType.LOST
+            val isInj = news.type == NewsType.INJURED
+            val isPlayoff = news.type == NewsType.PLAYOFFS
+
+            val borderColor = when {
+                isWin -> RatingGreen
+                isLoss -> RatingRed
+                isInj -> MaterialTheme.colorScheme.error
+                isPlayoff -> Color(0xFFFFD700)
+                else -> MaterialTheme.colorScheme.outlineVariant
+            }
+
+            val bgColor = when {
+                isWin -> RatingGreen.copy(alpha = 0.08f)
+                isLoss -> RatingRed.copy(alpha = 0.08f)
+                isInj -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f)
+                else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            }
+
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable {
-                        if (news.playerId != null) {
-                            selectedPlayerForDetail = playerMap[news.playerId]
-                        } else if (news.type == NewsType.WON || news.type == NewsType.LOST || news.type == NewsType.PLAYOFFS) {
-                            val relatedMatch = todayMatches.find { it.matchday == news.matchday }
-                            if (relatedMatch != null) {
-                                scope.launch {
-                                    boxScoreResults = viewModel.getMatchBoxScores(relatedMatch.id)
-                                    selectedMatchForBoxScore = relatedMatch
+                        if (news.type == NewsType.WON || news.type == NewsType.LOST || news.type == NewsType.PLAYOFFS) {
+                            scope.launch {
+                                val dayMatches = viewModel.getMatchesForDay(news.matchday)
+                                val match = dayMatches.find { it.teamLocalId == userTeam?.id || it.teamVisitorId == userTeam?.id }
+                                if (match != null) {
+                                    boxScoreResults = viewModel.getMatchBoxScores(match.id)
+                                    selectedMatchForBoxScore = match
                                 }
                             }
+                        } else if (news.playerId != null) {
+                            selectedPlayerForDetail = playerMap[news.playerId]
                         }
                     },
                 shape = RoundedCornerShape(10.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
+                border = BorderStroke(1.dp, borderColor),
+                colors = CardDefaults.cardColors(containerColor = bgColor)
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Row(
@@ -374,7 +314,12 @@ fun DashboardScreen(
                         Text(
                             text = news.title,
                             fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.bodyMedium
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = when {
+                                isWin -> RatingGreen
+                                isLoss -> RatingRed
+                                else -> MaterialTheme.colorScheme.onSurface
+                            }
                         )
                         Text(
                             text = "Day ${news.matchday}",
@@ -392,19 +337,59 @@ fun DashboardScreen(
         }
     }
 
-    // Auto Simulation Target Dialog
+    // Fast Forward Dialog (Simulate 1 Week / 1 Month / Day 166 / Custom)
     if (showAutoSimDialog) {
+        val currentDay = game?.currentMatchday ?: 1
         AlertDialog(
             onDismissRequest = { showAutoSimDialog = false },
-            title = { Text("Auto Simulate To Day") },
+            title = { Text("Fast Forward Simulation") },
             text = {
-                Column {
-                    Text("Current matchday: ${game?.currentMatchday ?: 1}")
-                    Spacer(modifier = Modifier.height(8.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Current Matchday: $currentDay / 166")
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                showAutoSimDialog = false
+                                viewModel.autoSimulateToMatchday((currentDay + 7).coerceAtMost(166))
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("+1 Week (7d)")
+                        }
+
+                        Button(
+                            onClick = {
+                                showAutoSimDialog = false
+                                viewModel.autoSimulateToMatchday((currentDay + 30).coerceAtMost(166))
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("+1 Month (30d)")
+                        }
+                    }
+
+                    Button(
+                        onClick = {
+                            showAutoSimDialog = false
+                            viewModel.autoSimulateToMatchday(166)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("Simulate to End of Regular Season (Day 166)")
+                    }
+
+                    HorizontalDivider()
+
                     OutlinedTextField(
                         value = targetMatchdayInput,
                         onValueChange = { targetMatchdayInput = it },
-                        label = { Text("Target Matchday (1..234)") },
+                        label = { Text("Or Enter Target Matchday (1..234)") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -413,7 +398,7 @@ fun DashboardScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        val target = targetMatchdayInput.toIntOrNull() ?: ((game?.currentMatchday ?: 1) + 10)
+                        val target = targetMatchdayInput.toIntOrNull() ?: (currentDay + 1)
                         showAutoSimDialog = false
                         viewModel.autoSimulateToMatchday(target.coerceIn(1, 234))
                     }
@@ -430,12 +415,10 @@ fun DashboardScreen(
     }
 
     selectedMatchForBoxScore?.let { match ->
-        val local = teamMap[match.teamLocalId]
-        val visitor = teamMap[match.teamVisitorId]
         MatchBoxScoreDialog(
             match = match,
-            localTeam = local,
-            visitorTeam = visitor,
+            localTeam = teamMap[match.teamLocalId],
+            visitorTeam = teamMap[match.teamVisitorId],
             boxScores = boxScoreResults,
             onDismiss = { selectedMatchForBoxScore = null }
         )
@@ -444,10 +427,8 @@ fun DashboardScreen(
     selectedPlayerForDetail?.let { player ->
         PlayerDetailBottomSheet(
             player = player,
+            stats = viewModel.getPlayerSeasonStats(player.id),
             onDismiss = { selectedPlayerForDetail = null }
         )
     }
 }
-
-// Helper extension for switch scale
-fun Modifier.scale(scale: Float): Modifier = this
