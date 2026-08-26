@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@id/mainMenuExportPlayerCsv" android:title="@string/main_export_player_csv" android:showAsAction="never" />
+    <item android:id="@id/mainMenuExportTeam" android:visible="true" android:title="@string/main_export_team" android:showAsAction="never" />
+    <item android:id="@id/mainMenuExportMatch" android:visible="true" android:title="@string/main_export_match" android:showAsAction="never" />
+    <item android:id="@id/mainMenuExportMatchResult" android:visible="true" android:title="@string/main_export_match_result" android:showAsAction="never" />
+    <item android:id="@id/mainMenuExportPlayer" android:visible="true" android:title="@string/main_export_player" android:showAsAction="never" />
+    <item android:id="@id/mainMenuExportPlayoffs" android:visible="true" android:title="@string/main_export_playoffs" android:showAsAction="never" />
+</menu>

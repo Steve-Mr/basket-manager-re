@@ -1,0 +1,58 @@
+package com.google.android.gms.drive.query.internal;
+
+import android.os.Parcel;
+import android.os.Parcelable;
+import com.google.android.gms.common.internal.safeparcel.a;
+import com.google.android.gms.drive.metadata.internal.MetadataBundle;
+
+/* JADX INFO: loaded from: classes.dex */
+public class b implements Parcelable.Creator<FieldOnlyFilter> {
+    /* JADX WARN: Failed to analyze thrown exceptions
+    java.util.ConcurrentModificationException
+    	at java.base/java.util.ArrayList$Itr.checkForComodification(ArrayList.java:1095)
+    	at java.base/java.util.ArrayList$Itr.next(ArrayList.java:1049)
+    	at jadx.core.dex.visitors.MethodThrowsVisitor.processInstructions(MethodThrowsVisitor.java:130)
+    	at jadx.core.dex.visitors.MethodThrowsVisitor.visit(MethodThrowsVisitor.java:68)
+    	at jadx.core.dex.visitors.MethodThrowsVisitor.checkInsn(MethodThrowsVisitor.java:178)
+    	at jadx.core.dex.visitors.MethodThrowsVisitor.processInstructions(MethodThrowsVisitor.java:131)
+    	at jadx.core.dex.visitors.MethodThrowsVisitor.visit(MethodThrowsVisitor.java:68)
+     */
+    static void a(FieldOnlyFilter fieldOnlyFilter, Parcel parcel, int i) {
+        int iP = com.google.android.gms.common.internal.safeparcel.b.p(parcel);
+        com.google.android.gms.common.internal.safeparcel.b.c(parcel, 1000, fieldOnlyFilter.xH);
+        com.google.android.gms.common.internal.safeparcel.b.a(parcel, 1, (Parcelable) fieldOnlyFilter.GH, i, false);
+        com.google.android.gms.common.internal.safeparcel.b.F(parcel, iP);
+    }
+
+    @Override // android.os.Parcelable.Creator
+    /* JADX INFO: renamed from: aJ, reason: merged with bridge method [inline-methods] */
+    public FieldOnlyFilter[] newArray(int i) {
+        return new FieldOnlyFilter[i];
+    }
+
+    @Override // android.os.Parcelable.Creator
+    /* JADX INFO: renamed from: af, reason: merged with bridge method [inline-methods] */
+    public FieldOnlyFilter createFromParcel(Parcel parcel) {
+        int iO = com.google.android.gms.common.internal.safeparcel.a.o(parcel);
+        int iG = 0;
+        MetadataBundle metadataBundle = null;
+        while (parcel.dataPosition() < iO) {
+            int iN = com.google.android.gms.common.internal.safeparcel.a.n(parcel);
+            switch (com.google.android.gms.common.internal.safeparcel.a.R(iN)) {
+                case 1:
+                    metadataBundle = (MetadataBundle) com.google.android.gms.common.internal.safeparcel.a.a(parcel, iN, MetadataBundle.CREATOR);
+                    break;
+                case 1000:
+                    iG = com.google.android.gms.common.internal.safeparcel.a.g(parcel, iN);
+                    break;
+                default:
+                    com.google.android.gms.common.internal.safeparcel.a.b(parcel, iN);
+                    break;
+            }
+        }
+        if (parcel.dataPosition() != iO) {
+            throw new a.C0019a("Overread allowed size end=" + iO, parcel);
+        }
+        return new FieldOnlyFilter(iG, metadataBundle);
+    }
+}

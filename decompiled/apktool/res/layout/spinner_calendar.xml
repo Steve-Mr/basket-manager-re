@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout style="@style/layoutDefault"
+  xmlns:android="http://schemas.android.com/apk/res/android" xmlns:ads="http://schemas.android.com/apk/res-auto">
+    <ImageView android:id="@id/spinnerCalendarImageView" android:src="@drawable/news_info" android:layout_alignParentLeft="true" android:layout_centerVertical="true" android:contentDescription="@string/blank" style="@style/imageDefault" />
+    <TextView android:textSize="@dimen/text_very_small" android:gravity="right" android:id="@id/spinnerCalendarTextViewName" android:paddingTop="@dimen/padding_default" android:text="@string/team" android:layout_alignTop="@id/spinnerCalendarImageView" android:layout_alignRight="@id/spinnerCalendarTextViewMatchday" android:layout_alignParentLeft="true" style="@style/textViewDefault" />
+    <TextView android:textSize="@dimen/text_very_small" android:gravity="right" android:id="@id/spinnerCalendarTextViewMatchday" android:paddingBottom="@dimen/padding_default" android:layout_width="40.0dp" android:text="@string/day" android:layout_toRightOf="@id/spinnerCalendarImageView" android:layout_alignBottom="@id/spinnerCalendarImageView" style="@style/textViewDefault" />
+</RelativeLayout>
