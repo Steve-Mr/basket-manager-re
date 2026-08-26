@@ -7,20 +7,22 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import top.maary.basketmanager.re.domain.model.Match
 import top.maary.basketmanager.re.domain.model.MatchResult
-import top.maary.basketmanager.re.domain.model.Team
 import top.maary.basketmanager.re.ui.components.MatchBoxScoreDialog
+import top.maary.basketmanager.re.ui.theme.RatingGreen
+import top.maary.basketmanager.re.ui.theme.RatingRed
 import top.maary.basketmanager.re.ui.viewmodel.GameDashboardViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -30,23 +32,28 @@ fun ScheduleScreen(
 ) {
     val game by viewModel.game.collectAsState()
     val allTeams by viewModel.allTeams.collectAsState()
-    val scheduleMatches by viewModel.scheduleMatches.collectAsState()
+    val userTeam by viewModel.userTeam.collectAsState()
     val scope = rememberCoroutineScope()
 
-    var selectedFilterMode by remember { mutableStateOf("MATCHDAY") } // "MATCHDAY" or "MY_TEAM" or "ALL_TEAMS"
-    var currentMatchdayFilter by remember(game) { mutableStateOf(game?.currentMatchday ?: 1) }
-    var selectedTeamIdFilter by remember(game) { mutableStateOf(game?.userTeamId ?: 0L) }
+    var selectedFilterTeamId by remember { mutableStateOf<Long?>(userTeam?.id) }
+    var selectedMatchday by remember { mutableStateOf(game?.currentMatchday ?: 1) }
+    var filterMode by remember { mutableStateOf(0) } // 0: My Team / Specific Team, 1: By Matchday (All 30 teams)
 
+    var scheduleList by remember { mutableStateOf<List<Match>>(emptyList()) }
     var selectedMatchForBoxScore by remember { mutableStateOf<Match?>(null) }
     var boxScoreResults by remember { mutableStateOf<List<MatchResult>>(emptyList()) }
 
+    var targetSimDayToConfirm by remember { mutableStateOf<Int?>(null) }
+
     val teamMap = remember(allTeams) { allTeams.associateBy { it.id } }
 
-    LaunchedEffect(selectedFilterMode, currentMatchdayFilter, selectedTeamIdFilter) {
-        if (selectedFilterMode == "MATCHDAY") {
-            viewModel.loadScheduleByMatchday(currentMatchdayFilter)
+    LaunchedEffect(game?.id, selectedFilterTeamId, selectedMatchday, filterMode) {
+        val gId = game?.id ?: return@LaunchedEffect
+        if (filterMode == 0) {
+            val tId = selectedFilterTeamId ?: userTeam?.id ?: 1L
+            scheduleList = viewModel.getTeamSchedule(tId)
         } else {
-            viewModel.loadScheduleByTeam(selectedTeamIdFilter)
+            scheduleList = viewModel.getMatchesForDay(selectedMatchday)
         }
     }
 
@@ -55,73 +62,77 @@ fun ScheduleScreen(
             .fillMaxSize()
             .padding(16.dp)
     ) {
-        Text(
-            text = "League Calendar & Results",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold
-        )
-        Text(
-            text = "View upcoming games, past results, and full box scores",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "NBA Season Schedule",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Current: Day ${game?.currentMatchday ?: 1} / 166 (Tap future day to Sim)",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
-        // Mode switch
+        // Mode Selector: Team Schedule vs Matchday Schedule
         SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
             SegmentedButton(
-                selected = selectedFilterMode == "MATCHDAY",
-                onClick = { selectedFilterMode = "MATCHDAY" },
+                selected = filterMode == 0,
+                onClick = { filterMode = 0 },
                 shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
             ) {
-                Text("By Matchday (${currentMatchdayFilter})")
+                Text("By Team (82 Games)")
             }
             SegmentedButton(
-                selected = selectedFilterMode == "MY_TEAM",
-                onClick = {
-                    selectedFilterMode = "MY_TEAM"
-                    selectedTeamIdFilter = game?.userTeamId ?: 0L
-                },
+                selected = filterMode == 1,
+                onClick = { filterMode = 1 },
                 shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
             ) {
-                Text("My Team Schedule")
+                Text("By Matchday (All Games)")
             }
         }
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        if (selectedFilterMode == "MATCHDAY") {
+        if (filterMode == 0) {
+            // Team Selector Chips
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("Day:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                (1..166).forEach { day ->
+                allTeams.forEach { team ->
                     FilterChip(
-                        selected = currentMatchdayFilter == day,
-                        onClick = { currentMatchdayFilter = day },
-                        label = { Text("D$day", fontSize = 11.sp) }
+                        selected = (selectedFilterTeamId ?: userTeam?.id) == team.id,
+                        onClick = { selectedFilterTeamId = team.id },
+                        label = { Text(team.name) }
                     )
                 }
             }
         } else {
+            // Matchday Selector Chips (1..166)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("Team:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                allTeams.forEach { t ->
+                val current = game?.currentMatchday ?: 1
+                (1..166).forEach { day ->
                     FilterChip(
-                        selected = selectedTeamIdFilter == t.id,
-                        onClick = { selectedTeamIdFilter = t.id },
-                        label = { Text(t.name, fontSize = 11.sp) }
+                        selected = selectedMatchday == day,
+                        onClick = { selectedMatchday = day },
+                        label = { Text(if (day == current) "Day $day (Today)" else "Day $day") }
                     )
                 }
             }
@@ -129,84 +140,100 @@ fun ScheduleScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        if (scheduleMatches.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("No matches found for this selection.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(scheduleMatches) { match ->
-                    val localTeam = teamMap[match.teamLocalId]
-                    val visitorTeam = teamMap[match.teamVisitorId]
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(scheduleList) { match ->
+                val local = teamMap[match.teamLocalId]
+                val visitor = teamMap[match.teamVisitorId]
+                val isMyTeam = (match.teamLocalId == userTeam?.id || match.teamVisitorId == userTeam?.id)
 
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable(enabled = match.isPlayed) {
+                val isFuture = match.matchday > (game?.currentMatchday ?: 1)
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            if (match.isPlayed) {
                                 scope.launch {
                                     boxScoreResults = viewModel.getMatchBoxScores(match.id)
                                     selectedMatchForBoxScore = match
                                 }
-                            },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (match.teamLocalId == game?.userTeamId || match.teamVisitorId == game?.userTeamId)
-                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-                            else MaterialTheme.colorScheme.surfaceVariant
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(14.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Matchday ${match.matchday}",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = "${visitorTeam?.name ?: "VIS"} @ ${localTeam?.name ?: "LOC"}",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
+                            } else if (isFuture) {
+                                targetSimDayToConfirm = match.matchday
                             }
-
-                            if (match.isPlayed) {
-                                Column(horizontalAlignment = Alignment.End) {
-                                    Text(
-                                        text = "${match.visitorScore ?: 0} - ${match.localScore ?: 0}",
-                                        style = MaterialTheme.typography.titleLarge,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                    Text(
-                                        text = "FINAL (Tap for Box Score)",
-                                        fontSize = 10.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            } else {
+                        },
+                    shape = RoundedCornerShape(10.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (isMyTeam) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+                        else MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
                                 Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = MaterialTheme.colorScheme.surface
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = MaterialTheme.colorScheme.primary
                                 ) {
                                     Text(
-                                        text = "UPCOMING",
+                                        text = "Day ${match.matchday}",
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        color = Color.White,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                                     )
                                 }
+                                Text(
+                                    text = "${visitor?.name ?: "VIS"} @ ${local?.name ?: "LOC"}",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                            }
+                            if (match.isPlayed) {
+                                Text(
+                                    text = "Tap to inspect full box score",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            } else {
+                                Text(
+                                    text = "Tap to fast forward simulate to Day ${match.matchday}",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+
+                        if (match.isPlayed) {
+                            Text(
+                                text = "${match.visitorScore} - ${match.localScore}",
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 15.sp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        } else {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.surface
+                            ) {
+                                Text(
+                                    text = "SIM >",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
                             }
                         }
                     }
@@ -215,17 +242,39 @@ fun ScheduleScreen(
         }
     }
 
+    // Fast Forward Confirmation Dialog
+    targetSimDayToConfirm?.let { targetDay ->
+        AlertDialog(
+            onDismissRequest = { targetSimDayToConfirm = null },
+            title = { Text("Simulate to Matchday $targetDay") },
+            text = { Text("Do you want to fast forward simulation from Day ${game?.currentMatchday ?: 1} up to Day $targetDay?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        targetSimDayToConfirm = null
+                        viewModel.autoSimulateToMatchday(targetDay)
+                    }
+                ) {
+                    Text("Simulate")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { targetSimDayToConfirm = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
     selectedMatchForBoxScore?.let { match ->
         val local = teamMap[match.teamLocalId]
         val visitor = teamMap[match.teamVisitorId]
-        if (local != null && visitor != null) {
-            MatchBoxScoreDialog(
-                match = match,
-                localTeam = local,
-                visitorTeam = visitor,
-                boxScores = boxScoreResults,
-                onDismiss = { selectedMatchForBoxScore = null }
-            )
-        }
+        MatchBoxScoreDialog(
+            match = match,
+            localTeam = local,
+            visitorTeam = visitor,
+            boxScores = boxScoreResults,
+            onDismiss = { selectedMatchForBoxScore = null }
+        )
     }
 }
