@@ -22,7 +22,6 @@ import top.maary.basketmanager.re.ui.components.PlayerDetailBottomSheet
 import top.maary.basketmanager.re.ui.components.PositionBadge
 import top.maary.basketmanager.re.ui.components.RatingBadge
 import top.maary.basketmanager.re.ui.viewmodel.GameDashboardViewModel
-import top.maary.basketmanager.re.ui.viewmodel.PlayerSeasonStats
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -89,7 +88,7 @@ fun LeagueStatsScreen(
         Spacer(modifier = Modifier.height(12.dp))
 
         // Navigation Tabs
-        PrimaryTabRow(selectedTabIndex = selectedTab) {
+        TabRow(selectedTabIndex = selectedTab) {
             Tab(
                 selected = selectedTab == 0,
                 onClick = { selectedTab = 0 },
@@ -109,7 +108,7 @@ fun LeagueStatsScreen(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Position Filter Chips (Applies to all tabs!)
+        // Position Filter Chips (Applies to all tabs)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -168,7 +167,7 @@ fun LeagueStatsScreen(
                             rank = index + 1,
                             player = player,
                             teamName = team?.name ?: "FA",
-                            trailingText = "OVR: ${player.overallRating}",
+                            trailingText = "Pot: ★${player.potential}",
                             onClick = { selectedPlayerForDetail = player }
                         )
                     }
@@ -262,7 +261,7 @@ fun LeagueStatsScreen(
     selectedPlayerForDetail?.let { player ->
         PlayerDetailBottomSheet(
             player = player,
-            stats = statsMap[player.id],
+            stats = viewModel.getPlayerSeasonStats(player.id),
             onDismiss = { selectedPlayerForDetail = null }
         )
     }

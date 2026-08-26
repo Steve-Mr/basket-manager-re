@@ -3,7 +3,6 @@ package top.maary.basketmanager.re.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import top.maary.basketmanager.re.BasketManagerApplication
-import top.maary.basketmanager.re.domain.engine.TradeEvaluationResult
 import top.maary.basketmanager.re.domain.model.*
 import top.maary.basketmanager.re.domain.repository.GameRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -11,6 +10,17 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.io.InputStream
+
+data class PlayerSeasonStats(
+    val player: Player,
+    val gamesPlayed: Int,
+    val ppg: Double,
+    val rpg: Double,
+    val apg: Double,
+    val spg: Double,
+    val bpg: Double,
+    val avgPer: Double
+)
 
 class MainViewModel(
     private val repository: GameRepository = BasketManagerApplication.instance.gameRepository
@@ -49,22 +59,6 @@ class MainViewModel(
         }
     }
 }
-
-enum class LineupSlot {
-    STARTER_PG, STARTER_SG, STARTER_SF, STARTER_PF, STARTER_C,
-    RESERVE_PG, RESERVE_SG, RESERVE_SF, RESERVE_PF, RESERVE_C
-}
-
-data class PlayerSeasonStats(
-    val player: Player,
-    val gamesPlayed: Int,
-    val ppg: Double,
-    val rpg: Double,
-    val apg: Double,
-    val spg: Double,
-    val bpg: Double,
-    val avgPer: Double
-)
 
 class GameDashboardViewModel(
     private val repository: GameRepository = BasketManagerApplication.instance.gameRepository
@@ -160,6 +154,35 @@ class GameDashboardViewModel(
         _playerStatsList.value = statsList
     }
 
+    fun getPlayerSeasonStats(playerId: Long): PlayerSeasonStats? {
+        return _playerStatsList.value.find { it.player.id == playerId }
+    }
+
+    fun swapPlayerPositions(player: Player) {
+        if (player.positionSecond == Position.NONE || player.positionSecond == player.positionFirst) return
+        val updated = player.copy(
+            positionFirst = player.positionSecond,
+            positionSecond = player.positionFirst
+        )
+        viewModelScope.launch {
+            repository.updatePlayer(updated)
+            _game.value?.let { refreshGameData(it) }
+        }
+    }
+
+    suspend fun getTeamRoster(teamId: Long): List<Player> {
+        return repository.getTeamPlayers(teamId)
+    }
+
+    suspend fun getTeamSchedule(teamId: Long): List<Match> {
+        val gId = _game.value?.id ?: return emptyList()
+        return repository.getTeamMatches(gId, teamId)
+    }
+
+    suspend fun getTeamTactic(teamId: Long): Tactic? {
+        return repository.getTactic(teamId)
+    }
+
     fun toggleAutoLineup(enabled: Boolean) {
         val currentGame = _game.value ?: return
         val updated = currentGame.copy(autoLineupEnabled = enabled)
@@ -185,7 +208,7 @@ class GameDashboardViewModel(
         val currentGame = _game.value ?: return
         viewModelScope.launch {
             _isSimulating.value = true
-            val updated = repository.autoSimulateTo(currentGame.id, targetDay) { _, msg ->
+            val updated = repository.autoSimulateTo(currentGame.id, targetDay) { day, msg ->
                 _simulationProgressText.value = msg
             }
             _game.value = updated
@@ -194,66 +217,28 @@ class GameDashboardViewModel(
         }
     }
 
-    fun autoOptimizeLineup() {
-        val teamId = _userTeam.value?.id ?: return
-        viewModelScope.launch {
-            val optimized = repository.autoOptimizeLineup(teamId)
-            _userTactic.value = optimized
-        }
-    }
-
-    fun updateLineupSlot(slot: LineupSlot, playerId: Long) {
-        val current = _userTactic.value ?: return
-        val updated = when (slot) {
-            LineupSlot.STARTER_PG -> current.copy(starterPgId = playerId)
-            LineupSlot.STARTER_SG -> current.copy(starterSgId = playerId)
-            LineupSlot.STARTER_SF -> current.copy(starterSfId = playerId)
-            LineupSlot.STARTER_PF -> current.copy(starterPfId = playerId)
-            LineupSlot.STARTER_C -> current.copy(starterCId = playerId)
-            LineupSlot.RESERVE_PG -> current.copy(reservePgId = playerId)
-            LineupSlot.RESERVE_SG -> current.copy(reserveSgId = playerId)
-            LineupSlot.RESERVE_SF -> current.copy(reserveSfId = playerId)
-            LineupSlot.RESERVE_PF -> current.copy(reservePfId = playerId)
-            LineupSlot.RESERVE_C -> current.copy(reserveCId = playerId)
-        }
-        _userTactic.value = updated
-        viewModelScope.launch {
-            repository.updateTactic(updated)
-        }
-    }
-
-    fun updateStarPlayer(starIndex: Int, playerId: Long?) {
-        val current = _userTactic.value ?: return
-        val updated = when (starIndex) {
-            1 -> current.copy(starOnePlayerId = playerId)
-            2 -> current.copy(starTwoPlayerId = playerId)
-            3 -> current.copy(starThreePlayerId = playerId)
-            else -> current
-        }
-        _userTactic.value = updated
-        viewModelScope.launch {
-            repository.updateTactic(updated)
-        }
-    }
-
     fun updateTactic(tactic: Tactic) {
-        _userTactic.value = tactic
         viewModelScope.launch {
             repository.updateTactic(tactic)
+            _userTactic.value = tactic
         }
     }
 
-    fun loadScheduleByMatchday(day: Int) {
-        val gId = _game.value?.id ?: return
-        viewModelScope.launch {
-            _scheduleMatches.value = repository.getMatchesForDay(gId, day)
-        }
+    fun optimizeUserLineup() {
+        val tactic = _userTactic.value ?: return
+        val roster = _userRoster.value
+        val optimized = top.maary.basketmanager.re.domain.engine.LineupOptimizer.optimizeLineup(roster, tactic)
+        updateTactic(optimized)
     }
 
-    fun loadScheduleByTeam(teamId: Long) {
-        val gId = _game.value?.id ?: return
+    fun signFreeAgent(playerId: Long, salary: Int, years: Int, onComplete: (Boolean) -> Unit) {
+        val team = _userTeam.value ?: return
         viewModelScope.launch {
-            _scheduleMatches.value = repository.getTeamMatches(gId, teamId)
+            val success = repository.signFreeAgent(playerId, team.id, salary, years)
+            if (success) {
+                _game.value?.let { refreshGameData(it) }
+            }
+            onComplete(success)
         }
     }
 
@@ -261,28 +246,8 @@ class GameDashboardViewModel(
         return repository.getMatchResults(matchId)
     }
 
-    fun executeTrade(proposal: TradeProposal, onResult: (TradeEvaluationResult) -> Unit) {
-        viewModelScope.launch {
-            val result = repository.executeTrade(proposal)
-            _game.value?.let { refreshGameData(it) }
-            onResult(result)
-        }
-    }
-
-    fun signFreeAgent(playerId: Long, salary: Int, years: Int, onComplete: (Boolean) -> Unit) {
-        val uTeamId = _userTeam.value?.id ?: return
-        viewModelScope.launch {
-            val success = repository.signFreeAgent(playerId, uTeamId, salary, years)
-            _game.value?.let { refreshGameData(it) }
-            onComplete(success)
-        }
-    }
-
-    fun selectDraftPick(prospectId: Long, pickId: Long, onComplete: (Boolean) -> Unit) {
-        viewModelScope.launch {
-            val success = repository.selectDraftPick(prospectId, pickId)
-            _game.value?.let { refreshGameData(it) }
-            onComplete(success)
-        }
+    suspend fun getMatchesForDay(day: Int): List<Match> {
+        val gId = _game.value?.id ?: return emptyList()
+        return repository.getMatchesForDay(gId, day)
     }
 }

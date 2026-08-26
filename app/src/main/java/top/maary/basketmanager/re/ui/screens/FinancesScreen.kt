@@ -1,20 +1,19 @@
 package top.maary.basketmanager.re.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountBalance
-import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import top.maary.basketmanager.re.domain.model.Player
+import top.maary.basketmanager.re.ui.components.PlayerDetailBottomSheet
 import top.maary.basketmanager.re.ui.components.PositionBadge
 import top.maary.basketmanager.re.ui.components.RatingBadge
 import top.maary.basketmanager.re.ui.viewmodel.GameDashboardViewModel
@@ -26,9 +25,19 @@ fun FinancesScreen(
     val userTeam by viewModel.userTeam.collectAsState()
     val roster by viewModel.userRoster.collectAsState()
 
+    var selectedPlayerForDetail by remember { mutableStateOf<Player?>(null) }
+
     val totalPayroll = remember(roster) { roster.sumOf { it.salary } }
     val salaryCap = userTeam?.salaryCap ?: 70_000_000
     val capSpace = salaryCap - totalPayroll
+
+    fun formatMoney(amount: Int): String {
+        return if (amount >= 1_000_000 || amount <= -1_000_000) {
+            "$${amount / 1_000_000}M"
+        } else {
+            "$${amount / 1_000}K"
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -61,7 +70,7 @@ fun FinancesScreen(
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text("Total Payroll", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(
-                        text = "$${totalPayroll / 1_000_000.0}M",
+                        text = formatMoney(totalPayroll),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.ExtraBold,
                         color = MaterialTheme.colorScheme.primary
@@ -77,7 +86,7 @@ fun FinancesScreen(
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text("Salary Cap", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(
-                        text = "$${salaryCap / 1_000_000.0}M",
+                        text = formatMoney(salaryCap),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.ExtraBold
                     )
@@ -94,7 +103,7 @@ fun FinancesScreen(
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text("Cap Room", fontSize = 11.sp)
                     Text(
-                        text = "$${capSpace / 1_000_000.0}M",
+                        text = formatMoney(capSpace),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.ExtraBold
                     )
@@ -146,7 +155,9 @@ fun FinancesScreen(
         ) {
             items(roster.sortedByDescending { it.salary }) { player ->
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { selectedPlayerForDetail = player },
                     shape = RoundedCornerShape(10.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                 ) {
@@ -176,7 +187,7 @@ fun FinancesScreen(
                         }
 
                         Text(
-                            text = "$${player.salary / 1_000_000.0}M / yr",
+                            text = "${formatMoney(player.salary)} / yr",
                             fontWeight = FontWeight.ExtraBold,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -184,5 +195,13 @@ fun FinancesScreen(
                 }
             }
         }
+    }
+
+    selectedPlayerForDetail?.let { player ->
+        PlayerDetailBottomSheet(
+            player = player,
+            stats = viewModel.getPlayerSeasonStats(player.id),
+            onDismiss = { selectedPlayerForDetail = null }
+        )
     }
 }

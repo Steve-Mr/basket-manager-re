@@ -2,91 +2,74 @@ package top.maary.basketmanager.re.ui.navigation
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavType
-import androidx.navigation.compose.*
-import androidx.navigation.navArgument
 import kotlinx.coroutines.launch
 import top.maary.basketmanager.re.ui.screens.*
 import top.maary.basketmanager.re.ui.viewmodel.GameDashboardViewModel
 import top.maary.basketmanager.re.ui.viewmodel.MainViewModel
 
-sealed class Screen(val route: String) {
-    data object MainMenu : Screen("main_menu")
-    data object SelectTeam : Screen("select_team/{gameName}") {
-        fun createRoute(gameName: String) = "select_team/$gameName"
-    }
-    data object GameDashboard : Screen("game_dashboard/{gameId}") {
-        fun createRoute(gameId: Long) = "game_dashboard/$gameId"
-    }
+enum class Screen {
+    MAIN_MENU,
+    SELECT_TEAM,
+    DASHBOARD
 }
 
-enum class PrimaryTab(val title: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
+enum class PrimaryTab(val title: String, val icon: ImageVector) {
     HOME("Home", Icons.Default.Home),
-    SQUAD("Squad", Icons.Default.Group),
-    LEAGUE("League", Icons.Default.EmojiEvents),
+    SQUAD("Squad", Icons.Default.People),
+    LEAGUE("League", Icons.Default.FormatListNumbered),
     OFFICE("Office", Icons.Default.BusinessCenter)
 }
 
 @Composable
-fun AppNavigation() {
-    val navController = rememberNavController()
-    val mainViewModel: MainViewModel = viewModel()
+fun AppNavigation(
+    mainViewModel: MainViewModel = viewModel(),
+    dashboardViewModel: GameDashboardViewModel = viewModel()
+) {
+    var currentScreen by remember { mutableStateOf(Screen.MAIN_MENU) }
+    var selectedGameName by remember { mutableStateOf("My Franchise") }
 
-    NavHost(
-        navController = navController,
-        startDestination = Screen.MainMenu.route
-    ) {
-        composable(Screen.MainMenu.route) {
+    when (currentScreen) {
+        Screen.MAIN_MENU -> {
             MainMenuScreen(
                 viewModel = mainViewModel,
                 onNavigateToSelectTeam = { name ->
-                    navController.navigate(Screen.SelectTeam.createRoute(name))
+                    selectedGameName = name
+                    currentScreen = Screen.SELECT_TEAM
                 },
                 onNavigateToGame = { gameId ->
-                    navController.navigate(Screen.GameDashboard.createRoute(gameId))
+                    dashboardViewModel.loadGame(gameId)
+                    currentScreen = Screen.DASHBOARD
                 }
             )
         }
 
-        composable(
-            route = Screen.SelectTeam.route,
-            arguments = listOf(navArgument("gameName") { type = NavType.StringType })
-        ) { backStackEntry ->
-            val gameName = backStackEntry.arguments?.getString("gameName") ?: "My Franchise"
+        Screen.SELECT_TEAM -> {
             SelectTeamScreen(
-                gameName = gameName,
+                gameName = selectedGameName,
                 viewModel = mainViewModel,
-                onBack = { navController.popBackStack() },
+                onBack = { currentScreen = Screen.MAIN_MENU },
                 onGameCreated = { gameId ->
-                    navController.navigate(Screen.GameDashboard.createRoute(gameId)) {
-                        popUpTo(Screen.MainMenu.route) { inclusive = false }
-                    }
+                    dashboardViewModel.loadGame(gameId)
+                    currentScreen = Screen.DASHBOARD
                 }
             )
         }
 
-        composable(
-            route = Screen.GameDashboard.route,
-            arguments = listOf(navArgument("gameId") { type = NavType.LongType })
-        ) { backStackEntry ->
-            val gameId = backStackEntry.arguments?.getLong("gameId") ?: 0L
-            val dashboardViewModel: GameDashboardViewModel = viewModel()
-
-            LaunchedEffect(gameId) {
-                dashboardViewModel.loadGame(gameId)
-            }
-
-            MainGameDashboardScaffold(
+        Screen.DASHBOARD -> {
+            DashboardScaffold(
                 viewModel = dashboardViewModel,
                 onExitToMainMenu = {
-                    navController.popBackStack(Screen.MainMenu.route, inclusive = false)
+                    mainViewModel.loadSavedGames()
+                    currentScreen = Screen.MAIN_MENU
                 }
             )
         }
@@ -95,42 +78,54 @@ fun AppNavigation() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainGameDashboardScaffold(
+fun DashboardScaffold(
     viewModel: GameDashboardViewModel,
     onExitToMainMenu: () -> Unit
 ) {
-    val game by viewModel.game.collectAsState()
-    val userTeam by viewModel.userTeam.collectAsState()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
+    val game by viewModel.game.collectAsState()
+    val userTeam by viewModel.userTeam.collectAsState()
 
     var primaryTab by remember { mutableStateOf(PrimaryTab.HOME) }
     var squadSubTab by remember { mutableStateOf(0) } // 0: Roster, 1: Lineup, 2: Tactics, 3: Finances
     var leagueSubTab by remember { mutableStateOf(0) } // 0: Standings, 1: Schedule, 2: Leaders
     var officeSubTab by remember { mutableStateOf(0) } // 0: Trade, 1: Free Agency, 2: Draft, 3: Challenges
 
+    var viewingTeamDetailId by remember { mutableStateOf<Long?>(null) }
+
+    if (viewingTeamDetailId != null) {
+        TeamDetailScreen(
+            teamId = viewingTeamDetailId!!,
+            viewModel = viewModel,
+            onBack = { viewingTeamDetailId = null }
+        )
+        return
+    }
+
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet {
                 Spacer(modifier = Modifier.height(16.dp))
-                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                    Text(
-                        text = "Basket Manager 2015",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "Franchise: ${userTeam?.name ?: "N/A"} • Season ${game?.currentSeason ?: 1} Day ${game?.currentMatchday ?: 1}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+                Text(
+                    text = userTeam?.name ?: "Basket Manager",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.ExtraBold,
+                    modifier = Modifier.padding(horizontal = 24.dp)
+                )
+                Text(
+                    text = "Season ${game?.currentSeason ?: 1} • Day ${game?.currentMatchday ?: 1}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp)
+                )
                 HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
 
+                // Section 1: Dashboard
                 NavigationDrawerItem(
-                    icon = { Icon(Icons.Default.Home, contentDescription = null) },
-                    label = { Text("Dashboard (Play)") },
+                    icon = { Icon(Icons.Default.Dashboard, contentDescription = null) },
+                    label = { Text("Dashboard Overview") },
                     selected = primaryTab == PrimaryTab.HOME,
                     onClick = {
                         primaryTab = PrimaryTab.HOME
@@ -138,9 +133,17 @@ fun MainGameDashboardScaffold(
                     }
                 )
 
+                // Section 2: Squad Management
+                Text(
+                    text = "SQUAD MANAGEMENT",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                )
+
                 NavigationDrawerItem(
-                    icon = { Icon(Icons.Default.People, contentDescription = null) },
-                    label = { Text("Team Roster") },
+                    icon = { Icon(Icons.Default.Group, contentDescription = null) },
+                    label = { Text("Roster & Contracts") },
                     selected = primaryTab == PrimaryTab.SQUAD && squadSubTab == 0,
                     onClick = {
                         primaryTab = PrimaryTab.SQUAD
@@ -150,7 +153,7 @@ fun MainGameDashboardScaffold(
                 )
 
                 NavigationDrawerItem(
-                    icon = { Icon(Icons.Default.FormatListNumbered, contentDescription = null) },
+                    icon = { Icon(Icons.Default.SportsBasketball, contentDescription = null) },
                     label = { Text("Lineup & Rotation") },
                     selected = primaryTab == PrimaryTab.SQUAD && squadSubTab == 1,
                     onClick = {
@@ -162,7 +165,7 @@ fun MainGameDashboardScaffold(
 
                 NavigationDrawerItem(
                     icon = { Icon(Icons.Default.Tune, contentDescription = null) },
-                    label = { Text("Team Tactics") },
+                    label = { Text("Game Tactics") },
                     selected = primaryTab == PrimaryTab.SQUAD && squadSubTab == 2,
                     onClick = {
                         primaryTab = PrimaryTab.SQUAD
@@ -172,8 +175,27 @@ fun MainGameDashboardScaffold(
                 )
 
                 NavigationDrawerItem(
-                    icon = { Icon(Icons.Default.Leaderboard, contentDescription = null) },
-                    label = { Text("League Standings") },
+                    icon = { Icon(Icons.Default.AccountBalance, contentDescription = null) },
+                    label = { Text("Franchise Finances") },
+                    selected = primaryTab == PrimaryTab.SQUAD && squadSubTab == 3,
+                    onClick = {
+                        primaryTab = PrimaryTab.SQUAD
+                        squadSubTab = 3
+                        scope.launch { drawerState.close() }
+                    }
+                )
+
+                // Section 3: League Hub
+                Text(
+                    text = "LEAGUE HUB",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                )
+
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Default.FormatListNumbered, contentDescription = null) },
+                    label = { Text("Standings") },
                     selected = primaryTab == PrimaryTab.LEAGUE && leagueSubTab == 0,
                     onClick = {
                         primaryTab = PrimaryTab.LEAGUE
@@ -184,7 +206,7 @@ fun MainGameDashboardScaffold(
 
                 NavigationDrawerItem(
                     icon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
-                    label = { Text("Calendar & Schedule") },
+                    label = { Text("Season Schedule") },
                     selected = primaryTab == PrimaryTab.LEAGUE && leagueSubTab == 1,
                     onClick = {
                         primaryTab = PrimaryTab.LEAGUE
@@ -194,14 +216,22 @@ fun MainGameDashboardScaffold(
                 )
 
                 NavigationDrawerItem(
-                    icon = { Icon(Icons.Default.Star, contentDescription = null) },
-                    label = { Text("Top 100 & Rookie Stats") },
+                    icon = { Icon(Icons.Default.Leaderboard, contentDescription = null) },
+                    label = { Text("Leaders & Top 100") },
                     selected = primaryTab == PrimaryTab.LEAGUE && leagueSubTab == 2,
                     onClick = {
                         primaryTab = PrimaryTab.LEAGUE
                         leagueSubTab = 2
                         scope.launch { drawerState.close() }
                     }
+                )
+
+                // Section 4: Front Office
+                Text(
+                    text = "FRONT OFFICE",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
                 )
 
                 NavigationDrawerItem(
@@ -228,7 +258,7 @@ fun MainGameDashboardScaffold(
 
                 NavigationDrawerItem(
                     icon = { Icon(Icons.Default.HowToVote, contentDescription = null) },
-                    label = { Text("Rookie Draft") },
+                    label = { Text("Rookie Draft Hub") },
                     selected = primaryTab == PrimaryTab.OFFICE && officeSubTab == 2,
                     onClick = {
                         primaryTab = PrimaryTab.OFFICE
@@ -252,7 +282,7 @@ fun MainGameDashboardScaffold(
                 HorizontalDivider()
 
                 NavigationDrawerItem(
-                    icon = { Icon(Icons.Default.ExitToApp, contentDescription = null) },
+                    icon = { Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null) },
                     label = { Text("Save & Exit to Menu") },
                     selected = false,
                     onClick = {
@@ -316,13 +346,16 @@ fun MainGameDashboardScaffold(
                             onNavigateToStandings = {
                                 primaryTab = PrimaryTab.LEAGUE
                                 leagueSubTab = 0
+                            },
+                            onNavigateToTeamDetail = { teamId ->
+                                viewingTeamDetailId = teamId
                             }
                         )
                     }
 
                     PrimaryTab.SQUAD -> {
                         Column(modifier = Modifier.fillMaxSize()) {
-                            PrimaryTabRow(selectedTabIndex = squadSubTab) {
+                            TabRow(selectedTabIndex = squadSubTab) {
                                 Tab(selected = squadSubTab == 0, onClick = { squadSubTab = 0 }, text = { Text("Roster") })
                                 Tab(selected = squadSubTab == 1, onClick = { squadSubTab = 1 }, text = { Text("Lineup") })
                                 Tab(selected = squadSubTab == 2, onClick = { squadSubTab = 2 }, text = { Text("Tactics") })
@@ -339,13 +372,13 @@ fun MainGameDashboardScaffold(
 
                     PrimaryTab.LEAGUE -> {
                         Column(modifier = Modifier.fillMaxSize()) {
-                            PrimaryTabRow(selectedTabIndex = leagueSubTab) {
+                            TabRow(selectedTabIndex = leagueSubTab) {
                                 Tab(selected = leagueSubTab == 0, onClick = { leagueSubTab = 0 }, text = { Text("Standings") })
                                 Tab(selected = leagueSubTab == 1, onClick = { leagueSubTab = 1 }, text = { Text("Schedule") })
                                 Tab(selected = leagueSubTab == 2, onClick = { leagueSubTab = 2 }, text = { Text("Leaders") })
                             }
                             when (leagueSubTab) {
-                                0 -> StandingsScreen(viewModel = viewModel)
+                                0 -> StandingsScreen(viewModel = viewModel, onNavigateToTeamDetail = { viewingTeamDetailId = it })
                                 1 -> ScheduleScreen(viewModel = viewModel)
                                 2 -> LeagueStatsScreen(viewModel = viewModel)
                             }
@@ -354,7 +387,7 @@ fun MainGameDashboardScaffold(
 
                     PrimaryTab.OFFICE -> {
                         Column(modifier = Modifier.fillMaxSize()) {
-                            PrimaryTabRow(selectedTabIndex = officeSubTab) {
+                            TabRow(selectedTabIndex = officeSubTab) {
                                 Tab(selected = officeSubTab == 0, onClick = { officeSubTab = 0 }, text = { Text("Trade") })
                                 Tab(selected = officeSubTab == 1, onClick = { officeSubTab = 1 }, text = { Text("Free Agents") })
                                 Tab(selected = officeSubTab == 2, onClick = { officeSubTab = 2 }, text = { Text("Draft") })

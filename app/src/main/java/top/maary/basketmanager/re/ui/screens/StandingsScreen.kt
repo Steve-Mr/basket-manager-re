@@ -1,5 +1,6 @@
 package top.maary.basketmanager.re.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -19,7 +20,8 @@ import top.maary.basketmanager.re.ui.viewmodel.GameDashboardViewModel
 
 @Composable
 fun StandingsScreen(
-    viewModel: GameDashboardViewModel
+    viewModel: GameDashboardViewModel,
+    onNavigateToTeamDetail: (Long) -> Unit = {}
 ) {
     val standings by viewModel.standings.collectAsState()
     val userTeam by viewModel.userTeam.collectAsState()
@@ -44,8 +46,13 @@ fun StandingsScreen(
     ) {
         Text(
             text = "League Standings",
-            style = MaterialTheme.typography.titleLarge,
+            style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold
+        )
+        Text(
+            text = "Tap any team to inspect squad roster & schedule",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
         Spacer(modifier = Modifier.height(10.dp))
@@ -81,14 +88,18 @@ fun StandingsScreen(
                         Text("PCT", modifier = Modifier.weight(0.9f), textAlign = TextAlign.Center, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                         Text("DIFF", modifier = Modifier.weight(0.9f), textAlign = TextAlign.Center, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                     }
-                    Divider()
+                    HorizontalDivider()
                 }
 
                 itemsIndexed(filteredList) { index, item ->
                     val isUser = item.teamId == userTeam?.id
                     val isPlayoffCutoff = (selectedTab != 0 && index == 7)
 
-                    Column {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onNavigateToTeamDetail(item.teamId) }
+                    ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -100,7 +111,7 @@ fun StandingsScreen(
                             Text(
                                 text = item.teamName,
                                 modifier = Modifier.weight(2f),
-                                fontWeight = if (isUser) FontWeight.Black else FontWeight.Medium,
+                                fontWeight = if (isUser) FontWeight.ExtraBold else FontWeight.Medium,
                                 color = if (isUser) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                             )
                             Text("${item.gamesWon}", modifier = Modifier.weight(0.7f), textAlign = TextAlign.Center, fontSize = 12.sp)
@@ -110,9 +121,9 @@ fun StandingsScreen(
                         }
 
                         if (isPlayoffCutoff) {
-                            Divider(color = MaterialTheme.colorScheme.secondary, thickness = 2.dp)
+                            HorizontalDivider(color = MaterialTheme.colorScheme.secondary, thickness = 2.dp)
                         } else {
-                            Divider(color = MaterialTheme.colorScheme.surfaceVariant)
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                         }
                     }
                 }
