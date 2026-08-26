@@ -105,7 +105,11 @@ object MatchSimulationEngine {
         localPlayers.forEach { injuryMap[it.id] = it.stateInjury }
         visitorPlayers.forEach { injuryMap[it.id] = it.stateInjury }
 
-        var possessions = 120
+        val localCanInjure = localPlayers.count { it.stateInjury == 0 } > 12
+        val visitorCanInjure = visitorPlayers.count { it.stateInjury == 0 } > 12
+
+        // Authentic NBA Pace: ~190 total possessions (~95 possessions per team)
+        var possessions = 190
         var isOvertime = false
         var otPossessions = 0
 
@@ -122,6 +126,7 @@ object MatchSimulationEngine {
             val attackTactic = if (isLocalAttack) localTactic else visitorTactic
             val attackMods = if (isLocalAttack) localModAttack else visitorModAttack
             val defenseMods = if (isLocalAttack) visitorModDefense else localModDefense
+            val canInjure = if (isLocalAttack) localCanInjure else visitorCanInjure
 
             playSinglePossessionAuthentic(
                 attackTeam = attackTeam,
@@ -129,6 +134,7 @@ object MatchSimulationEngine {
                 attackTactic = attackTactic,
                 attackMods = attackMods,
                 defenseMods = defenseMods,
+                canInjure = canInjure,
                 rulete = ruleteEngine,
                 boxScores = boxScores,
                 injuryMap = injuryMap
@@ -138,9 +144,9 @@ object MatchSimulationEngine {
                 val lPts = getTeamPoints(isLocal = true)
                 val vPts = getTeamPoints(isLocal = false)
                 if (lPts == vPts) {
-                    possessions += 6
+                    possessions += 8
                     isOvertime = true
-                    otPossessions += 6
+                    otPossessions += 8
                 }
             }
             posIdx++
@@ -189,7 +195,8 @@ object MatchSimulationEngine {
 
                 val newForm: Int
                 val newEnergy: Int
-                val newInjury = injuryMap[p.id] ?: p.stateInjury
+                val rawInj = injuryMap[p.id] ?: p.stateInjury
+                val newInjury = if (rawInj == -1) 0 else rawInj
 
                 when {
                     isStarter -> {
@@ -266,24 +273,30 @@ object MatchSimulationEngine {
         attackTactic: Tactic,
         attackMods: Map<Long, Int>,
         defenseMods: Map<Long, Int>,
+        canInjure: Boolean,
         rulete: RuleteEngine,
         boxScores: MutableMap<Long, MatchResultBuilder>,
         injuryMap: MutableMap<Long, Int>
     ) {
-        // 1. Injury roll (4% chance)
-        if (skillAttempt(4)) {
+        // 1. Injury roll (only if healthy players > 12)
+        if (canInjure && skillAttempt(3)) {
             val injuredCandidate = rulete.getRulete(0, attackTeam.id)
             if (injuredCandidate != null) {
                 val defMod = defenseMods[injuredCandidate.id] ?: 0
                 val check = (injuredCandidate.stateEnergy * (injuredCandidate.skillPhysique + defMod)) / 100
                 if (!accomplishedAction(check, 1.0f)) {
-                    val damageType = Random.nextInt(100)
-                    val days = when {
-                        damageType <= 80 -> Random.nextInt(2, 8)
-                        damageType <= 99 -> Random.nextInt(8, 50)
-                        else -> Random.nextInt(50, 181)
+                    val currentInj = injuryMap[injuredCandidate.id] ?: 0
+                    if (currentInj == 0) {
+                        injuryMap[injuredCandidate.id] = -1 // Knock, sit remainder of match
+                    } else if (currentInj == -1) {
+                        val damageType = Random.nextInt(100)
+                        val days = when {
+                            damageType <= 85 -> Random.nextInt(2, 6)
+                            damageType <= 98 -> Random.nextInt(7, 21)
+                            else -> Random.nextInt(22, 60)
+                        }
+                        injuryMap[injuredCandidate.id] = days
                     }
-                    injuryMap[injuredCandidate.id] = days
                 }
             }
         }
@@ -301,8 +314,8 @@ object MatchSimulationEngine {
             }
         }
 
-        // 3. Turnover / Bad pass (17% chance)
-        if (skillAttempt(17)) {
+        // 3. Turnover / Bad pass (16% chance)
+        if (skillAttempt(16)) {
             val passer = rulete.getRulete(5, attackTeam.id)
             if (passer != null && !accomplishedAction(passer.skillPass + (attackMods[passer.id] ?: 0), 0.6f)) {
                 boxScores[passer.id]?.passesKo = (boxScores[passer.id]?.passesKo ?: 0) + 1
@@ -316,7 +329,7 @@ object MatchSimulationEngine {
         if (skillAttempt(34)) {
             val passer = rulete.getRulete(5, attackTeam.id)
             if (passer != null && accomplishedAction(passer.skillPass + (attackMods[passer.id] ?: 0), 1.0f)) {
-                assistanceModifier = 5
+                assistanceModifier = 6
                 assistPlayer = passer
             }
         }
@@ -329,7 +342,7 @@ object MatchSimulationEngine {
         var shotValue = 0
 
         if (skillAttempt(attackTactic.shotInteriorPercent)) {
-            shotModifier = 0.65f
+            shotModifier = 0.68f
             shotType = 1
             attemptBlock = 11
             shooter = rulete.getRulete(6, attackTeam.id)
@@ -338,10 +351,10 @@ object MatchSimulationEngine {
             }
         } else {
             if (skillAttempt(attackTactic.shotTriplePercent)) {
-                shotModifier = 0.45f
+                shotModifier = 0.48f
                 shotType = 3
             } else {
-                shotModifier = 0.55f
+                shotModifier = 0.58f
                 shotType = 2
             }
             attemptBlock = 9

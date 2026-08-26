@@ -17,6 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import top.maary.basketmanager.re.domain.model.Player
+import top.maary.basketmanager.re.domain.model.Position
 import top.maary.basketmanager.re.ui.components.PlayerDetailBottomSheet
 import top.maary.basketmanager.re.ui.components.PositionBadge
 import top.maary.basketmanager.re.ui.components.RatingBadge
@@ -32,34 +33,41 @@ fun LeagueStatsScreen(
     val playerStats by viewModel.playerStatsList.collectAsState()
     val allTeams by viewModel.allTeams.collectAsState()
 
-    var selectedTab by remember { mutableStateOf(0) } // 0: Top 100 MVP, 1: Top Rookies, 2: Stat Leaders
+    var selectedTab by remember { mutableStateOf(0) } // 0: Top 100 Rankings, 1: Top Rookies, 2: Stat Leaders
+    var selectedPositionFilter by remember { mutableStateOf<Position?>(null) }
     var selectedLeaderCategory by remember { mutableStateOf("PTS") } // PTS, REB, AST, STL, BLK, PER
     var selectedPlayerForDetail by remember { mutableStateOf<Player?>(null) }
 
     val teamMap = remember(allTeams) { allTeams.associateBy { it.id } }
+    val statsMap = remember(playerStats) { playerStats.associateBy { it.player.id } }
 
-    val top100Players = remember(allPlayers) {
-        allPlayers.filter { it.teamId != null && it.teamId!! > 0 }
-            .sortedByDescending { it.overallRating }
-            .take(100)
+    val filteredTopPlayers = remember(allPlayers, selectedPositionFilter) {
+        val rostered = allPlayers.filter { it.teamId != null && it.teamId!! > 0 }
+        val filtered = if (selectedPositionFilter == null) rostered
+        else rostered.filter { it.positionFirst == selectedPositionFilter || it.positionSecond == selectedPositionFilter }
+        filtered.sortedByDescending { it.overallRating }.take(100)
     }
 
-    val topRookies = remember(allPlayers) {
-        allPlayers.filter { it.teamId != null && it.teamId!! > 0 && it.yearsExperience == 0 }
-            .sortedByDescending { it.overallRating }
-            .take(50)
+    val filteredTopRookies = remember(allPlayers, selectedPositionFilter) {
+        val rookies = allPlayers.filter { it.teamId != null && it.teamId!! > 0 && it.yearsExperience == 0 }
+        val filtered = if (selectedPositionFilter == null) rookies
+        else rookies.filter { it.positionFirst == selectedPositionFilter || it.positionSecond == selectedPositionFilter }
+        filtered.sortedByDescending { it.overallRating }.take(100)
     }
 
-    val statLeaders = remember(playerStats, selectedLeaderCategory) {
+    val statLeaders = remember(playerStats, selectedLeaderCategory, selectedPositionFilter) {
+        val filtered = if (selectedPositionFilter == null) playerStats
+        else playerStats.filter { it.player.positionFirst == selectedPositionFilter || it.player.positionSecond == selectedPositionFilter }
+
         when (selectedLeaderCategory) {
-            "PTS" -> playerStats.sortedByDescending { it.ppg }
-            "REB" -> playerStats.sortedByDescending { it.rpg }
-            "AST" -> playerStats.sortedByDescending { it.apg }
-            "STL" -> playerStats.sortedByDescending { it.spg }
-            "BLK" -> playerStats.sortedByDescending { it.bpg }
-            "PER" -> playerStats.sortedByDescending { it.avgPer }
-            else -> playerStats.sortedByDescending { it.ppg }
-        }.take(50)
+            "PTS" -> filtered.sortedByDescending { it.ppg }
+            "REB" -> filtered.sortedByDescending { it.rpg }
+            "AST" -> filtered.sortedByDescending { it.apg }
+            "STL" -> filtered.sortedByDescending { it.spg }
+            "BLK" -> filtered.sortedByDescending { it.bpg }
+            "PER" -> filtered.sortedByDescending { it.avgPer }
+            else -> filtered.sortedByDescending { it.ppg }
+        }.take(100)
     }
 
     Column(
@@ -73,7 +81,7 @@ fun LeagueStatsScreen(
             fontWeight = FontWeight.Bold
         )
         Text(
-            text = "Top 100 MVP race, ROY candidates, and statistical leaders",
+            text = "Top players by position, ROY candidates, and statistical leaders",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -85,7 +93,7 @@ fun LeagueStatsScreen(
             Tab(
                 selected = selectedTab == 0,
                 onClick = { selectedTab = 0 },
-                text = { Text("Top 100 MVP") }
+                text = { Text("Top 100 Players") }
             )
             Tab(
                 selected = selectedTab == 1,
@@ -99,15 +107,62 @@ fun LeagueStatsScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Position Filter Chips (Applies to all tabs!)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Position:",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            FilterChip(
+                selected = selectedPositionFilter == null,
+                onClick = { selectedPositionFilter = null },
+                label = { Text("All Positions") }
+            )
+            listOf(
+                Position.POINT_GUARD,
+                Position.SHOOTING_GUARD,
+                Position.SMALL_FORWARD,
+                Position.POWER_FORWARD,
+                Position.CENTER
+            ).forEach { pos ->
+                FilterChip(
+                    selected = selectedPositionFilter == pos,
+                    onClick = { selectedPositionFilter = if (selectedPositionFilter == pos) null else pos },
+                    label = { Text(pos.shortName) }
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
 
         when (selectedTab) {
             0 -> {
+                val headerTitle = if (selectedPositionFilter == null) "Top 100 Players in League"
+                else "Top 100 ${selectedPositionFilter!!.shortName} Players in League"
+
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(text = headerTitle, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Text(text = "${filteredTopPlayers.size} Players", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    itemsIndexed(top100Players) { index, player ->
+                    itemsIndexed(filteredTopPlayers) { index, player ->
                         val team = teamMap[player.teamId]
                         LeaguePlayerRankRow(
                             rank = index + 1,
@@ -121,11 +176,22 @@ fun LeagueStatsScreen(
             }
 
             1 -> {
+                val headerTitle = if (selectedPositionFilter == null) "Top Rookie Candidates"
+                else "Top Rookie ${selectedPositionFilter!!.shortName} Candidates"
+
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(text = headerTitle, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Text(text = "${filteredTopRookies.size} Rookies", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    itemsIndexed(topRookies) { index, player ->
+                    itemsIndexed(filteredTopRookies) { index, player ->
                         val team = teamMap[player.teamId]
                         LeaguePlayerRankRow(
                             rank = index + 1,
@@ -194,7 +260,11 @@ fun LeagueStatsScreen(
     }
 
     selectedPlayerForDetail?.let { player ->
-        PlayerDetailBottomSheet(player = player, onDismiss = { selectedPlayerForDetail = null })
+        PlayerDetailBottomSheet(
+            player = player,
+            stats = statsMap[player.id],
+            onDismiss = { selectedPlayerForDetail = null }
+        )
     }
 }
 

@@ -1,48 +1,65 @@
 package top.maary.basketmanager.re.ui.screens
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.HowToVote
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import top.maary.basketmanager.re.BasketManagerApplication
-import top.maary.basketmanager.re.domain.engine.FreeAgencyEngine
+import top.maary.basketmanager.re.domain.engine.DraftEngine
+import top.maary.basketmanager.re.domain.model.DraftPick
 import top.maary.basketmanager.re.domain.model.Player
 import top.maary.basketmanager.re.domain.model.Position
 import top.maary.basketmanager.re.ui.components.PlayerDetailBottomSheet
 import top.maary.basketmanager.re.ui.components.PositionBadge
 import top.maary.basketmanager.re.ui.components.RatingBadge
 import top.maary.basketmanager.re.ui.viewmodel.GameDashboardViewModel
-import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FreeAgencyScreen(
     viewModel: GameDashboardViewModel
 ) {
-    val repository = remember { BasketManagerApplication.instance.gameRepository }
-    val scope = rememberCoroutineScope()
-    val game by viewModel.game.collectAsState()
+    val freeAgents by viewModel.freeAgents.collectAsState()
     val userTeam by viewModel.userTeam.collectAsState()
+    val roster by viewModel.userRoster.collectAsState()
 
-    var freeAgents by remember { mutableStateOf<List<Player>>(emptyList()) }
     var selectedPlayerForDetail by remember { mutableStateOf<Player?>(null) }
-    var filterPos by remember { mutableStateOf<Position?>(null) }
-    var signingPlayer by remember { mutableStateOf<Player?>(null) }
+    var selectedPlayerForSign by remember { mutableStateOf<Player?>(null) }
+    var positionFilter by remember { mutableStateOf<Position?>(null) }
+    var sortBy by remember { mutableStateOf("OVR") }
 
-    LaunchedEffect(game) {
-        val gId = game?.id ?: return@LaunchedEffect
-        freeAgents = repository.getFreeAgents(gId).sortedByDescending { it.overallRating }
-    }
+    val totalPayroll = remember(roster) { roster.sumOf { it.salary } }
+    val salaryCap = userTeam?.salaryCap ?: 70_000_000
+    val capRoom = salaryCap - totalPayroll
 
-    val filteredAgents = remember(freeAgents, filterPos) {
-        if (filterPos == null) freeAgents else freeAgents.filter { it.positionFirst == filterPos || it.positionSecond == filterPos }
+    val filteredList = remember(freeAgents, positionFilter, sortBy) {
+        var list = freeAgents
+        if (positionFilter != null) {
+            list = list.filter { it.positionFirst == positionFilter || it.positionSecond == positionFilter }
+        }
+        when (sortBy) {
+            "OVR" -> list.sortedByDescending { it.overallRating }
+            "POT" -> list.sortedByDescending { it.potential }
+            "AGE" -> list.sortedBy { it.age }
+            "SAL" -> list.sortedBy { it.salary }
+            else -> list.sortedByDescending { it.overallRating }
+        }
     }
 
     Column(
@@ -50,22 +67,64 @@ fun FreeAgencyScreen(
             .fillMaxSize()
             .padding(16.dp)
     ) {
-        Text(
-            text = "Free Agency Market",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "Free Agency Market",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "${freeAgents.size} available players • Cap Room: $${capRoom / 1_000_000.0}M",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Position filter chips
+        // Position Filter
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            FilterChip(selected = filterPos == null, onClick = { filterPos = null }, label = { Text("All") })
-            listOf(Position.POINT_GUARD, Position.SHOOTING_GUARD, Position.SMALL_FORWARD, Position.POWER_FORWARD, Position.CENTER).forEach { p ->
-                FilterChip(selected = filterPos == p, onClick = { filterPos = p }, label = { Text(p.shortName) })
+            FilterChip(
+                selected = positionFilter == null,
+                onClick = { positionFilter = null },
+                label = { Text("All Positions") }
+            )
+            listOf(Position.POINT_GUARD, Position.SHOOTING_GUARD, Position.SMALL_FORWARD, Position.POWER_FORWARD, Position.CENTER).forEach { pos ->
+                FilterChip(
+                    selected = positionFilter == pos,
+                    onClick = { positionFilter = if (positionFilter == pos) null else pos },
+                    label = { Text(pos.shortName) }
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        // Sort Filter
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text("Sort:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.align(Alignment.CenterVertically))
+            listOf("OVR" to "Rating", "POT" to "Potential", "AGE" to "Youngest", "SAL" to "Cheapest").forEach { (key, label) ->
+                FilterChip(
+                    selected = sortBy == key,
+                    onClick = { sortBy = key },
+                    label = { Text(label) }
+                )
             }
         }
 
@@ -75,8 +134,7 @@ fun FreeAgencyScreen(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            items(filteredAgents) { player ->
-                val expectedSal = FreeAgencyEngine.calculateExpectedSalary(player)
+            items(filteredList) { player ->
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -88,18 +146,27 @@ fun FreeAgencyScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            modifier = Modifier.weight(1f)
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            PositionBadge(position = player.positionFirst.shortName)
+                            RatingBadge(rating = player.overallRating)
                             Column {
-                                Text(player.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyLarge)
-                                Text("Exp Salary: $${expectedSal / 1_000_000.0}M | Age ${player.age}", style = MaterialTheme.typography.bodySmall)
+                                Text(player.name, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    PositionBadge(position = player.positionFirst)
+                                    Text(
+                                        text = "Age: ${player.age} • Pot: ★${player.potential}",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
 
@@ -107,13 +174,24 @@ fun FreeAgencyScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Button(
-                                onClick = { signingPlayer = player },
-                                shape = RoundedCornerShape(8.dp)
-                            ) {
-                                Text("Sign", fontSize = 12.sp)
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text(
+                                    text = "$${player.salary / 1_000_000.0}M/yr",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text("Ask: 1-2 yrs", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                            RatingBadge(rating = player.overallRating)
+
+                            Button(
+                                onClick = { selectedPlayerForSign = player },
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                enabled = capRoom >= player.salary && roster.size < 20
+                            ) {
+                                Text("Sign", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }
@@ -121,26 +199,46 @@ fun FreeAgencyScreen(
         }
     }
 
-    if (signingPlayer != null) {
-        val sal = FreeAgencyEngine.calculateExpectedSalary(signingPlayer!!)
+    // Sign Free Agent Dialog
+    selectedPlayerForSign?.let { player ->
+        var offerYears by remember { mutableStateOf(1) }
+        var offerSalary by remember { mutableStateOf(player.salary) }
+
         AlertDialog(
-            onDismissRequest = { signingPlayer = null },
-            title = { Text("Sign Free Agent") },
+            onDismissRequest = { selectedPlayerForSign = null },
+            title = { Text("Sign ${player.name}") },
             text = {
-                Text("Offer contract to ${signingPlayer!!.name} for 2 years at $${sal / 1_000_000.0}M/year?")
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Offered Contract Terms:")
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Years: $offerYears")
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            (1..4).forEach { y ->
+                                FilterChip(
+                                    selected = offerYears == y,
+                                    onClick = { offerYears = y },
+                                    label = { Text("${y}y") }
+                                )
+                            }
+                        }
+                    }
+                    Text("Salary: $${offerSalary / 1_000_000.0}M per year")
+                    Text(
+                        text = "Cap Room Available: $${capRoom / 1_000_000.0}M",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             },
             confirmButton = {
                 Button(
                     onClick = {
-                        val p = signingPlayer!!
-                        val t = userTeam ?: return@Button
-                        scope.launch {
-                            val success = repository.signFreeAgent(p.id, t.id, sal, 2)
-                            signingPlayer = null
-                            if (success && game != null) {
-                                freeAgents = repository.getFreeAgents(game!!.id).sortedByDescending { it.overallRating }
-                                viewModel.loadGame(game!!.id)
-                            }
+                        viewModel.signFreeAgent(player.id, offerSalary, offerYears) { success ->
+                            selectedPlayerForSign = null
                         }
                     }
                 ) {
@@ -148,33 +246,44 @@ fun FreeAgencyScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { signingPlayer = null }) {
+                TextButton(onClick = { selectedPlayerForSign = null }) {
                     Text("Cancel")
                 }
             }
         )
     }
 
-    if (selectedPlayerForDetail != null) {
-        PlayerDetailBottomSheet(
-            player = selectedPlayerForDetail,
-            onDismiss = { selectedPlayerForDetail = null }
-        )
+    selectedPlayerForDetail?.let { player ->
+        PlayerDetailBottomSheet(player = player, onDismiss = { selectedPlayerForDetail = null })
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DraftScreen(
     viewModel: GameDashboardViewModel
 ) {
-    val repository = remember { BasketManagerApplication.instance.gameRepository }
     val game by viewModel.game.collectAsState()
-    var prospects by remember { mutableStateOf<List<Player>>(emptyList()) }
+    val allTeams by viewModel.allTeams.collectAsState()
+    val draftPicks by viewModel.draftPicks.collectAsState()
+    val userTeam by viewModel.userTeam.collectAsState()
+
+    var selectedTab by remember { mutableStateOf(0) } // 0: Upcoming Draft Class (Big Board), 1: Draft Pick Ownership
+    var positionFilter by remember { mutableStateOf<Position?>(null) }
     var selectedProspectForDetail by remember { mutableStateOf<Player?>(null) }
 
-    LaunchedEffect(game) {
-        val gId = game?.id ?: return@LaunchedEffect
-        prospects = repository.getDraftProspects(gId)
+    val teamMap = remember(allTeams) { allTeams.associateBy { it.id } }
+
+    // Seeded Upcoming Draft Class (60 top college/international prospects)
+    val draftClass = remember(game?.id, game?.currentSeason) {
+        val gId = game?.id ?: 1L
+        val seasonSeed = (game?.currentSeason ?: 1) * 1000L
+        DraftEngine.generateDraftProspects(gId, count = 60).sortedByDescending { it.overallRating }
+    }
+
+    val filteredProspects = remember(draftClass, positionFilter) {
+        if (positionFilter == null) draftClass
+        else draftClass.filter { it.positionFirst == positionFilter || it.positionSecond == positionFilter }
     }
 
     Column(
@@ -183,58 +292,215 @@ fun DraftScreen(
             .padding(16.dp)
     ) {
         Text(
-            text = "NBA Rookie Draft Board",
-            style = MaterialTheme.typography.titleLarge,
+            text = "NBA Rookie Draft Hub",
+            style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold
         )
         Text(
-            text = "Prospects Scouting & Rankings",
-            style = MaterialTheme.typography.bodyMedium,
+            text = "Season ${game?.currentSeason ?: 1} Incoming Draft Class & Pick Ownership",
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(prospects) { prospect ->
-                Card(
+        // Tabs
+        PrimaryTabRow(selectedTabIndex = selectedTab) {
+            Tab(
+                selected = selectedTab == 0,
+                onClick = { selectedTab = 0 },
+                text = { Text("Draft Big Board (${draftClass.size})") }
+            )
+            Tab(
+                selected = selectedTab == 1,
+                onClick = { selectedTab = 1 },
+                text = { Text("Pick Ownership (30 Teams)") }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        when (selectedTab) {
+            0 -> {
+                // Position Filter
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { selectedProspectForDetail = prospect },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    FilterChip(
+                        selected = positionFilter == null,
+                        onClick = { positionFilter = null },
+                        label = { Text("All Positions") }
+                    )
+                    listOf(Position.POINT_GUARD, Position.SHOOTING_GUARD, Position.SMALL_FORWARD, Position.POWER_FORWARD, Position.CENTER).forEach { pos ->
+                        FilterChip(
+                            selected = positionFilter == pos,
+                            onClick = { positionFilter = if (positionFilter == pos) null else pos },
+                            label = { Text(pos.shortName) }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    itemsIndexed(filteredProspects) { index, prospect ->
+                        val projPick = when {
+                            index < 3 -> "Top 3 Pick"
+                            index < 14 -> "Lottery Pick"
+                            index < 30 -> "1st Round"
+                            else -> "2nd Round"
+                        }
+
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { selectedProspectForDetail = prospect },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                         ) {
-                            PositionBadge(position = prospect.positionFirst.shortName)
-                            Column {
-                                Text(prospect.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyLarge)
-                                Text("Age: ${prospect.age} | Potential: ${prospect.potential}/10", style = MaterialTheme.typography.bodySmall)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = when (index) {
+                                            0 -> Color(0xFFFFD700)
+                                            1 -> Color(0xFFC0C0C0)
+                                            2 -> Color(0xFFCD7F32)
+                                            else -> MaterialTheme.colorScheme.surface
+                                        },
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Text(
+                                                text = "#${index + 1}",
+                                                fontWeight = FontWeight.ExtraBold,
+                                                fontSize = 11.sp,
+                                                color = if (index < 3) Color.Black else MaterialTheme.colorScheme.onSurface
+                                            )
+                                        }
+                                    }
+
+                                    RatingBadge(rating = prospect.overallRating)
+
+                                    Column {
+                                        Text(prospect.name, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            PositionBadge(position = prospect.positionFirst)
+                                            Text(
+                                                text = "Age: ${prospect.age} • Pot: ★${prospect.potential}",
+                                                fontSize = 11.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = if (index < 14) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
+                                ) {
+                                    Text(
+                                        text = projPick,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                        color = if (index < 14) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
-                        RatingBadge(rating = prospect.overallRating)
+                    }
+                }
+            }
+
+            1 -> {
+                // Draft Pick Ownership
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(draftPicks) { pick ->
+                        val origTeam = teamMap[pick.originalTeamId]
+                        val currTeam = teamMap[pick.currentTeamId]
+                        val isUserPick = (pick.currentTeamId == userTeam?.id)
+
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isUserPick) MaterialTheme.colorScheme.primaryContainer
+                                else MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.HowToVote,
+                                        contentDescription = null,
+                                        tint = if (isUserPick) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Column {
+                                        Text(
+                                            text = "Round ${pick.round} Draft Pick",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp
+                                        )
+                                        Text(
+                                            text = "Original Team: ${origTeam?.name ?: "N/A"}",
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = if (isUserPick) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface
+                                ) {
+                                    Text(
+                                        text = "Owner: ${currTeam?.name ?: "N/A"}",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                        color = if (isUserPick) Color.White else MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
     }
 
-    if (selectedProspectForDetail != null) {
-        PlayerDetailBottomSheet(
-            player = selectedProspectForDetail,
-            onDismiss = { selectedProspectForDetail = null }
-        )
+    selectedProspectForDetail?.let { player ->
+        PlayerDetailBottomSheet(player = player, onDismiss = { selectedProspectForDetail = null })
     }
 }

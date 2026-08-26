@@ -1,6 +1,7 @@
 package top.maary.basketmanager.re.domain.model
 
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 data class Player(
     val id: Long = 0,
@@ -39,17 +40,20 @@ data class Player(
 
     val isHealthy: Boolean get() = stateInjury == 0
 
-    val attackRating: Double
-        get() = calculateAverageSkill(positionFirst, attack = true, defense = false)
+    val attackRating: Int
+        get() = calculateAverageSkill(positionFirst, attack = true, defense = false).roundToInt()
 
-    val defenseRating: Double
-        get() = calculateAverageSkill(positionFirst, attack = false, defense = true)
+    val defenseRating: Int
+        get() = calculateAverageSkill(positionFirst, attack = false, defense = true).roundToInt()
 
-    val overallRating: Double
+    val overallRating: Int
+        get() = calculateAverageSkill(positionFirst, attack = true, defense = true).roundToInt()
+
+    val overallRatingExact: Double
         get() = calculateAverageSkill(positionFirst, attack = true, defense = true)
 
     val value: Double
-        get() = overallRating + (potential * 2.0) - (age / 2.0)
+        get() = overallRating.toDouble() + (potential * 2.0) - (age / 2.0)
 
     val marketValue: Double
         get() {
@@ -58,7 +62,7 @@ data class Player(
             if (age < 24 && potential > 8) {
                 mv += potential.toDouble()
             }
-            if (overallRating > 79.0) {
+            if (overallRating > 79) {
                 mv += (potential + 10).toDouble()
             }
             return if (mv < 0.0) mv / 4.0 else mv
@@ -86,10 +90,11 @@ data class Player(
         return mod + formMod + energyMod
     }
 
-    fun getMatchValue(position: Position? = null): Double {
+    fun getMatchValue(position: Position? = null): Double = calculateValuation(position)
+    fun calculateValuation(position: Position? = null): Double {
         val pos = position ?: positionFirst
         val penalty = getPenalty(pos)
-        return overallRating + (potential * 1.8) - (age / 2.5) + penalty
+        return overallRating.toDouble() + (potential * 1.8) - (age / 2.5) + penalty
     }
 
     fun calculateAverageSkill(pos: Position, attack: Boolean, defense: Boolean): Double {
@@ -139,33 +144,31 @@ data class Player(
                     else -> 27
                 }
                 4 -> when (pos) {
-                    1, 2 -> 20
+                    1 -> 10
+                    2 -> 15
                     3 -> 27
-                    4 -> 31
-                    else -> 35
+                    else -> 31
                 }
                 5 -> when (pos) {
-                    1 -> 35
-                    2 -> 30
-                    3 -> 27
-                    else -> 18
+                    1 -> 31
+                    2 -> 27
+                    3 -> 20
+                    else -> 10
                 }
                 6 -> when (pos) {
-                    1 -> 15
-                    2 -> 25
-                    3 -> 28
-                    4 -> 33
-                    else -> 35
+                    1 -> 10
+                    2 -> 20
+                    3 -> 25
+                    else -> 31
                 }
                 7 -> when (pos) {
-                    1 -> 30
-                    2 -> 35
-                    3 -> 28
-                    4 -> 25
-                    else -> 15
+                    1 -> 31
+                    2 -> 31
+                    3 -> 27
+                    else -> 10
                 }
-                8 -> if (pos == 1 || pos == 2) 30 else if (pos == 3) 28 else 20
-                else -> 25
+                8 -> 27
+                else -> 20
             }
         }
     }

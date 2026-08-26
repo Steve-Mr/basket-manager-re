@@ -10,7 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,10 +26,11 @@ import top.maary.basketmanager.re.domain.model.Player
 import top.maary.basketmanager.re.domain.model.Position
 import top.maary.basketmanager.re.domain.model.Team
 import top.maary.basketmanager.re.ui.theme.*
+import top.maary.basketmanager.re.ui.viewmodel.PlayerSeasonStats
 
 @Composable
 fun RatingBadge(
-    rating: Double,
+    rating: Number,
     modifier: Modifier = Modifier,
     size: Int = 32
 ) {
@@ -90,6 +91,7 @@ fun PositionBadge(
 @Composable
 fun PlayerDetailBottomSheet(
     player: Player?,
+    stats: PlayerSeasonStats? = null,
     onDismiss: () -> Unit
 ) {
     if (player == null) return
@@ -151,7 +153,30 @@ fun PlayerDetailBottomSheet(
                 }
             }
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+            HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
+
+            // Season Statistics Section
+            Text(
+                text = "Season Statistics",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                StatCard(label = "GP", value = "${stats?.gamesPlayed ?: 0}")
+                StatCard(label = "PPG", value = String.format("%.1f", stats?.ppg ?: 0.0))
+                StatCard(label = "RPG", value = String.format("%.1f", stats?.rpg ?: 0.0))
+                StatCard(label = "APG", value = String.format("%.1f", stats?.apg ?: 0.0))
+                StatCard(label = "SPG", value = String.format("%.1f", stats?.spg ?: 0.0))
+                StatCard(label = "BPG", value = String.format("%.1f", stats?.bpg ?: 0.0))
+                StatCard(label = "PER", value = String.format("%.1f", stats?.avgPer ?: 0.0))
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
 
             Text(
                 text = "Player Attributes",
@@ -159,7 +184,7 @@ fun PlayerDetailBottomSheet(
                 fontWeight = FontWeight.Bold
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
             SkillProgressBar(label = "Physique / Energy", value = player.skillPhysique)
             SkillProgressBar(label = "Interior Shooting (2PT)", value = player.skillShotInterior)
@@ -170,7 +195,7 @@ fun PlayerDetailBottomSheet(
             SkillProgressBar(label = "Stealing", value = player.skillSteal)
             SkillProgressBar(label = "Shot Blocking", value = player.skillBlock)
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+            HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -204,21 +229,37 @@ fun PlayerDetailBottomSheet(
 }
 
 @Composable
+fun StatCard(label: String, value: String) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(label, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold)
+            Text(value, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
+        }
+    }
+}
+
+@Composable
 fun SkillProgressBar(
     label: String,
     value: Int
 ) {
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(text = label, fontSize = 12.sp)
-            Text(text = value.toString(), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Text(text = label, fontSize = 11.sp)
+            Text(text = value.toString(), fontSize = 11.sp, fontWeight = FontWeight.Bold)
         }
         LinearProgressIndicator(
             progress = { (value / 100f).coerceIn(0f, 1f) },
-            modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+            modifier = Modifier.fillMaxWidth().height(5.dp).clip(RoundedCornerShape(3.dp)),
             color = when {
                 value >= 80 -> RatingGreen
                 value >= 65 -> RatingBlue
@@ -239,11 +280,23 @@ fun MatchBoxScoreDialog(
 ) {
     if (match == null) return
 
+    val visitorPlayers = remember(boxScores, visitorTeam) {
+        val vId = visitorTeam?.id ?: match.teamVisitorId
+        boxScores.filter { it.teamId == vId }.sortedByDescending { it.points }
+    }
+
+    val localPlayers = remember(boxScores, localTeam) {
+        val lId = localTeam?.id ?: match.teamLocalId
+        boxScores.filter { it.teamId == lId }.sortedByDescending { it.points }
+    }
+
+    var selectedTeamTab by remember { mutableStateOf(0) } // 0: Visitor, 1: Local
+
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.85f),
+                .fillMaxHeight(0.88f),
             shape = RoundedCornerShape(16.dp)
         ) {
             Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
@@ -265,89 +318,111 @@ fun MatchBoxScoreDialog(
                 // Quarter breakdown table
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(8.dp),
                         horizontalArrangement = Arrangement.SpaceAround
                     ) {
-                        Text("Team", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        Text("Q1", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        Text("Q2", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        Text("Q3", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        Text("Q4", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text("Team", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        Text("Q1", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        Text("Q2", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        Text("Q3", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        Text("Q4", fontWeight = FontWeight.Bold, fontSize = 11.sp)
                         if ((match.localOt ?: 0) > 0 || (match.visitorOt ?: 0) > 0) {
-                            Text("OT", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text("OT", fontWeight = FontWeight.Bold, fontSize = 11.sp)
                         }
-                        Text("TOT", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+                        Text("TOT", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
                     }
                     HorizontalDivider()
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(8.dp),
                         horizontalArrangement = Arrangement.SpaceAround
                     ) {
-                        Text(visitorTeam?.name ?: "VIS", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        Text("${match.visitorQuarter1 ?: 0}", fontSize = 12.sp)
-                        Text("${match.visitorQuarter2 ?: 0}", fontSize = 12.sp)
-                        Text("${match.visitorQuarter3 ?: 0}", fontSize = 12.sp)
-                        Text("${match.visitorQuarter4 ?: 0}", fontSize = 12.sp)
+                        Text(visitorTeam?.name ?: "VIS", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text("${match.visitorQuarter1 ?: 0}", fontSize = 11.sp)
+                        Text("${match.visitorQuarter2 ?: 0}", fontSize = 11.sp)
+                        Text("${match.visitorQuarter3 ?: 0}", fontSize = 11.sp)
+                        Text("${match.visitorQuarter4 ?: 0}", fontSize = 11.sp)
                         if ((match.localOt ?: 0) > 0 || (match.visitorOt ?: 0) > 0) {
-                            Text("${match.visitorOt ?: 0}", fontSize = 12.sp)
+                            Text("${match.visitorOt ?: 0}", fontSize = 11.sp)
                         }
-                        Text("${match.visitorScore ?: 0}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        Text("${match.visitorScore ?: 0}", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(8.dp),
                         horizontalArrangement = Arrangement.SpaceAround
                     ) {
-                        Text(localTeam?.name ?: "LOC", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        Text("${match.localQuarter1 ?: 0}", fontSize = 12.sp)
-                        Text("${match.localQuarter2 ?: 0}", fontSize = 12.sp)
-                        Text("${match.localQuarter3 ?: 0}", fontSize = 12.sp)
-                        Text("${match.localQuarter4 ?: 0}", fontSize = 12.sp)
+                        Text(localTeam?.name ?: "LOC", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text("${match.localQuarter1 ?: 0}", fontSize = 11.sp)
+                        Text("${match.localQuarter2 ?: 0}", fontSize = 11.sp)
+                        Text("${match.localQuarter3 ?: 0}", fontSize = 11.sp)
+                        Text("${match.localQuarter4 ?: 0}", fontSize = 11.sp)
                         if ((match.localOt ?: 0) > 0 || (match.visitorOt ?: 0) > 0) {
-                            Text("${match.localOt ?: 0}", fontSize = 12.sp)
+                            Text("${match.localOt ?: 0}", fontSize = 11.sp)
                         }
-                        Text("${match.localScore ?: 0}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        Text("${match.localScore ?: 0}", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     }
                 }
 
-                Text(
-                    text = "Player Statistics",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
-                )
+                // Team Tab Switch to separate stats cleanly
+                SingleChoiceSegmentedButtonRow(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                ) {
+                    SegmentedButton(
+                        selected = selectedTeamTab == 0,
+                        onClick = { selectedTeamTab = 0 },
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                    ) {
+                        Text("${visitorTeam?.name ?: "VIS"} (${match.visitorScore ?: 0})", fontWeight = FontWeight.Bold)
+                    }
+                    SegmentedButton(
+                        selected = selectedTeamTab == 1,
+                        onClick = { selectedTeamTab = 1 },
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                    ) {
+                        Text("${localTeam?.name ?: "LOC"} (${match.localScore ?: 0})", fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                val currentDisplayedPlayers = if (selectedTeamTab == 0) visitorPlayers else localPlayers
 
                 LazyColumn(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    items(boxScores.sortedByDescending { it.points }) { stat ->
+                    items(currentDisplayedPlayers) { stat ->
                         Card(
                             shape = RoundedCornerShape(8.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(
-                                modifier = Modifier.fillMaxWidth().padding(8.dp),
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Column {
                                     Text(stat.playerName, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                     Text(
-                                        text = "${stat.minutesPlayed} MIN • PER: ${stat.per}",
+                                        text = "${stat.minutesPlayed} MIN • PER: ${stat.per} • F: ${stat.fouls}",
                                         fontSize = 11.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
-                                Text(
-                                    text = "${stat.points} PTS, ${stat.rebounds} REB, ${stat.passesOk} AST",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        text = "${stat.points} PTS",
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize = 13.sp,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        text = "${stat.rebounds} REB, ${stat.passesOk} AST, ${stat.steals} STL, ${stat.blocks} BLK",
+                                        fontSize = 10.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
                     }
