@@ -137,11 +137,12 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
             val updateGame = ContentValues().apply { put("userTeamId", userTeamId) }
             db.update(DB.TABLE_GAME_SESSION, updateGame, "id = ?", arrayOf(gameId.toString()))
 
-            // 3. Load and Insert Players from CSV
+            // 3. Load and Insert Players from CSV with exact team codes
             val rawPlayers = RosterParser.parseRostersCsv(rosterStream, gameId)
-            rawPlayers.forEach { p ->
-                val matchedTeam = createdTeams.find { p.name.contains(it.name, ignoreCase = true) } ?: createdTeams.random()
-                val playerEntity = p.copy(gameId = gameId, teamId = matchedTeam.id).toEntity()
+            rawPlayers.forEach { parsed ->
+                val matchedTeam = createdTeams.find { it.name.equals(parsed.teamCode, ignoreCase = true) }
+                val assignedTeamId = if (parsed.teamCode == "0" || matchedTeam == null) null else matchedTeam.id
+                val playerEntity = parsed.player.copy(gameId = gameId, teamId = assignedTeamId).toEntity()
                 insertPlayerDirect(db, playerEntity)
             }
 
@@ -616,7 +617,7 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
         val db = dbHelper.writableDatabase
         db.beginTransaction()
         try {
-            // 1. Daily Player State Evolution (Injury recovery, natural form & energy recovery)
+            // 1. Daily Player State Evolution
             val allPlayers = getPlayers(gameId)
             allPlayers.forEach { p ->
                 var newInjury = p.stateInjury
@@ -648,7 +649,7 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
                 }
             }
 
-            // 2. Player Development Tick (every matchday for players where id % 10 == matchday % 10)
+            // 2. Player Development Tick
             val devCandidates = allPlayers.filter { (it.id % 10) == (currentDay.toLong() % 10) }
             val statsMap = getAllPlayerStats(gameId)
             devCandidates.forEach { p ->
@@ -670,8 +671,19 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
                         val visitorTeam = teamMap[match.teamVisitorId] ?: return@forEach
                         val localPlayers = getTeamPlayersDirect(db, localTeam.id)
                         val visitorPlayers = getTeamPlayersDirect(db, visitorTeam.id)
-                        val localTactic = getTactic(localTeam.id) ?: LineupOptimizer.optimizeLineup(localPlayers, Tactic(teamId = localTeam.id))
-                        val visitorTactic = getTactic(visitorTeam.id) ?: LineupOptimizer.optimizeLineup(visitorPlayers, Tactic(teamId = visitorTeam.id))
+
+                        // Respect user's autoLineup setting
+                        val localTactic = if (localTeam.id == game.userTeamId && !game.autoLineupEnabled) {
+                            getTactic(localTeam.id) ?: LineupOptimizer.optimizeLineup(localPlayers, Tactic(teamId = localTeam.id))
+                        } else {
+                            LineupOptimizer.optimizeLineup(localPlayers, getTactic(localTeam.id) ?: Tactic(teamId = localTeam.id))
+                        }
+
+                        val visitorTactic = if (visitorTeam.id == game.userTeamId && !game.autoLineupEnabled) {
+                            getTactic(visitorTeam.id) ?: LineupOptimizer.optimizeLineup(visitorPlayers, Tactic(teamId = visitorTeam.id))
+                        } else {
+                            LineupOptimizer.optimizeLineup(visitorPlayers, getTactic(visitorTeam.id) ?: Tactic(teamId = visitorTeam.id))
+                        }
 
                         val simResult = MatchSimulationEngine.simulateMatch(
                             match = match,
@@ -737,7 +749,6 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
 
                 // Contract Renewals & Salary Cap Performance Adjustments (Matchday 227..229)
                 currentDay == 227 -> {
-                    // Update salary caps based on playoff finish
                     val standings = getStandings(gameId)
                     val topTeams = standings.take(8).map { it.teamId }
                     topTeams.forEach { tId ->
@@ -765,7 +776,6 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
 
                 // CPU Free Agency Validation & New Season Reset (Matchday 234)
                 currentDay >= 234 -> {
-                    // CPU teams sign free agents
                     val teams = getTeams(gameId)
                     val freeAgents = getFreeAgents(gameId)
                     val rosterMap = teams.associate { it.id to getTeamPlayersDirect(db, it.id) }
@@ -774,7 +784,6 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
                         db.execSQL("UPDATE ${DB.TABLE_PLAYER} SET teamId = ?, salary = ?, yearsContract = ? WHERE id = ?", arrayOf(t.id, p.salary, p.yearsContract, p.id))
                     }
 
-                    // Reset for new season
                     val newSeason = game.currentSeason + 1
                     db.delete(DB.TABLE_MATCH, "gameId = ?", arrayOf(gameId.toString()))
                     db.delete(DB.TABLE_MATCH_RESULT, "gameId = ?", arrayOf(gameId.toString()))

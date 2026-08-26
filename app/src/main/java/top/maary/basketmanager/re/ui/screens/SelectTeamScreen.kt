@@ -3,14 +3,17 @@ package top.maary.basketmanager.re.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,9 +26,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import top.maary.basketmanager.re.R
+import top.maary.basketmanager.re.domain.engine.RosterParser
 import top.maary.basketmanager.re.domain.model.Conference
 import top.maary.basketmanager.re.domain.model.Division
+import top.maary.basketmanager.re.domain.model.Player
 import top.maary.basketmanager.re.domain.model.Team
+import top.maary.basketmanager.re.ui.components.PositionBadge
+import top.maary.basketmanager.re.ui.components.RatingBadge
 import top.maary.basketmanager.re.ui.viewmodel.MainViewModel
 
 data class TeamSelectionItem(
@@ -48,67 +55,86 @@ fun SelectTeamScreen(
     var selectedTeamName by remember { mutableStateOf("BOS") }
     val isLoading by viewModel.isLoading.collectAsState()
 
-    val allTeams = remember {
+    // Pre-parse rosters from raw resources to preview squads
+    val allRosterPlayers = remember {
+        val stream = context.resources.openRawResource(R.raw.rosters)
+        RosterParser.parseRostersCsv(stream)
+    }
+
+    val teamList = remember {
         listOf(
-            // Eastern Conference
-            TeamSelectionItem("BOS", Division.E1_ATLANTIC, 80_000_000, "#05854C"),
-            TeamSelectionItem("BRO", Division.E1_ATLANTIC, 80_000_000, "#000000"),
-            TeamSelectionItem("NYK", Division.E1_ATLANTIC, 80_000_000, "#0953A0"),
-            TeamSelectionItem("PHI", Division.E1_ATLANTIC, 55_000_000, "#D0103A"),
-            TeamSelectionItem("TOR", Division.E1_ATLANTIC, 75_000_000, "#B31B1B"),
+            TeamSelectionItem("BOS", Division.E1_ATLANTIC, Team.getDefaultSalaryCap("BOS"), Team.getTeamColor("BOS")),
+            TeamSelectionItem("BRO", Division.E1_ATLANTIC, Team.getDefaultSalaryCap("BRO"), Team.getTeamColor("BRO")),
+            TeamSelectionItem("NYK", Division.E1_ATLANTIC, Team.getDefaultSalaryCap("NYK"), Team.getTeamColor("NYK")),
+            TeamSelectionItem("PHI", Division.E1_ATLANTIC, Team.getDefaultSalaryCap("PHI"), Team.getTeamColor("PHI")),
+            TeamSelectionItem("TOR", Division.E1_ATLANTIC, Team.getDefaultSalaryCap("TOR"), Team.getTeamColor("TOR")),
 
-            TeamSelectionItem("CHI", Division.E2_CENTRAL, 80_000_000, "#D4001F"),
-            TeamSelectionItem("CLE", Division.E2_CENTRAL, 70_000_000, "#9F1425"),
-            TeamSelectionItem("DET", Division.E2_CENTRAL, 60_000_000, "#006BB6"),
-            TeamSelectionItem("IND", Division.E2_CENTRAL, 75_000_000, "#002E62"),
-            TeamSelectionItem("MIL", Division.E2_CENTRAL, 55_000_000, "#00330A"),
+            TeamSelectionItem("CHI", Division.E2_CENTRAL, Team.getDefaultSalaryCap("CHI"), Team.getTeamColor("CHI")),
+            TeamSelectionItem("CLE", Division.E2_CENTRAL, Team.getDefaultSalaryCap("CLE"), Team.getTeamColor("CLE")),
+            TeamSelectionItem("DET", Division.E2_CENTRAL, Team.getDefaultSalaryCap("DET"), Team.getTeamColor("DET")),
+            TeamSelectionItem("IND", Division.E2_CENTRAL, Team.getDefaultSalaryCap("IND"), Team.getTeamColor("IND")),
+            TeamSelectionItem("MIL", Division.E2_CENTRAL, Team.getDefaultSalaryCap("MIL"), Team.getTeamColor("MIL")),
 
-            TeamSelectionItem("ATL", Division.E3_SOUTHEAST, 65_000_000, "#01244C"),
-            TeamSelectionItem("CHA", Division.E3_SOUTHEAST, 65_000_000, "#29588B"),
-            TeamSelectionItem("MIA", Division.E3_SOUTHEAST, 80_000_000, "#B62630"),
-            TeamSelectionItem("ORL", Division.E3_SOUTHEAST, 70_000_000, "#0047AB"),
-            TeamSelectionItem("WAS", Division.E3_SOUTHEAST, 70_000_000, "#002244"),
+            TeamSelectionItem("ATL", Division.E3_SOUTHEAST, Team.getDefaultSalaryCap("ATL"), Team.getTeamColor("ATL")),
+            TeamSelectionItem("CHA", Division.E3_SOUTHEAST, Team.getDefaultSalaryCap("CHA"), Team.getTeamColor("CHA")),
+            TeamSelectionItem("MIA", Division.E3_SOUTHEAST, Team.getDefaultSalaryCap("MIA"), Team.getTeamColor("MIA")),
+            TeamSelectionItem("ORL", Division.E3_SOUTHEAST, Team.getDefaultSalaryCap("ORL"), Team.getTeamColor("ORL")),
+            TeamSelectionItem("WAS", Division.E3_SOUTHEAST, Team.getDefaultSalaryCap("WAS"), Team.getTeamColor("WAS")),
 
-            // Western Conference
-            TeamSelectionItem("DAL", Division.W1_SOUTHWEST, 80_000_000, "#006AB5"),
-            TeamSelectionItem("HOU", Division.W1_SOUTHWEST, 80_000_000, "#CC0000"),
-            TeamSelectionItem("MEM", Division.W1_SOUTHWEST, 55_000_000, "#001B41"),
-            TeamSelectionItem("NOR", Division.W1_SOUTHWEST, 70_000_000, "#002B5C"),
-            TeamSelectionItem("SAN", Division.W1_SOUTHWEST, 80_000_000, "#111111"),
+            TeamSelectionItem("DAL", Division.W1_SOUTHWEST, Team.getDefaultSalaryCap("DAL"), Team.getTeamColor("DAL")),
+            TeamSelectionItem("HOU", Division.W1_SOUTHWEST, Team.getDefaultSalaryCap("HOU"), Team.getTeamColor("HOU")),
+            TeamSelectionItem("MEM", Division.W1_SOUTHWEST, Team.getDefaultSalaryCap("MEM"), Team.getTeamColor("MEM")),
+            TeamSelectionItem("NOR", Division.W1_SOUTHWEST, Team.getDefaultSalaryCap("NOR"), Team.getTeamColor("NOR")),
+            TeamSelectionItem("SAN", Division.W1_SOUTHWEST, Team.getDefaultSalaryCap("SAN"), Team.getTeamColor("SAN")),
 
-            TeamSelectionItem("DEN", Division.W2_NORTHWEST, 65_000_000, "#4393D1"),
-            TeamSelectionItem("MIN", Division.W2_NORTHWEST, 60_000_000, "#015287"),
-            TeamSelectionItem("POR", Division.W2_NORTHWEST, 70_000_000, "#222222"),
-            TeamSelectionItem("OKC", Division.W2_NORTHWEST, 75_000_000, "#007DC3"),
-            TeamSelectionItem("UTA", Division.W2_NORTHWEST, 60_000_000, "#00275D"),
+            TeamSelectionItem("DEN", Division.W2_NORTHWEST, Team.getDefaultSalaryCap("DEN"), Team.getTeamColor("DEN")),
+            TeamSelectionItem("MIN", Division.W2_NORTHWEST, Team.getDefaultSalaryCap("MIN"), Team.getTeamColor("MIN")),
+            TeamSelectionItem("POR", Division.W2_NORTHWEST, Team.getDefaultSalaryCap("POR"), Team.getTeamColor("POR")),
+            TeamSelectionItem("OKC", Division.W2_NORTHWEST, Team.getDefaultSalaryCap("OKC"), Team.getTeamColor("OKC")),
+            TeamSelectionItem("UTA", Division.W2_NORTHWEST, Team.getDefaultSalaryCap("UTA"), Team.getTeamColor("UTA")),
 
-            TeamSelectionItem("GSW", Division.W3_PACIFIC, 75_000_000, "#002942"),
-            TeamSelectionItem("LAC", Division.W3_PACIFIC, 80_000_000, "#EE2944"),
-            TeamSelectionItem("LAL", Division.W3_PACIFIC, 80_000_000, "#4A2583"),
-            TeamSelectionItem("PHO", Division.W3_PACIFIC, 60_000_000, "#1C105E"),
-            TeamSelectionItem("SAC", Division.W3_PACIFIC, 70_000_000, "#753BBD")
+            TeamSelectionItem("GSW", Division.W3_PACIFIC, Team.getDefaultSalaryCap("GSW"), Team.getTeamColor("GSW")),
+            TeamSelectionItem("LAC", Division.W3_PACIFIC, Team.getDefaultSalaryCap("LAC"), Team.getTeamColor("LAC")),
+            TeamSelectionItem("LAL", Division.W3_PACIFIC, Team.getDefaultSalaryCap("LAL"), Team.getTeamColor("LAL")),
+            TeamSelectionItem("PHO", Division.W3_PACIFIC, Team.getDefaultSalaryCap("PHO"), Team.getTeamColor("PHO")),
+            TeamSelectionItem("SAC", Division.W3_PACIFIC, Team.getDefaultSalaryCap("SAC"), Team.getTeamColor("SAC"))
         )
     }
 
     val filteredTeams = remember(selectedConference) {
-        if (selectedConference == null) allTeams else allTeams.filter { it.division.conference == selectedConference }
+        if (selectedConference == null) teamList
+        else teamList.filter { it.division.conference == selectedConference }
+    }
+
+    val selectedTeam = remember(selectedTeamName) {
+        teamList.find { it.name == selectedTeamName } ?: teamList[0]
+    }
+
+    val selectedTeamRoster = remember(selectedTeamName) {
+        allRosterPlayers
+            .filter { it.teamCode.equals(selectedTeamName, ignoreCase = true) }
+            .map { it.player }
+            .sortedByDescending { it.overallRating }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Select Your Team") },
+                title = { Text("Choose Your Team", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
             )
         },
         bottomBar = {
             Surface(
-                tonalElevation = 6.dp,
-                modifier = Modifier.fillMaxWidth()
+                tonalElevation = 8.dp,
+                shadowElevation = 8.dp
             ) {
                 Row(
                     modifier = Modifier
@@ -119,31 +145,39 @@ fun SelectTeamScreen(
                 ) {
                     Column {
                         Text(
-                            text = "Selected: $selectedTeamName",
-                            fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.titleMedium
+                            text = "Selected: ${selectedTeam.name}",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
                         )
-                        val cap = allTeams.find { it.name == selectedTeamName }?.salaryCap ?: 70_000_000
                         Text(
-                            text = "Cap: $${cap / 1_000_000}M",
-                            style = MaterialTheme.typography.bodySmall
+                            text = "Cap: $${selectedTeam.salaryCap / 1_000_000}M • ${selectedTeamRoster.size} Players",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
 
                     Button(
                         onClick = {
                             val stream = context.resources.openRawResource(R.raw.rosters)
-                            viewModel.createGame(gameName, selectedTeamName, stream) { newSession ->
-                                onGameCreated(newSession.id)
-                            }
+                            viewModel.createNewGame(
+                                name = gameName,
+                                userTeamName = selectedTeamName,
+                                rosterStream = stream,
+                                onCreated = { session ->
+                                    onGameCreated(session.id)
+                                }
+                            )
                         },
                         enabled = !isLoading,
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        )
                     ) {
                         if (isLoading) {
-                            CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White)
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                         } else {
-                            Text("Start Season", fontWeight = FontWeight.Bold)
+                            Text("Start Game", fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -154,35 +188,50 @@ fun SelectTeamScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 16.dp)
         ) {
-            // Conference filter tabs
-            TabRow(
-                selectedTabIndex = when (selectedConference) {
-                    null -> 0
-                    Conference.EAST -> 1
-                    Conference.WEST -> 2
-                },
-                modifier = Modifier.clip(RoundedCornerShape(8.dp))
+            // Conference Filters
+            SingleChoiceSegmentedButtonRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
             ) {
-                Tab(selected = selectedConference == null, onClick = { selectedConference = null }, text = { Text("All (30)") })
-                Tab(selected = selectedConference == Conference.EAST, onClick = { selectedConference = Conference.EAST }, text = { Text("East (15)") })
-                Tab(selected = selectedConference == Conference.WEST, onClick = { selectedConference = Conference.WEST }, text = { Text("West (15)") })
+                SegmentedButton(
+                    selected = selectedConference == null,
+                    onClick = { selectedConference = null },
+                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3)
+                ) {
+                    Text("All 30")
+                }
+                SegmentedButton(
+                    selected = selectedConference == Conference.EAST,
+                    onClick = { selectedConference = Conference.EAST },
+                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3)
+                ) {
+                    Text("East")
+                }
+                SegmentedButton(
+                    selected = selectedConference == Conference.WEST,
+                    onClick = { selectedConference = Conference.WEST },
+                    shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3)
+                ) {
+                    Text("West")
+                }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Teams Grid
+            // Teams Grid (Takes upper portion)
             LazyVerticalGrid(
-                columns = GridCells.Fixed(3),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.fillMaxSize()
+                columns = GridCells.Adaptive(minSize = 64.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(180.dp)
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(filteredTeams) { team ->
-                    val isSelected = team.name == selectedTeamName
-                    val parsedColor = try {
-                        Color(android.graphics.Color.parseColor(team.colorHex))
+                items(filteredTeams) { item ->
+                    val isSelected = (item.name == selectedTeamName)
+                    val teamColor = try {
+                        Color(android.graphics.Color.parseColor(item.colorHex))
                     } catch (_: Exception) {
                         MaterialTheme.colorScheme.primary
                     }
@@ -190,50 +239,125 @@ fun SelectTeamScreen(
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(105.dp)
-                            .clickable { selectedTeamName = team.name },
+                            .clickable { selectedTeamName = item.name },
                         shape = RoundedCornerShape(12.dp),
                         colors = CardDefaults.cardColors(
-                            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+                            containerColor = if (isSelected) teamColor else MaterialTheme.colorScheme.surfaceVariant
                         ),
-                        border = if (isSelected) CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary)) else null
+                        elevation = CardDefaults.cardElevation(if (isSelected) 4.dp else 1.dp)
                     ) {
                         Column(
                             modifier = Modifier
-                                .fillMaxSize()
-                                .padding(8.dp),
+                                .fillMaxWidth()
+                                .padding(vertical = 10.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(36.dp)
+                                    .size(24.dp)
                                     .clip(CircleShape)
-                                    .background(parsedColor),
+                                    .background(if (isSelected) Color.White.copy(alpha = 0.3f) else teamColor),
                                 contentAlignment = Alignment.Center
                             ) {
                                 if (isSelected) {
-                                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                                 }
                             }
-
-                            Spacer(modifier = Modifier.height(6.dp))
-
+                            Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = team.name,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp,
-                                textAlign = TextAlign.Center
-                            )
-                            Text(
-                                text = "$${team.salaryCap / 1_000_000}M Cap",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                text = item.name,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 14.sp,
+                                color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
                 }
             }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+            // Team Roster Preview Header
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "${selectedTeam.name} Roster (${selectedTeamRoster.size})",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Div: ${selectedTeam.division.displayName}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // Player List of Selected Team
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                items(selectedTeamRoster) { player ->
+                    TeamRosterPreviewRow(player)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun TeamRosterPreviewRow(player: Player) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                RatingBadge(rating = player.overallRating)
+                Column {
+                    Text(text = player.name, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        PositionBadge(position = player.positionFirst)
+                        if (player.positionSecond.id > 0) {
+                            PositionBadge(position = player.positionSecond)
+                        }
+                        Text(
+                            text = "Age: ${player.age} • Pot: ★${player.potential}",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            Text(
+                text = "$${player.salary / 1_000_000.0}M (${player.yearsContract}y)",
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.primary
+            )
         }
     }
 }

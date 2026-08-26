@@ -23,6 +23,8 @@ import androidx.compose.ui.window.Dialog
 import top.maary.basketmanager.re.domain.model.Match
 import top.maary.basketmanager.re.domain.model.MatchResult
 import top.maary.basketmanager.re.domain.model.Player
+import top.maary.basketmanager.re.domain.model.Position
+import top.maary.basketmanager.re.domain.model.Team
 import top.maary.basketmanager.re.ui.theme.*
 
 @Composable
@@ -54,6 +56,14 @@ fun RatingBadge(
             fontSize = (size * 0.42).sp
         )
     }
+}
+
+@Composable
+fun PositionBadge(
+    position: Position,
+    modifier: Modifier = Modifier
+) {
+    PositionBadge(position = position.shortName, modifier = modifier)
 }
 
 @Composable
@@ -98,78 +108,95 @@ fun PlayerDetailBottomSheet(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Column {
-                    Text(
-                        text = player.name,
-                        style = MaterialTheme.typography.titleLarge
-                    )
-                    Row(
-                        modifier = Modifier.padding(top = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        PositionBadge(position = player.positionFirst.shortName)
-                        if (player.positionSecond != top.maary.basketmanager.re.domain.model.Position.NONE) {
-                            PositionBadge(position = player.positionSecond.shortName)
-                        }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    RatingBadge(rating = player.overallRating, size = 44)
+                    Column {
                         Text(
-                            text = "Age: ${player.age} | Exp: ${player.yearsExperience}y",
-                            style = MaterialTheme.typography.bodyMedium
+                            text = player.name,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
                         )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            PositionBadge(position = player.positionFirst)
+                            if (player.positionSecond.id > 0) {
+                                PositionBadge(position = player.positionSecond)
+                            }
+                            Text(
+                                text = "Age: ${player.age} • Pot: ★${player.potential}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
-                RatingBadge(rating = player.overallRating, size = 44)
+
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = "$${player.salary / 1_000_000.0}M",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "${player.yearsContract} yrs left",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
-            Divider(modifier = Modifier.padding(vertical = 12.dp))
+            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
 
-            // Contract & Physical Status
+            Text(
+                text = "Player Attributes",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            SkillProgressBar(label = "Physique / Energy", value = player.skillPhysique)
+            SkillProgressBar(label = "Interior Shooting (2PT)", value = player.skillShotInterior)
+            SkillProgressBar(label = "Exterior Shooting (2PT/3PT)", value = player.skillShotExterior)
+            SkillProgressBar(label = "Free Throw", value = player.skillShotFree)
+            SkillProgressBar(label = "Passing / Vision", value = player.skillPass)
+            SkillProgressBar(label = "Rebounding", value = player.skillRebound)
+            SkillProgressBar(label = "Stealing", value = player.skillSteal)
+            SkillProgressBar(label = "Shot Blocking", value = player.skillBlock)
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column {
-                    Text(
-                        text = "Salary: $${String.format("%,d", player.salary)}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        text = "Contract: ${player.yearsContract} years",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+                    Text("Form", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("${player.stateForm}%", fontWeight = FontWeight.Bold)
                 }
                 Column {
-                    Text(
-                        text = "Energy: ${player.stateEnergy}% | Form: ${player.stateForm}%",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Text(
-                        text = "Potential: ${player.potential}/10",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.secondary
-                    )
+                    Text("Energy", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("${player.stateEnergy}%", fontWeight = FontWeight.Bold)
+                }
+                Column {
+                    Text("Injury Status", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (player.stateInjury > 0) {
+                        Text("${player.stateInjury} days", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                    } else {
+                        Text("Healthy", color = RatingGreen, fontWeight = FontWeight.Bold)
+                    }
+                }
+                Column {
+                    Text("Loyalty", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("★".repeat(player.loyalty), color = MaterialTheme.colorScheme.primary)
                 }
             }
-
-            Divider(modifier = Modifier.padding(vertical = 12.dp))
-
-            Text(
-                text = "Player Attributes",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-
-            // 8 Core Skills
-            SkillProgressBar(name = "Physique / Speed", value = player.skillPhysique)
-            SkillProgressBar(name = "Inside Shot (Paint)", value = player.skillShotInterior)
-            SkillProgressBar(name = "Perimeter Shot (2PT/3PT)", value = player.skillShotExterior)
-            SkillProgressBar(name = "Free Throw", value = player.skillShotFree)
-            SkillProgressBar(name = "Passing / Playmaking", value = player.skillPass)
-            SkillProgressBar(name = "Rebounding", value = player.skillRebound)
-            SkillProgressBar(name = "Steals / Perimeter Defense", value = player.skillSteal)
-            SkillProgressBar(name = "Shot Blocking / Interior Defense", value = player.skillBlock)
 
             Spacer(modifier = Modifier.height(24.dp))
         }
@@ -178,30 +205,26 @@ fun PlayerDetailBottomSheet(
 
 @Composable
 fun SkillProgressBar(
-    name: String,
+    label: String,
     value: Int
 ) {
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(text = name, style = MaterialTheme.typography.bodySmall)
-            Text(text = value.toString(), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+            Text(text = label, fontSize = 12.sp)
+            Text(text = value.toString(), fontSize = 12.sp, fontWeight = FontWeight.Bold)
         }
         LinearProgressIndicator(
-            progress = { (value - 40).toFloat() / 59f },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(6.dp)
-                .clip(RoundedCornerShape(3.dp)),
+            progress = { (value / 100f).coerceIn(0f, 1f) },
+            modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
             color = when {
-                value >= 85 -> RatingGreen
-                value >= 75 -> RatingBlue
-                value >= 65 -> RatingYellow
+                value >= 80 -> RatingGreen
+                value >= 65 -> RatingBlue
+                value >= 50 -> RatingYellow
                 else -> RatingOrange
-            },
-            trackColor = MaterialTheme.colorScheme.surfaceVariant
+            }
         )
     }
 }
@@ -209,6 +232,8 @@ fun SkillProgressBar(
 @Composable
 fun MatchBoxScoreDialog(
     match: Match?,
+    localTeam: Team? = null,
+    visitorTeam: Team? = null,
     boxScores: List<MatchResult>,
     onDismiss: () -> Unit
 ) {
@@ -246,69 +271,84 @@ fun MatchBoxScoreDialog(
                         modifier = Modifier.fillMaxWidth().padding(8.dp),
                         horizontalArrangement = Arrangement.SpaceAround
                     ) {
+                        Text("Team", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         Text("Q1", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         Text("Q2", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         Text("Q3", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         Text("Q4", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        if ((match.localOt ?: 0) > 0) Text("OT", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        Text("TOT", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        if ((match.localOt ?: 0) > 0 || (match.visitorOt ?: 0) > 0) {
+                            Text("OT", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+                        Text("TOT", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
                     }
+                    HorizontalDivider()
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
+                        modifier = Modifier.fillMaxWidth().padding(8.dp),
                         horizontalArrangement = Arrangement.SpaceAround
                     ) {
-                        Text("${match.localQuarter1 ?: 0}", fontSize = 12.sp)
-                        Text("${match.localQuarter2 ?: 0}", fontSize = 12.sp)
-                        Text("${match.localQuarter3 ?: 0}", fontSize = 12.sp)
-                        Text("${match.localQuarter4 ?: 0}", fontSize = 12.sp)
-                        if ((match.localOt ?: 0) > 0) Text("${match.localOt ?: 0}", fontSize = 12.sp)
-                        Text("${match.localScore ?: 0}", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
-                        horizontalArrangement = Arrangement.SpaceAround
-                    ) {
+                        Text(visitorTeam?.name ?: "VIS", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         Text("${match.visitorQuarter1 ?: 0}", fontSize = 12.sp)
                         Text("${match.visitorQuarter2 ?: 0}", fontSize = 12.sp)
                         Text("${match.visitorQuarter3 ?: 0}", fontSize = 12.sp)
                         Text("${match.visitorQuarter4 ?: 0}", fontSize = 12.sp)
-                        if ((match.visitorOt ?: 0) > 0) Text("${match.visitorOt ?: 0}", fontSize = 12.sp)
-                        Text("${match.visitorScore ?: 0}", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        if ((match.localOt ?: 0) > 0 || (match.visitorOt ?: 0) > 0) {
+                            Text("${match.visitorOt ?: 0}", fontSize = 12.sp)
+                        }
+                        Text("${match.visitorScore ?: 0}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(8.dp),
+                        horizontalArrangement = Arrangement.SpaceAround
+                    ) {
+                        Text(localTeam?.name ?: "LOC", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text("${match.localQuarter1 ?: 0}", fontSize = 12.sp)
+                        Text("${match.localQuarter2 ?: 0}", fontSize = 12.sp)
+                        Text("${match.localQuarter3 ?: 0}", fontSize = 12.sp)
+                        Text("${match.localQuarter4 ?: 0}", fontSize = 12.sp)
+                        if ((match.localOt ?: 0) > 0 || (match.visitorOt ?: 0) > 0) {
+                            Text("${match.localOt ?: 0}", fontSize = 12.sp)
+                        }
+                        Text("${match.localScore ?: 0}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     }
                 }
 
-                Divider(modifier = Modifier.padding(vertical = 8.dp))
+                Text(
+                    text = "Player Statistics",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                )
 
-                // Player Stats List
-                LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    item {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    items(boxScores.sortedByDescending { it.points }) { stat ->
+                        Card(
+                            shape = RoundedCornerShape(8.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("PLAYER", modifier = Modifier.weight(2f), fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                            Text("MIN", modifier = Modifier.weight(0.7f), textAlign = TextAlign.Center, fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                            Text("PTS", modifier = Modifier.weight(0.7f), textAlign = TextAlign.Center, fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                            Text("REB", modifier = Modifier.weight(0.7f), textAlign = TextAlign.Center, fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                            Text("AST", modifier = Modifier.weight(0.7f), textAlign = TextAlign.Center, fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                            Text("PER", modifier = Modifier.weight(0.8f), textAlign = TextAlign.Center, fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                        }
-                    }
-
-                    items(boxScores.sortedByDescending { it.points }) { p ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(p.playerName, modifier = Modifier.weight(2f), style = MaterialTheme.typography.bodyMedium)
-                            Text("${p.minutesPlayed}", modifier = Modifier.weight(0.7f), textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyMedium)
-                            Text("${p.points}", modifier = Modifier.weight(0.7f), textAlign = TextAlign.Center, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
-                            Text("${p.rebounds}", modifier = Modifier.weight(0.7f), textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyMedium)
-                            Text("${p.passesOk}", modifier = Modifier.weight(0.7f), textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyMedium)
-                            Text(String.format("%.1f", p.per), modifier = Modifier.weight(0.8f), textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium)
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(stat.playerName, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    Text(
+                                        text = "${stat.minutesPlayed} MIN • PER: ${stat.per}",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Text(
+                                    text = "${stat.points} PTS, ${stat.rebounds} REB, ${stat.passesOk} AST",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
                         }
                     }
                 }

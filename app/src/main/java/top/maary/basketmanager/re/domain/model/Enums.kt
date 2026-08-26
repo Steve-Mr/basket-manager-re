@@ -1,21 +1,21 @@
 package top.maary.basketmanager.re.domain.model
 
-enum class Conference(val id: Int, val titleResName: String) {
-    EAST(1, "conference_east"),
-    WEST(2, "conference_west");
+enum class Conference(val id: Int, val titleResName: String, val displayName: String) {
+    EAST(1, "conference_east", "Eastern Conference"),
+    WEST(2, "conference_west", "Western Conference");
 
     companion object {
         fun fromId(id: Int): Conference = entries.find { it.id == id } ?: EAST
     }
 }
 
-enum class Division(val id: Int, val conference: Conference, val titleResName: String) {
-    E1_ATLANTIC(1, Conference.EAST, "division_e1"),
-    E2_CENTRAL(2, Conference.EAST, "division_e2"),
-    E3_SOUTHEAST(3, Conference.EAST, "division_e3"),
-    W1_SOUTHWEST(4, Conference.WEST, "division_w1"),
-    W2_NORTHWEST(5, Conference.WEST, "division_w2"),
-    W3_PACIFIC(6, Conference.WEST, "division_w3");
+enum class Division(val id: Int, val conference: Conference, val titleResName: String, val displayName: String) {
+    E1_ATLANTIC(1, Conference.EAST, "division_e1", "Atlantic"),
+    E2_CENTRAL(2, Conference.EAST, "division_e2", "Central"),
+    E3_SOUTHEAST(3, Conference.EAST, "division_e3", "Southeast"),
+    W1_SOUTHWEST(4, Conference.WEST, "division_w1", "Southwest"),
+    W2_NORTHWEST(5, Conference.WEST, "division_w2", "Northwest"),
+    W3_PACIFIC(6, Conference.WEST, "division_w3", "Pacific");
 
     companion object {
         fun fromId(id: Int): Division = entries.find { it.id == id } ?: E1_ATLANTIC
@@ -30,7 +30,15 @@ enum class Position(val id: Int, val shortName: String) {
     POWER_FORWARD(4, "PF"),
     CENTER(5, "C");
 
+    val code: String get() = shortName
+
     companion object {
+        val PG = POINT_GUARD
+        val SG = SHOOTING_GUARD
+        val SF = SMALL_FORWARD
+        val PF = POWER_FORWARD
+        val C = CENTER
+
         fun fromId(id: Int): Position = entries.find { it.id == id } ?: NONE
     }
 }

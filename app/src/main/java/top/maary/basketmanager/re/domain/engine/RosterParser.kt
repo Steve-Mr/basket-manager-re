@@ -5,12 +5,17 @@ import top.maary.basketmanager.re.domain.model.Position
 import java.io.InputStream
 import kotlin.random.Random
 
+data class ParsedRosterPlayer(
+    val player: Player,
+    val teamCode: String
+)
+
 object RosterParser {
 
-    fun parseRostersCsv(inputStream: InputStream, gameId: Long = 0): List<Player> {
-        val players = mutableListOf<Player>()
+    fun parseRostersCsv(inputStream: InputStream, gameId: Long = 0): List<ParsedRosterPlayer> {
+        val list = mutableListOf<ParsedRosterPlayer>()
         val lines = inputStream.bufferedReader().readLines()
-        if (lines.isEmpty()) return players
+        if (lines.isEmpty()) return list
 
         val header = lines[0].split(";").map { it.trim() }
         val nameIdx = header.indexOf("name")
@@ -34,7 +39,7 @@ object RosterParser {
         for (i in 1 until lines.size) {
             val line = lines[i].trim()
             if (line.isEmpty()) continue
-            val tokens = line.split(";")
+            val tokens = line.split(";").map { it.trim() }
             if (tokens.size < header.size) continue
 
             try {
@@ -54,11 +59,12 @@ object RosterParser {
                 val shotInt = tokens.getOrNull(shotIntIdx)?.toIntOrNull() ?: 50
                 val shotExt = tokens.getOrNull(shotExtIdx)?.toIntOrNull() ?: 50
                 val shotFre = tokens.getOrNull(shotFreIdx)?.toIntOrNull() ?: 50
+                val teamCode = tokens.getOrNull(teamIdx)?.uppercase() ?: "0"
 
                 val player = Player(
                     id = 0,
                     gameId = gameId,
-                    teamId = null, // Will be linked via team abbreviation in repository
+                    teamId = null,
                     name = name,
                     age = age,
                     potential = potential,
@@ -77,14 +83,13 @@ object RosterParser {
                     skillShotExterior = shotExt,
                     skillShotFree = shotFre,
                     stateEnergy = 99,
-                    stateForm = Random.nextInt(40, 75),
+                    stateForm = Random.nextInt(45, 75),
                     stateInjury = 0
                 )
-                players.add(player)
+                list.add(ParsedRosterPlayer(player, teamCode))
             } catch (_: Exception) {
-                // Ignore malformed rows gracefully
             }
         }
-        return players
+        return list
     }
 }
