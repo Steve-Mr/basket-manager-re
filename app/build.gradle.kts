@@ -1,3 +1,6 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -5,11 +8,11 @@ plugins {
 }
 
 android {
-    namespace = "com.basketmanager.re"
+    namespace = "top.maary.basketmanager.re"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.basketmanager.re"
+        applicationId = "top.maary.basket_manager_re"
         minSdk = 24
         targetSdk = 35
         versionCode = 100
@@ -21,8 +24,29 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            val keystorePropertiesFile = rootProject.file("keystore.properties")
+            val keystoreFile = rootProject.file("keystore.jks")
+            if (keystorePropertiesFile.exists() && keystoreFile.exists()) {
+                val keystoreProperties = Properties().apply {
+                    load(FileInputStream(keystorePropertiesFile))
+                }
+                storeFile = keystoreFile
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            val keystorePropertiesFile = rootProject.file("keystore.properties")
+            val keystoreFile = rootProject.file("keystore.jks")
+            if (keystorePropertiesFile.exists() && keystoreFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -30,19 +54,28 @@ android {
             )
         }
         debug {
+            val keystorePropertiesFile = rootProject.file("keystore.properties")
+            val keystoreFile = rootProject.file("keystore.jks")
+            if (keystorePropertiesFile.exists() && keystoreFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             isMinifyEnabled = false
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+
     kotlinOptions {
         jvmTarget = "17"
     }
+
     buildFeatures {
         compose = true
     }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"

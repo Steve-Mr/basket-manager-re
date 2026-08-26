@@ -1,0 +1,1140 @@
+package top.maary.basketmanager.re.data.repository
+
+import android.content.ContentValues
+import android.content.Context
+import android.database.Cursor
+import top.maary.basketmanager.re.data.local.database.BasketManagerDatabaseHelper
+import top.maary.basketmanager.re.data.local.database.BasketManagerDatabaseHelper.Companion as DB
+import top.maary.basketmanager.re.data.local.database.toDomain
+import top.maary.basketmanager.re.data.local.database.toEntity
+import top.maary.basketmanager.re.data.local.entity.*
+import top.maary.basketmanager.re.domain.engine.*
+import top.maary.basketmanager.re.domain.model.*
+import top.maary.basketmanager.re.domain.repository.GameRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.InputStream
+import kotlin.random.Random
+
+class GameRepositoryImpl(private val context: Context) : GameRepository {
+
+    private val dbHelper = BasketManagerDatabaseHelper(context)
+
+    // ==========================================
+    // Game Sessions
+    // ==========================================
+
+    override suspend fun getAllGames(): List<GameSession> = withContext(Dispatchers.IO) {
+        val list = mutableListOf<GameSession>()
+        val db = dbHelper.readableDatabase
+        val cursor = db.rawQuery("SELECT * FROM ${DB.TABLE_GAME_SESSION} ORDER BY lastPlayedAt DESC", null)
+        cursor.use { c ->
+            while (c.moveToNext()) {
+                list.add(cursorToGameSession(c))
+            }
+        }
+        list
+    }
+
+    override suspend fun getGame(gameId: Long): GameSession? = withContext(Dispatchers.IO) {
+        val db = dbHelper.readableDatabase
+        val cursor = db.rawQuery("SELECT * FROM ${DB.TABLE_GAME_SESSION} WHERE id = ?", arrayOf(gameId.toString()))
+        cursor.use { c ->
+            if (c.moveToFirst()) cursorToGameSession(c) else null
+        }
+    }
+
+    override suspend fun createNewGame(name: String, userTeamName: String, rosterStream: InputStream): GameSession = withContext(Dispatchers.IO) {
+        val db = dbHelper.writableDatabase
+        db.beginTransaction()
+        try {
+            // 1. Create Game Session
+            val gameValues = ContentValues().apply {
+                put("name", name)
+                put("currentSeason", 1)
+                put("currentMatchday", 1)
+                put("userTeamId", 0)
+                put("autoLineupEnabled", 1)
+                put("createdAt", System.currentTimeMillis())
+                put("lastPlayedAt", System.currentTimeMillis())
+            }
+            val gameId = db.insert(DB.TABLE_GAME_SESSION, null, gameValues)
+
+            // 2. Create 30 Teams
+            val teamNames = listOf(
+                // East Atlantic
+                "BOS" to Division.E1_ATLANTIC, "BRO" to Division.E1_ATLANTIC, "NYK" to Division.E1_ATLANTIC, "PHI" to Division.E1_ATLANTIC, "TOR" to Division.E1_ATLANTIC,
+                // East Central
+                "CHI" to Division.E2_CENTRAL, "CLE" to Division.E2_CENTRAL, "DET" to Division.E2_CENTRAL, "IND" to Division.E2_CENTRAL, "MIL" to Division.E2_CENTRAL,
+                // East Southeast
+                "ATL" to Division.E3_SOUTHEAST, "CHA" to Division.E3_SOUTHEAST, "MIA" to Division.E3_SOUTHEAST, "ORL" to Division.E3_SOUTHEAST, "WAS" to Division.E3_SOUTHEAST,
+                // West Southwest
+                "DAL" to Division.W1_SOUTHWEST, "HOU" to Division.W1_SOUTHWEST, "MEM" to Division.W1_SOUTHWEST, "NOR" to Division.W1_SOUTHWEST, "SAN" to Division.W1_SOUTHWEST,
+                // West Northwest
+                "DEN" to Division.W2_NORTHWEST, "MIN" to Division.W2_NORTHWEST, "POR" to Division.W2_NORTHWEST, "OKC" to Division.W2_NORTHWEST, "UTA" to Division.W2_NORTHWEST,
+                // West Pacific
+                "GSW" to Division.W3_PACIFIC, "LAC" to Division.W3_PACIFIC, "LAL" to Division.W3_PACIFIC, "PHO" to Division.W3_PACIFIC, "SAC" to Division.W3_PACIFIC
+            )
+
+            var userTeamId = 0L
+            val createdTeams = mutableListOf<Team>()
+
+            teamNames.forEach { (tName, div) ->
+                val cap = Team.getDefaultSalaryCap(tName)
+                val color = Team.getTeamColor(tName)
+                val teamValues = ContentValues().apply {
+                    put("gameId", gameId)
+                    put("name", tName)
+                    put("fullName", tName)
+                    put("conference", div.conference.id)
+                    put("division", div.id)
+                    put("salaryCap", cap)
+                    put("colorHex", color)
+                }
+                val tId = db.insert(DB.TABLE_TEAM, null, teamValues)
+                val teamObj = Team(id = tId, gameId = gameId, name = tName, conference = div.conference, division = div, salaryCap = cap, colorHex = color)
+                createdTeams.add(teamObj)
+
+                if (tName.equals(userTeamName, ignoreCase = true)) {
+                    userTeamId = tId
+                }
+
+                // Initial Standings row
+                val stdValues = ContentValues().apply {
+                    put("gameId", gameId)
+                    put("teamId", tId)
+                    put("teamName", tName)
+                    put("conference", div.conference.id)
+                    put("division", div.id)
+                    put("gamesWon", 0)
+                    put("gamesLost", 0)
+                    put("pointsScored", 0)
+                    put("pointsAllowed", 0)
+                }
+                db.insert(DB.TABLE_STANDINGS, null, stdValues)
+
+                // Initial Draft Picks (Round 1 & Round 2)
+                val dp1 = ContentValues().apply {
+                    put("gameId", gameId)
+                    put("originalTeamId", tId)
+                    put("currentTeamId", tId)
+                    put("round", 1)
+                    put("marketValue", 25.0)
+                }
+                db.insert(DB.TABLE_DRAFT_PICK, null, dp1)
+
+                val dp2 = ContentValues().apply {
+                    put("gameId", gameId)
+                    put("originalTeamId", tId)
+                    put("currentTeamId", tId)
+                    put("round", 2)
+                    put("marketValue", 8.0)
+                }
+                db.insert(DB.TABLE_DRAFT_PICK, null, dp2)
+            }
+
+            // Update user team ID in session
+            val updateGame = ContentValues().apply { put("userTeamId", userTeamId) }
+            db.update(DB.TABLE_GAME_SESSION, updateGame, "id = ?", arrayOf(gameId.toString()))
+
+            // 3. Load and Insert Players from CSV
+            val rawPlayers = RosterParser.parseRostersCsv(rosterStream, gameId)
+            rawPlayers.forEach { p ->
+                val matchedTeam = createdTeams.find { p.name.contains(it.name, ignoreCase = true) } ?: createdTeams.random()
+                val playerEntity = p.copy(gameId = gameId, teamId = matchedTeam.id).toEntity()
+                insertPlayerDirect(db, playerEntity)
+            }
+
+            // 4. Initialize Tactics for each team with Lineup Optimization
+            createdTeams.forEach { t ->
+                val teamPlayers = getTeamPlayersDirect(db, t.id)
+                val initTactic = Tactic(id = 0, gameId = gameId, teamId = t.id)
+                val optTactic = LineupOptimizer.optimizeLineup(teamPlayers, initTactic)
+                insertTacticDirect(db, optTactic.toEntity())
+            }
+
+            // 5. Generate Regular Season Schedule (82 games)
+            val schedule = SeasonCalendarEngine.generateSeasonSchedule(gameId, createdTeams)
+            schedule.forEach { m ->
+                insertMatchDirect(db, m.toEntity())
+            }
+
+            // 6. First Welcome News
+            val welcomeNews = NewsItem(
+                gameId = gameId,
+                matchday = 0,
+                type = NewsType.INFO,
+                title = "Welcome to Basket Manager!",
+                body = "You have taken charge of your franchise. Set your tactics, lineup, and lead your team to the Championship!",
+                team1Id = userTeamId
+            )
+            insertNewsDirect(db, welcomeNews.toEntity())
+
+            db.setTransactionSuccessful()
+
+            GameSession(
+                id = gameId,
+                name = name,
+                currentSeason = 1,
+                currentMatchday = 1,
+                userTeamId = userTeamId,
+                autoLineupEnabled = true
+            )
+        } finally {
+            db.endTransaction()
+        }
+    }
+
+    override suspend fun deleteGame(gameId: Long) = withContext(Dispatchers.IO) {
+        val db = dbHelper.writableDatabase
+        db.beginTransaction()
+        try {
+            db.delete(DB.TABLE_GAME_SESSION, "id = ?", arrayOf(gameId.toString()))
+            db.delete(DB.TABLE_TEAM, "gameId = ?", arrayOf(gameId.toString()))
+            db.delete(DB.TABLE_PLAYER, "gameId = ?", arrayOf(gameId.toString()))
+            db.delete(DB.TABLE_TACTIC, "gameId = ?", arrayOf(gameId.toString()))
+            db.delete(DB.TABLE_MATCH, "gameId = ?", arrayOf(gameId.toString()))
+            db.delete(DB.TABLE_MATCH_RESULT, "gameId = ?", arrayOf(gameId.toString()))
+            db.delete(DB.TABLE_STANDINGS, "gameId = ?", arrayOf(gameId.toString()))
+            db.delete(DB.TABLE_PLAYOFF_SERIES, "gameId = ?", arrayOf(gameId.toString()))
+            db.delete(DB.TABLE_NEWS, "gameId = ?", arrayOf(gameId.toString()))
+            db.delete(DB.TABLE_DRAFT_PICK, "gameId = ?", arrayOf(gameId.toString()))
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
+    override suspend fun updateGame(game: GameSession): Unit = withContext(Dispatchers.IO) {
+        val db = dbHelper.writableDatabase
+        val cv = ContentValues().apply {
+            put("name", game.name)
+            put("currentSeason", game.currentSeason)
+            put("currentMatchday", game.currentMatchday)
+            put("userTeamId", game.userTeamId)
+            put("autoLineupEnabled", if (game.autoLineupEnabled) 1 else 0)
+            put("lastPlayedAt", System.currentTimeMillis())
+        }
+        db.update(DB.TABLE_GAME_SESSION, cv, "id = ?", arrayOf(game.id.toString()))
+    }
+
+    // ==========================================
+    // Teams
+    // ==========================================
+
+    override suspend fun getTeams(gameId: Long): List<Team> = withContext(Dispatchers.IO) {
+        val list = mutableListOf<Team>()
+        val db = dbHelper.readableDatabase
+        val cursor = db.rawQuery("SELECT * FROM ${DB.TABLE_TEAM} WHERE gameId = ? ORDER BY id ASC", arrayOf(gameId.toString()))
+        cursor.use { c ->
+            while (c.moveToNext()) {
+                list.add(cursorToTeam(c).toDomain())
+            }
+        }
+        list
+    }
+
+    override suspend fun getTeam(teamId: Long): Team? = withContext(Dispatchers.IO) {
+        val db = dbHelper.readableDatabase
+        val cursor = db.rawQuery("SELECT * FROM ${DB.TABLE_TEAM} WHERE id = ?", arrayOf(teamId.toString()))
+        cursor.use { c ->
+            if (c.moveToFirst()) cursorToTeam(c).toDomain() else null
+        }
+    }
+
+    override suspend fun updateTeam(team: Team): Unit = withContext(Dispatchers.IO) {
+        val db = dbHelper.writableDatabase
+        val cv = ContentValues().apply {
+            put("salaryCap", team.salaryCap)
+        }
+        db.update(DB.TABLE_TEAM, cv, "id = ?", arrayOf(team.id.toString()))
+    }
+
+    // ==========================================
+    // Players
+    // ==========================================
+
+    override suspend fun getPlayers(gameId: Long): List<Player> = withContext(Dispatchers.IO) {
+        val list = mutableListOf<Player>()
+        val db = dbHelper.readableDatabase
+        val cursor = db.rawQuery("SELECT * FROM ${DB.TABLE_PLAYER} WHERE gameId = ?", arrayOf(gameId.toString()))
+        cursor.use { c ->
+            while (c.moveToNext()) {
+                list.add(cursorToPlayer(c).toDomain())
+            }
+        }
+        list
+    }
+
+    override suspend fun getTeamPlayers(teamId: Long): List<Player> = withContext(Dispatchers.IO) {
+        val db = dbHelper.readableDatabase
+        getTeamPlayersDirect(db, teamId)
+    }
+
+    override suspend fun getFreeAgents(gameId: Long): List<Player> = withContext(Dispatchers.IO) {
+        val list = mutableListOf<Player>()
+        val db = dbHelper.readableDatabase
+        val cursor = db.rawQuery("SELECT * FROM ${DB.TABLE_PLAYER} WHERE gameId = ? AND (teamId IS NULL OR teamId = 0)", arrayOf(gameId.toString()))
+        cursor.use { c ->
+            while (c.moveToNext()) {
+                list.add(cursorToPlayer(c).toDomain())
+            }
+        }
+        list
+    }
+
+    override suspend fun getPlayer(playerId: Long): Player? = withContext(Dispatchers.IO) {
+        val db = dbHelper.readableDatabase
+        val cursor = db.rawQuery("SELECT * FROM ${DB.TABLE_PLAYER} WHERE id = ?", arrayOf(playerId.toString()))
+        cursor.use { c ->
+            if (c.moveToFirst()) cursorToPlayer(c).toDomain() else null
+        }
+    }
+
+    override suspend fun updatePlayer(player: Player): Unit = withContext(Dispatchers.IO) {
+        val db = dbHelper.writableDatabase
+        db.update(DB.TABLE_PLAYER, playerToContentValues(player.toEntity()), "id = ?", arrayOf(player.id.toString()))
+    }
+
+    override suspend fun updatePlayers(players: List<Player>): Unit = withContext(Dispatchers.IO) {
+        val db = dbHelper.writableDatabase
+        db.beginTransaction()
+        try {
+            players.forEach { p ->
+                db.update(DB.TABLE_PLAYER, playerToContentValues(p.toEntity()), "id = ?", arrayOf(p.id.toString()))
+            }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
+    // ==========================================
+    // Tactics
+    // ==========================================
+
+    override suspend fun getTactic(teamId: Long): Tactic? = withContext(Dispatchers.IO) {
+        val db = dbHelper.readableDatabase
+        val cursor = db.rawQuery("SELECT * FROM ${DB.TABLE_TACTIC} WHERE teamId = ?", arrayOf(teamId.toString()))
+        cursor.use { c ->
+            if (c.moveToFirst()) cursorToTactic(c).toDomain() else null
+        }
+    }
+
+    override suspend fun updateTactic(tactic: Tactic): Unit = withContext(Dispatchers.IO) {
+        val db = dbHelper.writableDatabase
+        db.update(DB.TABLE_TACTIC, tacticToContentValues(tactic.toEntity()), "id = ?", arrayOf(tactic.id.toString()))
+    }
+
+    override suspend fun autoOptimizeLineup(teamId: Long): Tactic = withContext(Dispatchers.IO) {
+        val db = dbHelper.writableDatabase
+        val teamPlayers = getTeamPlayersDirect(db, teamId)
+        val currentTactic = getTactic(teamId) ?: Tactic(id = 0, teamId = teamId)
+        val optimized = LineupOptimizer.optimizeLineup(teamPlayers, currentTactic)
+        if (optimized.id > 0) {
+            db.update(DB.TABLE_TACTIC, tacticToContentValues(optimized.toEntity()), "id = ?", arrayOf(optimized.id.toString()))
+        } else {
+            val newId = db.insert(DB.TABLE_TACTIC, null, tacticToContentValues(optimized.toEntity()))
+            return@withContext optimized.copy(id = newId)
+        }
+        optimized
+    }
+
+    // ==========================================
+    // Matches & Statistics
+    // ==========================================
+
+    override suspend fun getMatchesForDay(gameId: Long, matchday: Int): List<Match> = withContext(Dispatchers.IO) {
+        val list = mutableListOf<Match>()
+        val db = dbHelper.readableDatabase
+        val cursor = db.rawQuery("SELECT * FROM ${DB.TABLE_MATCH} WHERE gameId = ? AND matchday = ?", arrayOf(gameId.toString(), matchday.toString()))
+        cursor.use { c ->
+            while (c.moveToNext()) {
+                list.add(cursorToMatch(c).toDomain())
+            }
+        }
+        list
+    }
+
+    override suspend fun getTeamMatches(gameId: Long, teamId: Long): List<Match> = withContext(Dispatchers.IO) {
+        val list = mutableListOf<Match>()
+        val db = dbHelper.readableDatabase
+        val cursor = db.rawQuery("SELECT * FROM ${DB.TABLE_MATCH} WHERE gameId = ? AND (teamLocalId = ? OR teamVisitorId = ?) ORDER BY matchday ASC", arrayOf(gameId.toString(), teamId.toString(), teamId.toString()))
+        cursor.use { c ->
+            while (c.moveToNext()) {
+                list.add(cursorToMatch(c).toDomain())
+            }
+        }
+        list
+    }
+
+    override suspend fun getMatch(matchId: Long): Match? = withContext(Dispatchers.IO) {
+        val db = dbHelper.readableDatabase
+        val cursor = db.rawQuery("SELECT * FROM ${DB.TABLE_MATCH} WHERE id = ?", arrayOf(matchId.toString()))
+        cursor.use { c ->
+            if (c.moveToFirst()) cursorToMatch(c).toDomain() else null
+        }
+    }
+
+    override suspend fun getMatchResults(matchId: Long): List<MatchResult> = withContext(Dispatchers.IO) {
+        val list = mutableListOf<MatchResult>()
+        val db = dbHelper.readableDatabase
+        val cursor = db.rawQuery("SELECT * FROM ${DB.TABLE_MATCH_RESULT} WHERE matchId = ?", arrayOf(matchId.toString()))
+        cursor.use { c ->
+            while (c.moveToNext()) {
+                list.add(cursorToMatchResult(c).toDomain())
+            }
+        }
+        list
+    }
+
+    override suspend fun getPlayerCareerStats(gameId: Long, playerId: Long): List<MatchResult> = withContext(Dispatchers.IO) {
+        val list = mutableListOf<MatchResult>()
+        val db = dbHelper.readableDatabase
+        val cursor = db.rawQuery("SELECT * FROM ${DB.TABLE_MATCH_RESULT} WHERE gameId = ? AND playerId = ? ORDER BY matchday ASC", arrayOf(gameId.toString(), playerId.toString()))
+        cursor.use { c ->
+            while (c.moveToNext()) {
+                list.add(cursorToMatchResult(c).toDomain())
+            }
+        }
+        list
+    }
+
+    override suspend fun getAllPlayerStats(gameId: Long): Map<Long, List<MatchResult>> = withContext(Dispatchers.IO) {
+        val map = mutableMapOf<Long, MutableList<MatchResult>>()
+        val db = dbHelper.readableDatabase
+        val cursor = db.rawQuery("SELECT * FROM ${DB.TABLE_MATCH_RESULT} WHERE gameId = ?", arrayOf(gameId.toString()))
+        cursor.use { c ->
+            while (c.moveToNext()) {
+                val res = cursorToMatchResult(c).toDomain()
+                map.getOrPut(res.playerId) { mutableListOf() }.add(res)
+            }
+        }
+        map
+    }
+
+    // ==========================================
+    // Standings & Playoffs
+    // ==========================================
+
+    override suspend fun getStandings(gameId: Long): List<StandingsItem> = withContext(Dispatchers.IO) {
+        val list = mutableListOf<StandingsItem>()
+        val db = dbHelper.readableDatabase
+        val cursor = db.rawQuery("SELECT * FROM ${DB.TABLE_STANDINGS} WHERE gameId = ? ORDER BY gamesWon DESC, (pointsScored - pointsAllowed) DESC", arrayOf(gameId.toString()))
+        cursor.use { c ->
+            while (c.moveToNext()) {
+                list.add(cursorToStandings(c).toDomain())
+            }
+        }
+        list
+    }
+
+    override suspend fun getPlayoffSeries(gameId: Long): List<PlayoffSeries> = withContext(Dispatchers.IO) {
+        val list = mutableListOf<PlayoffSeries>()
+        val db = dbHelper.readableDatabase
+        val cursor = db.rawQuery("SELECT * FROM ${DB.TABLE_PLAYOFF_SERIES} WHERE gameId = ? ORDER BY round ASC, id ASC", arrayOf(gameId.toString()))
+        cursor.use { c ->
+            while (c.moveToNext()) {
+                list.add(
+                    PlayoffSeries(
+                        id = c.getLong(c.getColumnIndexOrThrow("id")),
+                        gameId = c.getLong(c.getColumnIndexOrThrow("gameId")),
+                        conference = if (c.isNull(c.getColumnIndexOrThrow("conference"))) null else Conference.fromId(c.getInt(c.getColumnIndexOrThrow("conference"))),
+                        round = c.getInt(c.getColumnIndexOrThrow("round")),
+                        seed1 = c.getInt(c.getColumnIndexOrThrow("seed1")),
+                        seed2 = c.getInt(c.getColumnIndexOrThrow("seed2")),
+                        team1Id = c.getLong(c.getColumnIndexOrThrow("team1Id")),
+                        team2Id = c.getLong(c.getColumnIndexOrThrow("team2Id")),
+                        team1Wins = c.getInt(c.getColumnIndexOrThrow("team1Wins")),
+                        team2Wins = c.getInt(c.getColumnIndexOrThrow("team2Wins")),
+                        winnerTeamId = if (c.isNull(c.getColumnIndexOrThrow("winnerTeamId"))) null else c.getLong(c.getColumnIndexOrThrow("winnerTeamId"))
+                    )
+                )
+            }
+        }
+        list
+    }
+
+    // ==========================================
+    // News, Draft, Trade, Free Agency
+    // ==========================================
+
+    override suspend fun getNews(gameId: Long): List<NewsItem> = withContext(Dispatchers.IO) {
+        val list = mutableListOf<NewsItem>()
+        val db = dbHelper.readableDatabase
+        val cursor = db.rawQuery("SELECT * FROM ${DB.TABLE_NEWS} WHERE gameId = ? ORDER BY matchday DESC, id DESC LIMIT 100", arrayOf(gameId.toString()))
+        cursor.use { c ->
+            while (c.moveToNext()) {
+                list.add(cursorToNews(c).toDomain())
+            }
+        }
+        list
+    }
+
+    override suspend fun addNews(newsItem: NewsItem): Unit = withContext(Dispatchers.IO) {
+        val db = dbHelper.writableDatabase
+        insertNewsDirect(db, newsItem.toEntity())
+    }
+
+    override suspend fun getDraftPicks(gameId: Long): List<DraftPick> = withContext(Dispatchers.IO) {
+        val list = mutableListOf<DraftPick>()
+        val db = dbHelper.readableDatabase
+        val cursor = db.rawQuery("SELECT * FROM ${DB.TABLE_DRAFT_PICK} WHERE gameId = ? ORDER BY round ASC, id ASC", arrayOf(gameId.toString()))
+        cursor.use { c ->
+            while (c.moveToNext()) {
+                list.add(cursorToDraftPick(c).toDomain())
+            }
+        }
+        list
+    }
+
+    override suspend fun getDraftProspects(gameId: Long): List<Player> = withContext(Dispatchers.IO) {
+        val list = mutableListOf<Player>()
+        val db = dbHelper.readableDatabase
+        val cursor = db.rawQuery("SELECT * FROM ${DB.TABLE_PLAYER} WHERE gameId = ? AND (teamId IS NULL OR teamId = 0) AND yearsContract = 0", arrayOf(gameId.toString()))
+        cursor.use { c ->
+            while (c.moveToNext()) {
+                list.add(cursorToPlayer(c).toDomain())
+            }
+        }
+        list.sortedByDescending { it.overallRating }
+    }
+
+    override suspend fun executeTrade(proposal: TradeProposal): TradeEvaluationResult = withContext(Dispatchers.IO) {
+        val teamA = getTeam(proposal.teamAId)!!
+        val teamB = getTeam(proposal.teamBId)!!
+        val teamAPlayers = proposal.teamAPlayerIds.mapNotNull { getPlayer(it) }
+        val teamBPlayers = proposal.teamBPlayerIds.mapNotNull { getPlayer(it) }
+        val allPicks = getDraftPicks(teamA.gameId)
+        val teamADraftPicks = allPicks.filter { proposal.teamADraftPickIds.contains(it.id) }
+        val teamBDraftPicks = allPicks.filter { proposal.teamBDraftPickIds.contains(it.id) }
+        val teamARoster = getTeamPlayers(teamA.id)
+        val teamBRoster = getTeamPlayers(teamB.id)
+
+        val eval = TradeEvaluationEngine.evaluateTrade(
+            teamA, teamB, teamAPlayers, teamBPlayers, teamADraftPicks, teamBDraftPicks, teamARoster, teamBRoster
+        )
+
+        if (eval.isAccepted) {
+            val db = dbHelper.writableDatabase
+            db.beginTransaction()
+            try {
+                teamAPlayers.forEach { p ->
+                    db.execSQL("UPDATE ${DB.TABLE_PLAYER} SET teamId = ? WHERE id = ?", arrayOf(teamB.id, p.id))
+                }
+                teamBPlayers.forEach { p ->
+                    db.execSQL("UPDATE ${DB.TABLE_PLAYER} SET teamId = ? WHERE id = ?", arrayOf(teamA.id, p.id))
+                }
+                teamADraftPicks.forEach { dp ->
+                    db.execSQL("UPDATE ${DB.TABLE_DRAFT_PICK} SET currentTeamId = ? WHERE id = ?", arrayOf(teamB.id, dp.id))
+                }
+                teamBDraftPicks.forEach { dp ->
+                    db.execSQL("UPDATE ${DB.TABLE_DRAFT_PICK} SET currentTeamId = ? WHERE id = ?", arrayOf(teamA.id, dp.id))
+                }
+
+                val news = NewsItem(
+                    gameId = teamA.gameId,
+                    type = NewsType.TRADE,
+                    title = "Trade Completed!",
+                    body = "${teamA.name} and ${teamB.name} have agreed on a trade involving ${teamAPlayers.size + teamADraftPicks.size} assets from ${teamA.name} and ${teamBPlayers.size + teamBDraftPicks.size} assets from ${teamB.name}.",
+                    team1Id = teamA.id,
+                    team2Id = teamB.id
+                )
+                insertNewsDirect(db, news.toEntity())
+                db.setTransactionSuccessful()
+            } finally {
+                db.endTransaction()
+            }
+        }
+        eval
+    }
+
+    override suspend fun signFreeAgent(playerId: Long, teamId: Long, salary: Int, years: Int): Boolean = withContext(Dispatchers.IO) {
+        val player = getPlayer(playerId) ?: return@withContext false
+        val team = getTeam(teamId) ?: return@withContext false
+        val roster = getTeamPlayers(teamId)
+        val payroll = roster.sumOf { it.salary }
+
+        if (roster.size >= 20 || (payroll + salary) > team.salaryCap) {
+            return@withContext false
+        }
+
+        val db = dbHelper.writableDatabase
+        val cv = ContentValues().apply {
+            put("teamId", teamId)
+            put("salary", salary)
+            put("yearsContract", years)
+        }
+        db.update(DB.TABLE_PLAYER, cv, "id = ?", arrayOf(playerId.toString()))
+
+        val news = NewsItem(
+            gameId = team.gameId,
+            type = NewsType.INFO,
+            title = "Free Agent Signed",
+            body = "${team.name} signed ${player.name} to a $years-year, $${salary / 1_000_000.0}M deal.",
+            team1Id = teamId,
+            playerId = playerId
+        )
+        insertNewsDirect(db, news.toEntity())
+        true
+    }
+
+    override suspend fun selectDraftPick(prospectId: Long, pickId: Long): Boolean = withContext(Dispatchers.IO) {
+        val db = dbHelper.writableDatabase
+        val pickCursor = db.rawQuery("SELECT * FROM ${DB.TABLE_DRAFT_PICK} WHERE id = ?", arrayOf(pickId.toString()))
+        var teamId = 0L
+        var round = 1
+        var pickPos = 1
+        pickCursor.use { c ->
+            if (c.moveToFirst()) {
+                teamId = c.getLong(c.getColumnIndexOrThrow("currentTeamId"))
+                round = c.getInt(c.getColumnIndexOrThrow("round"))
+                pickPos = c.getInt(c.getColumnIndexOrThrow("position"))
+            }
+        }
+        if (teamId == 0L) return@withContext false
+
+        val (salary, years) = DraftEngine.calculateRookieSalary(round, pickPos)
+        val cv = ContentValues().apply {
+            put("teamId", teamId)
+            put("salary", salary)
+            put("yearsContract", years)
+        }
+        db.update(DB.TABLE_PLAYER, cv, "id = ?", arrayOf(prospectId.toString()))
+        db.delete(DB.TABLE_DRAFT_PICK, "id = ?", arrayOf(pickId.toString()))
+        true
+    }
+
+    // ==========================================
+    // Authentic Day Advancement & Multi-Season Loop
+    // ==========================================
+
+    override suspend fun advanceMatchday(gameId: Long): GameSession = withContext(Dispatchers.IO) {
+        val game = getGame(gameId) ?: throw IllegalStateException("Game not found")
+        val currentDay = game.currentMatchday
+
+        val db = dbHelper.writableDatabase
+        db.beginTransaction()
+        try {
+            // 1. Daily Player State Evolution (Injury recovery, natural form & energy recovery)
+            val allPlayers = getPlayers(gameId)
+            allPlayers.forEach { p ->
+                var newInjury = p.stateInjury
+                var newForm = p.stateForm
+                var newEnergy = p.stateEnergy
+
+                if (newInjury > 0) {
+                    newInjury--
+                    newForm = (newForm - Random.nextInt(0, 4)).coerceIn(30, 99)
+                    if (newInjury == 0 && p.teamId == game.userTeamId) {
+                        val recNews = NewsItem(
+                            gameId = gameId,
+                            matchday = currentDay,
+                            type = NewsType.RECOVERY,
+                            title = "Medical Clearance: ${p.shortName}",
+                            body = "${p.name} has fully recovered from injury and is cleared to play.",
+                            team1Id = p.teamId,
+                            playerId = p.id
+                        )
+                        insertNewsDirect(db, recNews.toEntity())
+                    }
+                } else {
+                    newForm = (newForm + Random.nextInt(-17, 16) + ((100 - newForm) / 20)).coerceIn(30, 99)
+                    newEnergy = (newEnergy + Random.nextInt(-3, 9) + ((100 - newEnergy) / 20)).coerceIn(20, 99)
+                }
+
+                if (newInjury != p.stateInjury || newForm != p.stateForm || newEnergy != p.stateEnergy) {
+                    db.execSQL("UPDATE ${DB.TABLE_PLAYER} SET stateInjury = ?, stateForm = ?, stateEnergy = ? WHERE id = ?", arrayOf(newInjury, newForm, newEnergy, p.id))
+                }
+            }
+
+            // 2. Player Development Tick (every matchday for players where id % 10 == matchday % 10)
+            val devCandidates = allPlayers.filter { (it.id % 10) == (currentDay.toLong() % 10) }
+            val statsMap = getAllPlayerStats(gameId)
+            devCandidates.forEach { p ->
+                val recentBoxScores = statsMap[p.id]?.takeLast(10) ?: emptyList()
+                val devReport = PlayerDevelopmentEngine.developPlayerAuthentic(p, recentBoxScores, currentDay, game.userTeamId)
+                db.update(DB.TABLE_PLAYER, playerToContentValues(devReport.updatedPlayer.toEntity()), "id = ?", arrayOf(p.id.toString()))
+                devReport.generatedNews.forEach { n -> insertNewsDirect(db, n.toEntity()) }
+            }
+
+            when {
+                // Regular season matchdays 1..166
+                currentDay <= 166 -> {
+                    val matches = getMatchesForDay(gameId, currentDay)
+                    val teams = getTeams(gameId)
+                    val teamMap = teams.associateBy { it.id }
+
+                    matches.forEach { match ->
+                        val localTeam = teamMap[match.teamLocalId] ?: return@forEach
+                        val visitorTeam = teamMap[match.teamVisitorId] ?: return@forEach
+                        val localPlayers = getTeamPlayersDirect(db, localTeam.id)
+                        val visitorPlayers = getTeamPlayersDirect(db, visitorTeam.id)
+                        val localTactic = getTactic(localTeam.id) ?: LineupOptimizer.optimizeLineup(localPlayers, Tactic(teamId = localTeam.id))
+                        val visitorTactic = getTactic(visitorTeam.id) ?: LineupOptimizer.optimizeLineup(visitorPlayers, Tactic(teamId = visitorTeam.id))
+
+                        val simResult = MatchSimulationEngine.simulateMatch(
+                            match = match,
+                            localTeam = localTeam,
+                            visitorTeam = visitorTeam,
+                            localPlayers = localPlayers,
+                            visitorPlayers = visitorPlayers,
+                            localTactic = localTactic,
+                            visitorTactic = visitorTactic,
+                            isPlayoffs = false,
+                            userTeamId = game.userTeamId
+                        )
+
+                        updateMatchDirect(db, simResult.match.toEntity())
+                        simResult.playerResults.forEach { pr -> insertMatchResultDirect(db, pr.toEntity()) }
+                        simResult.updatedPlayers.forEach { p ->
+                            db.update(DB.TABLE_PLAYER, playerToContentValues(p.toEntity()), "id = ?", arrayOf(p.id.toString()))
+                        }
+                        simResult.generatedNews.forEach { n -> insertNewsDirect(db, n.toEntity()) }
+
+                        val localWon = (simResult.match.localScore ?: 0) > (simResult.match.visitorScore ?: 0)
+                        updateStandingsAfterMatch(db, gameId, localTeam.id, localWon, simResult.match.localScore ?: 0, simResult.match.visitorScore ?: 0)
+                        updateStandingsAfterMatch(db, gameId, visitorTeam.id, !localWon, simResult.match.visitorScore ?: 0, simResult.match.localScore ?: 0)
+                    }
+
+                    // On matchday 166 completion -> Lock Playoff Seeds on Day 167
+                    if (currentDay == 166) {
+                        val standings = getStandings(gameId)
+                        val east = standings.filter { it.conference == Conference.EAST }.sortedByDescending { it.gamesWon }
+                        val west = standings.filter { it.conference == Conference.WEST }.sortedByDescending { it.gamesWon }
+                        val seriesList = PlayoffsEngine.generatePlayoffFirstRound(gameId, east, west)
+                        seriesList.forEach { s -> insertPlayoffSeriesDirect(db, s) }
+
+                        val playoffNews = NewsItem(
+                            gameId = gameId,
+                            matchday = currentDay,
+                            type = NewsType.PLAYOFFS,
+                            title = "Playoff Field Set!",
+                            body = "The regular season has concluded. The top 8 teams in each conference have secured their playoff berths."
+                        )
+                        insertNewsDirect(db, playoffNews.toEntity())
+                    }
+                }
+
+                // Season Finish & Player Aging / Retirements (Matchday 226)
+                currentDay == 226 -> {
+                    val (active, retired) = PlayerDevelopmentEngine.handleSeasonRetirements(allPlayers)
+                    active.forEach { p ->
+                        db.update(DB.TABLE_PLAYER, playerToContentValues(p.toEntity()), "id = ?", arrayOf(p.id.toString()))
+                    }
+                    retired.forEach { r ->
+                        db.delete(DB.TABLE_PLAYER, "id = ?", arrayOf(r.id.toString()))
+                    }
+                    val news = NewsItem(
+                        gameId = gameId,
+                        matchday = currentDay,
+                        type = NewsType.INFO,
+                        title = "Season Concluded",
+                        body = "${retired.size} veteran players retired from the league. Contract years decremented."
+                    )
+                    insertNewsDirect(db, news.toEntity())
+                }
+
+                // Contract Renewals & Salary Cap Performance Adjustments (Matchday 227..229)
+                currentDay == 227 -> {
+                    // Update salary caps based on playoff finish
+                    val standings = getStandings(gameId)
+                    val topTeams = standings.take(8).map { it.teamId }
+                    topTeams.forEach { tId ->
+                        db.execSQL("UPDATE ${DB.TABLE_TEAM} SET salaryCap = salaryCap + 3000000 WHERE id = ?", arrayOf(tId))
+                    }
+                    val botTeams = standings.takeLast(6).map { it.teamId }
+                    botTeams.forEach { tId ->
+                        db.execSQL("UPDATE ${DB.TABLE_TEAM} SET salaryCap = MAX(50000000, salaryCap - 2000000) WHERE id = ?", arrayOf(tId))
+                    }
+                }
+
+                // Trade Day & Draft Prospect Generation (Matchday 230)
+                currentDay == 230 -> {
+                    val prospects = DraftEngine.generateDraftProspects(gameId, 90)
+                    prospects.forEach { p -> insertPlayerDirect(db, p.toEntity()) }
+                    val news = NewsItem(
+                        gameId = gameId,
+                        matchday = currentDay,
+                        type = NewsType.TRADE,
+                        title = "Trade Day & Draft Pool Announced",
+                        body = "90 rookie prospects entered the draft board. Front offices finalize draft boards."
+                    )
+                    insertNewsDirect(db, news.toEntity())
+                }
+
+                // CPU Free Agency Validation & New Season Reset (Matchday 234)
+                currentDay >= 234 -> {
+                    // CPU teams sign free agents
+                    val teams = getTeams(gameId)
+                    val freeAgents = getFreeAgents(gameId)
+                    val rosterMap = teams.associate { it.id to getTeamPlayersDirect(db, it.id) }
+                    val signings = FreeAgencyEngine.evaluateCpuSignings(teams, freeAgents, rosterMap, game.userTeamId)
+                    signings.forEach { (p, t) ->
+                        db.execSQL("UPDATE ${DB.TABLE_PLAYER} SET teamId = ?, salary = ?, yearsContract = ? WHERE id = ?", arrayOf(t.id, p.salary, p.yearsContract, p.id))
+                    }
+
+                    // Reset for new season
+                    val newSeason = game.currentSeason + 1
+                    db.delete(DB.TABLE_MATCH, "gameId = ?", arrayOf(gameId.toString()))
+                    db.delete(DB.TABLE_MATCH_RESULT, "gameId = ?", arrayOf(gameId.toString()))
+                    db.delete(DB.TABLE_PLAYOFF_SERIES, "gameId = ?", arrayOf(gameId.toString()))
+                    db.execSQL("UPDATE ${DB.TABLE_STANDINGS} SET gamesWon = 0, gamesLost = 0, pointsScored = 0, pointsAllowed = 0 WHERE gameId = ?", arrayOf(gameId.toString()))
+
+                    val newSchedule = SeasonCalendarEngine.generateSeasonSchedule(gameId, teams)
+                    newSchedule.forEach { m -> insertMatchDirect(db, m.toEntity()) }
+
+                    val updatedGame = game.copy(currentSeason = newSeason, currentMatchday = 1)
+                    updateGame(updatedGame)
+                    db.setTransactionSuccessful()
+                    return@withContext updatedGame
+                }
+            }
+
+            val nextDay = currentDay + 1
+            val updatedGame = game.copy(currentMatchday = nextDay)
+            updateGame(updatedGame)
+            db.setTransactionSuccessful()
+            updatedGame
+        } finally {
+            db.endTransaction()
+        }
+    }
+
+    override suspend fun autoSimulateTo(gameId: Long, targetMatchday: Int, onProgress: (Int, String) -> Unit): GameSession = withContext(Dispatchers.IO) {
+        var current = getGame(gameId) ?: throw IllegalStateException("Game not found")
+        while (current.currentMatchday < targetMatchday && current.currentMatchday < 234) {
+            onProgress(current.currentMatchday, "Simulating Matchday ${current.currentMatchday}...")
+            current = advanceMatchday(gameId)
+        }
+        current
+    }
+
+    // ==========================================
+    // Internal Helper Functions
+    // ==========================================
+
+    private fun getTeamPlayersDirect(db: android.database.sqlite.SQLiteDatabase, teamId: Long): List<Player> {
+        val list = mutableListOf<Player>()
+        val cursor = db.rawQuery("SELECT * FROM ${DB.TABLE_PLAYER} WHERE teamId = ?", arrayOf(teamId.toString()))
+        cursor.use { c ->
+            while (c.moveToNext()) {
+                list.add(cursorToPlayer(c).toDomain())
+            }
+        }
+        return list
+    }
+
+    private fun insertPlayerDirect(db: android.database.sqlite.SQLiteDatabase, entity: PlayerEntity): Long {
+        return db.insert(DB.TABLE_PLAYER, null, playerToContentValues(entity))
+    }
+
+    private fun insertTacticDirect(db: android.database.sqlite.SQLiteDatabase, entity: TacticEntity): Long {
+        return db.insert(DB.TABLE_TACTIC, null, tacticToContentValues(entity))
+    }
+
+    private fun insertMatchDirect(db: android.database.sqlite.SQLiteDatabase, entity: MatchEntity): Long {
+        return db.insert(DB.TABLE_MATCH, null, matchToContentValues(entity))
+    }
+
+    private fun updateMatchDirect(db: android.database.sqlite.SQLiteDatabase, entity: MatchEntity) {
+        db.update(DB.TABLE_MATCH, matchToContentValues(entity), "id = ?", arrayOf(entity.id.toString()))
+    }
+
+    private fun insertMatchResultDirect(db: android.database.sqlite.SQLiteDatabase, entity: MatchResultEntity): Long {
+        return db.insert(DB.TABLE_MATCH_RESULT, null, matchResultToContentValues(entity))
+    }
+
+    private fun insertNewsDirect(db: android.database.sqlite.SQLiteDatabase, entity: NewsEntity): Long {
+        return db.insert(DB.TABLE_NEWS, null, newsToContentValues(entity))
+    }
+
+    private fun insertPlayoffSeriesDirect(db: android.database.sqlite.SQLiteDatabase, series: PlayoffSeries): Long {
+        val cv = ContentValues().apply {
+            put("gameId", series.gameId)
+            if (series.conference != null) put("conference", series.conference.id) else putNull("conference")
+            put("round", series.round)
+            put("seed1", series.seed1)
+            put("seed2", series.seed2)
+            put("team1Id", series.team1Id)
+            put("team2Id", series.team2Id)
+            put("team1Wins", series.team1Wins)
+            put("team2Wins", series.team2Wins)
+            if (series.winnerTeamId != null) put("winnerTeamId", series.winnerTeamId) else putNull("winnerTeamId")
+        }
+        return db.insert(DB.TABLE_PLAYOFF_SERIES, null, cv)
+    }
+
+    private fun updateStandingsAfterMatch(db: android.database.sqlite.SQLiteDatabase, gameId: Long, teamId: Long, won: Boolean, scored: Int, allowed: Int) {
+        val wonIncrement = if (won) 1 else 0
+        val lostIncrement = if (won) 0 else 1
+        db.execSQL("""
+            UPDATE ${DB.TABLE_STANDINGS} 
+            SET gamesWon = gamesWon + $wonIncrement,
+                gamesLost = gamesLost + $lostIncrement,
+                pointsScored = pointsScored + $scored,
+                pointsAllowed = pointsAllowed + $allowed
+            WHERE gameId = $gameId AND teamId = $teamId
+        """)
+    }
+
+    private fun playerToContentValues(p: PlayerEntity): ContentValues = ContentValues().apply {
+        put("gameId", p.gameId)
+        if (p.teamId != null) put("teamId", p.teamId) else putNull("teamId")
+        put("name", p.name)
+        put("age", p.age)
+        put("potential", p.potential)
+        put("yearsContract", p.yearsContract)
+        put("salary", p.salary)
+        put("loyalty", p.loyalty)
+        put("yearsExperience", p.yearsExperience)
+        put("positionFirst", p.positionFirst)
+        put("positionSecond", p.positionSecond)
+        put("skillPhysique", p.skillPhysique)
+        put("skillBlock", p.skillBlock)
+        put("skillSteal", p.skillSteal)
+        put("skillRebound", p.skillRebound)
+        put("skillPass", p.skillPass)
+        put("skillShotInterior", p.skillShotInterior)
+        put("skillShotExterior", p.skillShotExterior)
+        put("skillShotFree", p.skillShotFree)
+        put("stateEnergy", p.stateEnergy)
+        put("stateForm", p.stateForm)
+        put("stateInjury", p.stateInjury)
+    }
+
+    private fun tacticToContentValues(t: TacticEntity): ContentValues = ContentValues().apply {
+        put("gameId", t.gameId)
+        put("teamId", t.teamId)
+        put("gameType", t.gameType)
+        put("benchImportance", t.benchImportance)
+        put("shotInteriorPercent", t.shotInteriorPercent)
+        put("shotTriplePercent", t.shotTriplePercent)
+        if (t.starterPgId != null) put("starterPgId", t.starterPgId) else putNull("starterPgId")
+        if (t.starterSgId != null) put("starterSgId", t.starterSgId) else putNull("starterSgId")
+        if (t.starterSfId != null) put("starterSfId", t.starterSfId) else putNull("starterSfId")
+        if (t.starterPfId != null) put("starterPfId", t.starterPfId) else putNull("starterPfId")
+        if (t.starterCId != null) put("starterCId", t.starterCId) else putNull("starterCId")
+        if (t.reservePgId != null) put("reservePgId", t.reservePgId) else putNull("reservePgId")
+        if (t.reserveSgId != null) put("reserveSgId", t.reserveSgId) else putNull("reserveSgId")
+        if (t.reserveSfId != null) put("reserveSfId", t.reserveSfId) else putNull("reserveSfId")
+        if (t.reservePfId != null) put("reservePfId", t.reservePfId) else putNull("reservePfId")
+        if (t.reserveCId != null) put("reserveCId", t.reserveCId) else putNull("reserveCId")
+        if (t.starOnePlayerId != null) put("starOnePlayerId", t.starOnePlayerId) else putNull("starOnePlayerId")
+        if (t.starTwoPlayerId != null) put("starTwoPlayerId", t.starTwoPlayerId) else putNull("starTwoPlayerId")
+        if (t.starThreePlayerId != null) put("starThreePlayerId", t.starThreePlayerId) else putNull("starThreePlayerId")
+    }
+
+    private fun matchToContentValues(m: MatchEntity): ContentValues = ContentValues().apply {
+        put("gameId", m.gameId)
+        put("matchday", m.matchday)
+        put("teamLocalId", m.teamLocalId)
+        put("teamVisitorId", m.teamVisitorId)
+        put("name", m.name)
+        if (m.localScore != null) put("localScore", m.localScore) else putNull("localScore")
+        if (m.visitorScore != null) put("visitorScore", m.visitorScore) else putNull("visitorScore")
+        if (m.localQuarter1 != null) put("localQuarter1", m.localQuarter1) else putNull("localQuarter1")
+        if (m.localQuarter2 != null) put("localQuarter2", m.localQuarter2) else putNull("localQuarter2")
+        if (m.localQuarter3 != null) put("localQuarter3", m.localQuarter3) else putNull("localQuarter3")
+        if (m.localQuarter4 != null) put("localQuarter4", m.localQuarter4) else putNull("localQuarter4")
+        if (m.localOt != null) put("localOt", m.localOt) else putNull("localOt")
+        if (m.visitorQuarter1 != null) put("visitorQuarter1", m.visitorQuarter1) else putNull("visitorQuarter1")
+        if (m.visitorQuarter2 != null) put("visitorQuarter2", m.visitorQuarter2) else putNull("visitorQuarter2")
+        if (m.visitorQuarter3 != null) put("visitorQuarter3", m.visitorQuarter3) else putNull("visitorQuarter3")
+        if (m.visitorQuarter4 != null) put("visitorQuarter4", m.visitorQuarter4) else putNull("visitorQuarter4")
+        if (m.visitorOt != null) put("visitorOt", m.visitorOt) else putNull("visitorOt")
+        put("isPlayed", if (m.isPlayed) 1 else 0)
+    }
+
+    private fun matchResultToContentValues(r: MatchResultEntity): ContentValues = ContentValues().apply {
+        put("gameId", r.gameId)
+        put("matchId", r.matchId)
+        put("playerId", r.playerId)
+        put("playerName", r.playerName)
+        put("teamId", r.teamId)
+        put("matchday", r.matchday)
+        put("minutesPlayed", r.minutesPlayed)
+        put("points", r.points)
+        put("fouls", r.fouls)
+        put("blocks", r.blocks)
+        put("steals", r.steals)
+        put("rebounds", r.rebounds)
+        put("passesOk", r.passesOk)
+        put("passesKo", r.passesKo)
+        put("shotsFreeOk", r.shotsFreeOk)
+        put("shotsFreeKo", r.shotsFreeKo)
+        put("shotsInteriorOk", r.shotsInteriorOk)
+        put("shotsInteriorKo", r.shotsInteriorKo)
+        put("shotsExteriorDoubleOk", r.shotsExteriorDoubleOk)
+        put("shotsExteriorDoubleKo", r.shotsExteriorDoubleKo)
+        put("shotsExteriorTripleOk", r.shotsExteriorTripleOk)
+        put("shotsExteriorTripleKo", r.shotsExteriorTripleKo)
+    }
+
+    private fun newsToContentValues(n: NewsEntity): ContentValues = ContentValues().apply {
+        put("gameId", n.gameId)
+        put("matchday", n.matchday)
+        put("type", n.type)
+        put("title", n.title)
+        put("body", n.body)
+        if (n.team1Id != null) put("team1Id", n.team1Id) else putNull("team1Id")
+        if (n.team2Id != null) put("team2Id", n.team2Id) else putNull("team2Id")
+        if (n.playerId != null) put("playerId", n.playerId) else putNull("playerId")
+        put("createdAt", n.createdAt)
+    }
+
+    private fun cursorToGameSession(c: Cursor): GameSession = GameSession(
+        id = c.getLong(c.getColumnIndexOrThrow("id")),
+        name = c.getString(c.getColumnIndexOrThrow("name")),
+        currentSeason = c.getInt(c.getColumnIndexOrThrow("currentSeason")),
+        currentMatchday = c.getInt(c.getColumnIndexOrThrow("currentMatchday")),
+        userTeamId = c.getLong(c.getColumnIndexOrThrow("userTeamId")),
+        autoLineupEnabled = c.getInt(c.getColumnIndexOrThrow("autoLineupEnabled")) == 1,
+        createdAt = c.getLong(c.getColumnIndexOrThrow("createdAt")),
+        lastPlayedAt = c.getLong(c.getColumnIndexOrThrow("lastPlayedAt"))
+    )
+
+    private fun cursorToTeam(c: Cursor): TeamEntity = TeamEntity(
+        id = c.getLong(c.getColumnIndexOrThrow("id")),
+        gameId = c.getLong(c.getColumnIndexOrThrow("gameId")),
+        name = c.getString(c.getColumnIndexOrThrow("name")),
+        fullName = c.getString(c.getColumnIndexOrThrow("fullName")),
+        conference = c.getInt(c.getColumnIndexOrThrow("conference")),
+        division = c.getInt(c.getColumnIndexOrThrow("division")),
+        salaryCap = c.getInt(c.getColumnIndexOrThrow("salaryCap")),
+        colorHex = c.getString(c.getColumnIndexOrThrow("colorHex"))
+    )
+
+    private fun cursorToPlayer(c: Cursor): PlayerEntity = PlayerEntity(
+        id = c.getLong(c.getColumnIndexOrThrow("id")),
+        gameId = c.getLong(c.getColumnIndexOrThrow("gameId")),
+        teamId = if (c.isNull(c.getColumnIndexOrThrow("teamId"))) null else c.getLong(c.getColumnIndexOrThrow("teamId")),
+        name = c.getString(c.getColumnIndexOrThrow("name")),
+        age = c.getInt(c.getColumnIndexOrThrow("age")),
+        potential = c.getInt(c.getColumnIndexOrThrow("potential")),
+        yearsContract = c.getInt(c.getColumnIndexOrThrow("yearsContract")),
+        salary = c.getInt(c.getColumnIndexOrThrow("salary")),
+        loyalty = c.getInt(c.getColumnIndexOrThrow("loyalty")),
+        yearsExperience = c.getInt(c.getColumnIndexOrThrow("yearsExperience")),
+        positionFirst = c.getInt(c.getColumnIndexOrThrow("positionFirst")),
+        positionSecond = c.getInt(c.getColumnIndexOrThrow("positionSecond")),
+        skillPhysique = c.getInt(c.getColumnIndexOrThrow("skillPhysique")),
+        skillBlock = c.getInt(c.getColumnIndexOrThrow("skillBlock")),
+        skillSteal = c.getInt(c.getColumnIndexOrThrow("skillSteal")),
+        skillRebound = c.getInt(c.getColumnIndexOrThrow("skillRebound")),
+        skillPass = c.getInt(c.getColumnIndexOrThrow("skillPass")),
+        skillShotInterior = c.getInt(c.getColumnIndexOrThrow("skillShotInterior")),
+        skillShotExterior = c.getInt(c.getColumnIndexOrThrow("skillShotExterior")),
+        skillShotFree = c.getInt(c.getColumnIndexOrThrow("skillShotFree")),
+        stateEnergy = c.getInt(c.getColumnIndexOrThrow("stateEnergy")),
+        stateForm = c.getInt(c.getColumnIndexOrThrow("stateForm")),
+        stateInjury = c.getInt(c.getColumnIndexOrThrow("stateInjury"))
+    )
+
+    private fun cursorToTactic(c: Cursor): TacticEntity = TacticEntity(
+        id = c.getLong(c.getColumnIndexOrThrow("id")),
+        gameId = c.getLong(c.getColumnIndexOrThrow("gameId")),
+        teamId = c.getLong(c.getColumnIndexOrThrow("teamId")),
+        gameType = c.getInt(c.getColumnIndexOrThrow("gameType")),
+        benchImportance = c.getInt(c.getColumnIndexOrThrow("benchImportance")),
+        shotInteriorPercent = c.getInt(c.getColumnIndexOrThrow("shotInteriorPercent")),
+        shotTriplePercent = c.getInt(c.getColumnIndexOrThrow("shotTriplePercent")),
+        starterPgId = if (c.isNull(c.getColumnIndexOrThrow("starterPgId"))) null else c.getLong(c.getColumnIndexOrThrow("starterPgId")),
+        starterSgId = if (c.isNull(c.getColumnIndexOrThrow("starterSgId"))) null else c.getLong(c.getColumnIndexOrThrow("starterSgId")),
+        starterSfId = if (c.isNull(c.getColumnIndexOrThrow("starterSfId"))) null else c.getLong(c.getColumnIndexOrThrow("starterSfId")),
+        starterPfId = if (c.isNull(c.getColumnIndexOrThrow("starterPfId"))) null else c.getLong(c.getColumnIndexOrThrow("starterPfId")),
+        starterCId = if (c.isNull(c.getColumnIndexOrThrow("starterCId"))) null else c.getLong(c.getColumnIndexOrThrow("starterCId")),
+        reservePgId = if (c.isNull(c.getColumnIndexOrThrow("reservePgId"))) null else c.getLong(c.getColumnIndexOrThrow("reservePgId")),
+        reserveSgId = if (c.isNull(c.getColumnIndexOrThrow("reserveSgId"))) null else c.getLong(c.getColumnIndexOrThrow("reserveSgId")),
+        reserveSfId = if (c.isNull(c.getColumnIndexOrThrow("reserveSfId"))) null else c.getLong(c.getColumnIndexOrThrow("reserveSfId")),
+        reservePfId = if (c.isNull(c.getColumnIndexOrThrow("reservePfId"))) null else c.getLong(c.getColumnIndexOrThrow("reservePfId")),
+        reserveCId = if (c.isNull(c.getColumnIndexOrThrow("reserveCId"))) null else c.getLong(c.getColumnIndexOrThrow("reserveCId")),
+        starOnePlayerId = if (c.isNull(c.getColumnIndexOrThrow("starOnePlayerId"))) null else c.getLong(c.getColumnIndexOrThrow("starOnePlayerId")),
+        starTwoPlayerId = if (c.isNull(c.getColumnIndexOrThrow("starTwoPlayerId"))) null else c.getLong(c.getColumnIndexOrThrow("starTwoPlayerId")),
+        starThreePlayerId = if (c.isNull(c.getColumnIndexOrThrow("starThreePlayerId"))) null else c.getLong(c.getColumnIndexOrThrow("starThreePlayerId"))
+    )
+
+    private fun cursorToMatch(c: Cursor): MatchEntity = MatchEntity(
+        id = c.getLong(c.getColumnIndexOrThrow("id")),
+        gameId = c.getLong(c.getColumnIndexOrThrow("gameId")),
+        matchday = c.getInt(c.getColumnIndexOrThrow("matchday")),
+        teamLocalId = c.getLong(c.getColumnIndexOrThrow("teamLocalId")),
+        teamVisitorId = c.getLong(c.getColumnIndexOrThrow("teamVisitorId")),
+        name = if (c.isNull(c.getColumnIndexOrThrow("name"))) null else c.getString(c.getColumnIndexOrThrow("name")),
+        localScore = if (c.isNull(c.getColumnIndexOrThrow("localScore"))) null else c.getInt(c.getColumnIndexOrThrow("localScore")),
+        visitorScore = if (c.isNull(c.getColumnIndexOrThrow("visitorScore"))) null else c.getInt(c.getColumnIndexOrThrow("visitorScore")),
+        localQuarter1 = if (c.isNull(c.getColumnIndexOrThrow("localQuarter1"))) null else c.getInt(c.getColumnIndexOrThrow("localQuarter1")),
+        localQuarter2 = if (c.isNull(c.getColumnIndexOrThrow("localQuarter2"))) null else c.getInt(c.getColumnIndexOrThrow("localQuarter2")),
+        localQuarter3 = if (c.isNull(c.getColumnIndexOrThrow("localQuarter3"))) null else c.getInt(c.getColumnIndexOrThrow("localQuarter3")),
+        localQuarter4 = if (c.isNull(c.getColumnIndexOrThrow("localQuarter4"))) null else c.getInt(c.getColumnIndexOrThrow("localQuarter4")),
+        localOt = if (c.isNull(c.getColumnIndexOrThrow("localOt"))) null else c.getInt(c.getColumnIndexOrThrow("localOt")),
+        visitorQuarter1 = if (c.isNull(c.getColumnIndexOrThrow("visitorQuarter1"))) null else c.getInt(c.getColumnIndexOrThrow("visitorQuarter1")),
+        visitorQuarter2 = if (c.isNull(c.getColumnIndexOrThrow("visitorQuarter2"))) null else c.getInt(c.getColumnIndexOrThrow("visitorQuarter2")),
+        visitorQuarter3 = if (c.isNull(c.getColumnIndexOrThrow("visitorQuarter3"))) null else c.getInt(c.getColumnIndexOrThrow("visitorQuarter3")),
+        visitorQuarter4 = if (c.isNull(c.getColumnIndexOrThrow("visitorQuarter4"))) null else c.getInt(c.getColumnIndexOrThrow("visitorQuarter4")),
+        visitorOt = if (c.isNull(c.getColumnIndexOrThrow("visitorOt"))) null else c.getInt(c.getColumnIndexOrThrow("visitorOt")),
+        isPlayed = c.getInt(c.getColumnIndexOrThrow("isPlayed")) == 1
+    )
+
+    private fun cursorToMatchResult(c: Cursor): MatchResultEntity = MatchResultEntity(
+        id = c.getLong(c.getColumnIndexOrThrow("id")),
+        gameId = c.getLong(c.getColumnIndexOrThrow("gameId")),
+        matchId = c.getLong(c.getColumnIndexOrThrow("matchId")),
+        playerId = c.getLong(c.getColumnIndexOrThrow("playerId")),
+        playerName = c.getString(c.getColumnIndexOrThrow("playerName")),
+        teamId = c.getLong(c.getColumnIndexOrThrow("teamId")),
+        matchday = c.getInt(c.getColumnIndexOrThrow("matchday")),
+        minutesPlayed = c.getInt(c.getColumnIndexOrThrow("minutesPlayed")),
+        points = c.getInt(c.getColumnIndexOrThrow("points")),
+        fouls = c.getInt(c.getColumnIndexOrThrow("fouls")),
+        blocks = c.getInt(c.getColumnIndexOrThrow("blocks")),
+        steals = c.getInt(c.getColumnIndexOrThrow("steals")),
+        rebounds = c.getInt(c.getColumnIndexOrThrow("rebounds")),
+        passesOk = c.getInt(c.getColumnIndexOrThrow("passesOk")),
+        passesKo = c.getInt(c.getColumnIndexOrThrow("passesKo")),
+        shotsFreeOk = c.getInt(c.getColumnIndexOrThrow("shotsFreeOk")),
+        shotsFreeKo = c.getInt(c.getColumnIndexOrThrow("shotsFreeKo")),
+        shotsInteriorOk = c.getInt(c.getColumnIndexOrThrow("shotsInteriorOk")),
+        shotsInteriorKo = c.getInt(c.getColumnIndexOrThrow("shotsInteriorKo")),
+        shotsExteriorDoubleOk = c.getInt(c.getColumnIndexOrThrow("shotsExteriorDoubleOk")),
+        shotsExteriorDoubleKo = c.getInt(c.getColumnIndexOrThrow("shotsExteriorDoubleKo")),
+        shotsExteriorTripleOk = c.getInt(c.getColumnIndexOrThrow("shotsExteriorTripleOk")),
+        shotsExteriorTripleKo = c.getInt(c.getColumnIndexOrThrow("shotsExteriorTripleKo"))
+    )
+
+    private fun cursorToStandings(c: Cursor): StandingsEntity = StandingsEntity(
+        id = c.getLong(c.getColumnIndexOrThrow("id")),
+        gameId = c.getLong(c.getColumnIndexOrThrow("gameId")),
+        teamId = c.getLong(c.getColumnIndexOrThrow("teamId")),
+        teamName = c.getString(c.getColumnIndexOrThrow("teamName")),
+        conference = c.getInt(c.getColumnIndexOrThrow("conference")),
+        division = c.getInt(c.getColumnIndexOrThrow("division")),
+        gamesWon = c.getInt(c.getColumnIndexOrThrow("gamesWon")),
+        gamesLost = c.getInt(c.getColumnIndexOrThrow("gamesLost")),
+        pointsScored = c.getInt(c.getColumnIndexOrThrow("pointsScored")),
+        pointsAllowed = c.getInt(c.getColumnIndexOrThrow("pointsAllowed"))
+    )
+
+    private fun cursorToNews(c: Cursor): NewsEntity = NewsEntity(
+        id = c.getLong(c.getColumnIndexOrThrow("id")),
+        gameId = c.getLong(c.getColumnIndexOrThrow("gameId")),
+        matchday = c.getInt(c.getColumnIndexOrThrow("matchday")),
+        type = c.getString(c.getColumnIndexOrThrow("type")),
+        title = c.getString(c.getColumnIndexOrThrow("title")),
+        body = c.getString(c.getColumnIndexOrThrow("body")),
+        team1Id = if (c.isNull(c.getColumnIndexOrThrow("team1Id"))) null else c.getLong(c.getColumnIndexOrThrow("team1Id")),
+        team2Id = if (c.isNull(c.getColumnIndexOrThrow("team2Id"))) null else c.getLong(c.getColumnIndexOrThrow("team2Id")),
+        playerId = if (c.isNull(c.getColumnIndexOrThrow("playerId"))) null else c.getLong(c.getColumnIndexOrThrow("playerId")),
+        createdAt = c.getLong(c.getColumnIndexOrThrow("createdAt"))
+    )
+
+    private fun cursorToDraftPick(c: Cursor): DraftPickEntity = DraftPickEntity(
+        id = c.getLong(c.getColumnIndexOrThrow("id")),
+        gameId = c.getLong(c.getColumnIndexOrThrow("gameId")),
+        originalTeamId = c.getLong(c.getColumnIndexOrThrow("originalTeamId")),
+        currentTeamId = c.getLong(c.getColumnIndexOrThrow("currentTeamId")),
+        round = c.getInt(c.getColumnIndexOrThrow("round")),
+        position = if (c.isNull(c.getColumnIndexOrThrow("position"))) null else c.getInt(c.getColumnIndexOrThrow("position")),
+        marketValue = c.getDouble(c.getColumnIndexOrThrow("marketValue"))
+    )
+}

@@ -1,0 +1,31 @@
+# Built application and intermediate outputs
+*.iml
+.gradle/
+.idea/
+.kotlin/
+/local.properties
+/build/
+/app/build/
+/captures/
+.externalNativeBuild/
+.cxx/
+
+# Keystores, private keys, and sensitive signing properties
+*.jks
+*.keystore
+*.key
+*.p12
+*.pfx
+*.pem
+keystore.properties
+secrets.properties
+signing.properties
+
+# Android package outputs
+*.apk
+*.ap_
+*.aab
+
+# OS and temporary files
+.DS_Store
+Thumbs.db
