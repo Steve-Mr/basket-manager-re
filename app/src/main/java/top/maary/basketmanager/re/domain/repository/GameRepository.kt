@@ -2,7 +2,6 @@ package top.maary.basketmanager.re.domain.repository
 
 import top.maary.basketmanager.re.domain.engine.TradeEvaluationResult
 import top.maary.basketmanager.re.domain.model.*
-import kotlinx.coroutines.flow.Flow
 import java.io.InputStream
 
 interface GameRepository {
@@ -38,6 +37,8 @@ interface GameRepository {
     suspend fun getMatchResults(matchId: Long): List<MatchResult>
     suspend fun getPlayerCareerStats(gameId: Long, playerId: Long): List<MatchResult>
     suspend fun getAllPlayerStats(gameId: Long): Map<Long, List<MatchResult>>
+    suspend fun getAllPlayerRegularStats(gameId: Long): Map<Long, List<MatchResult>>
+    suspend fun getAllPlayerPlayoffStats(gameId: Long): Map<Long, List<MatchResult>>
 
     // Standings & Playoffs
     suspend fun getStandings(gameId: Long): List<StandingsItem>

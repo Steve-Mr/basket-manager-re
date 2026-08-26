@@ -251,7 +251,7 @@ fun RosterScreen(
     selectedPlayerForDetail?.let { player ->
         PlayerDetailBottomSheet(
             player = player,
-            stats = viewModel.getPlayerSeasonStats(player.id),
+            stats = viewModel.getPlayerSeasonStats(player.id), playoffStats = viewModel.getPlayerPlayoffStats(player.id),
             onDismiss = { selectedPlayerForDetail = null }
         )
     }

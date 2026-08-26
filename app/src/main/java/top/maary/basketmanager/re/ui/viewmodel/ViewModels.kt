@@ -19,7 +19,8 @@ data class PlayerSeasonStats(
     val apg: Double,
     val spg: Double,
     val bpg: Double,
-    val avgPer: Double
+    val avgPer: Double,
+    val isPlayoffs: Boolean = false
 )
 
 class MainViewModel(
@@ -97,6 +98,12 @@ class GameDashboardViewModel(
     private val _playerStatsList = MutableStateFlow<List<PlayerSeasonStats>>(emptyList())
     val playerStatsList: StateFlow<List<PlayerSeasonStats>> = _playerStatsList.asStateFlow()
 
+    private val _playerPlayoffStatsList = MutableStateFlow<List<PlayerSeasonStats>>(emptyList())
+    val playerPlayoffStatsList: StateFlow<List<PlayerSeasonStats>> = _playerPlayoffStatsList.asStateFlow()
+
+    private val _playoffSeries = MutableStateFlow<List<PlayoffSeries>>(emptyList())
+    val playoffSeries: StateFlow<List<PlayoffSeries>> = _playoffSeries.asStateFlow()
+
     private val _freeAgents = MutableStateFlow<List<Player>>(emptyList())
     val freeAgents: StateFlow<List<Player>> = _freeAgents.asStateFlow()
 
@@ -135,13 +142,15 @@ class GameDashboardViewModel(
         _freeAgents.value = repository.getFreeAgents(g.id)
         _draftPicks.value = repository.getDraftPicks(g.id)
         _draftProspects.value = repository.getDraftProspects(g.id)
+        _playoffSeries.value = repository.getPlayoffSeries(g.id)
 
         val players = repository.getPlayers(g.id)
         _allPlayers.value = players
 
-        val statsMap = repository.getAllPlayerStats(g.id)
-        val statsList = players.map { p ->
-            val pStats = statsMap[p.id] ?: emptyList()
+        // 1. Regular Season Statistics (matchday <= 166)
+        val regularMap = repository.getAllPlayerRegularStats(g.id)
+        val regularList = players.map { p ->
+            val pStats = regularMap[p.id] ?: emptyList()
             val gp = pStats.size
             val ppg = if (gp > 0) pStats.sumOf { it.points }.toDouble() / gp else 0.0
             val rpg = if (gp > 0) pStats.sumOf { it.rebounds }.toDouble() / gp else 0.0
@@ -149,13 +158,32 @@ class GameDashboardViewModel(
             val spg = if (gp > 0) pStats.sumOf { it.steals }.toDouble() / gp else 0.0
             val bpg = if (gp > 0) pStats.sumOf { it.blocks }.toDouble() / gp else 0.0
             val avgPer = if (gp > 0) pStats.sumOf { it.per }.toDouble() / gp else 0.0
-            PlayerSeasonStats(p, gp, ppg, rpg, apg, spg, bpg, avgPer)
+            PlayerSeasonStats(p, gp, ppg, rpg, apg, spg, bpg, avgPer, isPlayoffs = false)
         }
-        _playerStatsList.value = statsList
+        _playerStatsList.value = regularList
+
+        // 2. Playoff Statistics (matchday > 166)
+        val playoffMap = repository.getAllPlayerPlayoffStats(g.id)
+        val playoffList = players.map { p ->
+            val pStats = playoffMap[p.id] ?: emptyList()
+            val gp = pStats.size
+            val ppg = if (gp > 0) pStats.sumOf { it.points }.toDouble() / gp else 0.0
+            val rpg = if (gp > 0) pStats.sumOf { it.rebounds }.toDouble() / gp else 0.0
+            val apg = if (gp > 0) pStats.sumOf { it.passesOk }.toDouble() / gp else 0.0
+            val spg = if (gp > 0) pStats.sumOf { it.steals }.toDouble() / gp else 0.0
+            val bpg = if (gp > 0) pStats.sumOf { it.blocks }.toDouble() / gp else 0.0
+            val avgPer = if (gp > 0) pStats.sumOf { it.per }.toDouble() / gp else 0.0
+            PlayerSeasonStats(p, gp, ppg, rpg, apg, spg, bpg, avgPer, isPlayoffs = true)
+        }
+        _playerPlayoffStatsList.value = playoffList
     }
 
     fun getPlayerSeasonStats(playerId: Long): PlayerSeasonStats? {
         return _playerStatsList.value.find { it.player.id == playerId }
+    }
+
+    fun getPlayerPlayoffStats(playerId: Long): PlayerSeasonStats? {
+        return _playerPlayoffStatsList.value.find { it.player.id == playerId }
     }
 
     fun swapPlayerPositions(player: Player) {
@@ -196,7 +224,7 @@ class GameDashboardViewModel(
         val currentGame = _game.value ?: return
         viewModelScope.launch {
             _isSimulating.value = true
-            _simulationProgressText.value = "Simulating Matchday ${currentGame.currentMatchday}..."
+            _simulationProgressText.value = "Simulating Day ${currentGame.currentMatchday}..."
             val updated = repository.advanceMatchday(currentGame.id)
             _game.value = updated
             refreshGameData(updated)

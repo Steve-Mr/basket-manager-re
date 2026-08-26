@@ -92,9 +92,13 @@ fun PositionBadge(
 fun PlayerDetailBottomSheet(
     player: Player?,
     stats: PlayerSeasonStats? = null,
+    playoffStats: PlayerSeasonStats? = null,
     onDismiss: () -> Unit
 ) {
     if (player == null) return
+
+    var statsTab by remember { mutableStateOf(0) } // 0: Regular Season, 1: Playoffs
+    val activeStats = if (statsTab == 0) stats else playoffStats
 
     val formattedSalary = if (player.salary >= 1_000_000) {
         "$${player.salary / 1_000_000}M"
@@ -161,31 +165,60 @@ fun PlayerDetailBottomSheet(
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
 
-            // Season Statistics Section (Unified Card Grid)
+            // Season Statistics Section (Unified Card Grid with Scope Tabs)
             Card(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
-                    Text(
-                        text = "Season Performance Statistics",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceAround
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        StatItem(label = "GP", value = "${stats?.gamesPlayed ?: 0}")
-                        StatItem(label = "PPG", value = String.format("%.1f", stats?.ppg ?: 0.0))
-                        StatItem(label = "RPG", value = String.format("%.1f", stats?.rpg ?: 0.0))
-                        StatItem(label = "APG", value = String.format("%.1f", stats?.apg ?: 0.0))
-                        StatItem(label = "SPG", value = String.format("%.1f", stats?.spg ?: 0.0))
-                        StatItem(label = "BPG", value = String.format("%.1f", stats?.bpg ?: 0.0))
-                        StatItem(label = "PER", value = String.format("%.1f", stats?.avgPer ?: 0.0))
+                        Text(
+                            text = "Performance Stats",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+
+                        TabRow(
+                            selectedTabIndex = statsTab,
+                            modifier = Modifier.width(200.dp).clip(RoundedCornerShape(6.dp))
+                        ) {
+                            Tab(selected = statsTab == 0, onClick = { statsTab = 0 }, text = { Text("Regular", fontSize = 11.sp) })
+                            Tab(selected = statsTab == 1, onClick = { statsTab = 1 }, text = { Text("Playoffs", fontSize = 11.sp) })
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    if (activeStats != null && activeStats.gamesPlayed > 0) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceAround
+                        ) {
+                            StatItem(label = "GP", value = "${activeStats.gamesPlayed}")
+                            StatItem(label = "PPG", value = String.format("%.1f", activeStats.ppg))
+                            StatItem(label = "RPG", value = String.format("%.1f", activeStats.rpg))
+                            StatItem(label = "APG", value = String.format("%.1f", activeStats.apg))
+                            StatItem(label = "SPG", value = String.format("%.1f", activeStats.spg))
+                            StatItem(label = "BPG", value = String.format("%.1f", activeStats.bpg))
+                            StatItem(label = "PER", value = String.format("%.1f", activeStats.avgPer))
+                        }
+                    } else {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = if (statsTab == 0) "No regular season games recorded" else "No playoff appearances recorded",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }

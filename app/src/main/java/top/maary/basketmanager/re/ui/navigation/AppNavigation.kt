@@ -89,7 +89,7 @@ fun DashboardScaffold(
 
     var primaryTab by remember { mutableStateOf(PrimaryTab.HOME) }
     var squadSubTab by remember { mutableStateOf(0) } // 0: Roster, 1: Lineup, 2: Tactics, 3: Finances
-    var leagueSubTab by remember { mutableStateOf(0) } // 0: Standings, 1: Schedule, 2: Leaders
+    var leagueSubTab by remember { mutableStateOf(0) } // 0: Standings, 1: Schedule, 2: Leaders, 3: Playoffs
     var officeSubTab by remember { mutableStateOf(0) } // 0: Trade, 1: Free Agency, 2: Draft, 3: Challenges
 
     var viewingTeamDetailId by remember { mutableStateOf<Long?>(null) }
@@ -226,6 +226,17 @@ fun DashboardScaffold(
                     }
                 )
 
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Default.EmojiEvents, contentDescription = null) },
+                    label = { Text("Playoffs Bracket 🏆") },
+                    selected = primaryTab == PrimaryTab.LEAGUE && leagueSubTab == 3,
+                    onClick = {
+                        primaryTab = PrimaryTab.LEAGUE
+                        leagueSubTab = 3
+                        scope.launch { drawerState.close() }
+                    }
+                )
+
                 // Section 4: Front Office
                 Text(
                     text = "FRONT OFFICE",
@@ -268,7 +279,7 @@ fun DashboardScaffold(
                 )
 
                 NavigationDrawerItem(
-                    icon = { Icon(Icons.Default.EmojiEvents, contentDescription = null) },
+                    icon = { Icon(Icons.Default.MilitaryTech, contentDescription = null) },
                     label = { Text("Championship Challenges") },
                     selected = primaryTab == PrimaryTab.OFFICE && officeSubTab == 3,
                     onClick = {
@@ -376,11 +387,13 @@ fun DashboardScaffold(
                                 Tab(selected = leagueSubTab == 0, onClick = { leagueSubTab = 0 }, text = { Text("Standings") })
                                 Tab(selected = leagueSubTab == 1, onClick = { leagueSubTab = 1 }, text = { Text("Schedule") })
                                 Tab(selected = leagueSubTab == 2, onClick = { leagueSubTab = 2 }, text = { Text("Leaders") })
+                                Tab(selected = leagueSubTab == 3, onClick = { leagueSubTab = 3 }, text = { Text("Playoffs 🏆") })
                             }
                             when (leagueSubTab) {
                                 0 -> StandingsScreen(viewModel = viewModel, onNavigateToTeamDetail = { viewingTeamDetailId = it })
                                 1 -> ScheduleScreen(viewModel = viewModel)
                                 2 -> LeagueStatsScreen(viewModel = viewModel)
+                                3 -> PlayoffsScreen(viewModel = viewModel)
                             }
                         }
                     }

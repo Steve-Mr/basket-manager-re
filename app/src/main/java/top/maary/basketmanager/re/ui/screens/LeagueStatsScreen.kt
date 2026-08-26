@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -23,50 +24,56 @@ import top.maary.basketmanager.re.ui.components.PositionBadge
 import top.maary.basketmanager.re.ui.components.RatingBadge
 import top.maary.basketmanager.re.ui.viewmodel.GameDashboardViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LeagueStatsScreen(
     viewModel: GameDashboardViewModel
 ) {
     val allPlayers by viewModel.allPlayers.collectAsState()
-    val playerStats by viewModel.playerStatsList.collectAsState()
     val allTeams by viewModel.allTeams.collectAsState()
+    val regularStatsList by viewModel.playerStatsList.collectAsState()
+    val playoffStatsList by viewModel.playerPlayoffStatsList.collectAsState()
 
-    var selectedTab by remember { mutableStateOf(0) } // 0: Top 100 Rankings, 1: Top Rookies, 2: Stat Leaders
+    var selectedTab by remember { mutableStateOf(0) } // 0: Top 100 Overall, 1: Top Rookies, 2: Stat Leaders
     var selectedPositionFilter by remember { mutableStateOf<Position?>(null) }
-    var selectedLeaderCategory by remember { mutableStateOf("PTS") } // PTS, REB, AST, STL, BLK, PER
+    var selectedLeaderCategory by remember { mutableStateOf("PTS") }
+    var selectedStatsScope by remember { mutableStateOf(0) } // 0: Regular Season, 1: Playoffs
+
     var selectedPlayerForDetail by remember { mutableStateOf<Player?>(null) }
 
     val teamMap = remember(allTeams) { allTeams.associateBy { it.id } }
-    val statsMap = remember(playerStats) { playerStats.associateBy { it.player.id } }
 
     val filteredTopPlayers = remember(allPlayers, selectedPositionFilter) {
-        val rostered = allPlayers.filter { it.teamId != null && it.teamId!! > 0 }
-        val filtered = if (selectedPositionFilter == null) rostered
-        else rostered.filter { it.positionFirst == selectedPositionFilter || it.positionSecond == selectedPositionFilter }
-        filtered.sortedByDescending { it.overallRating }.take(100)
+        val pool = if (selectedPositionFilter != null) {
+            allPlayers.filter { it.positionFirst == selectedPositionFilter || it.positionSecond == selectedPositionFilter }
+        } else {
+            allPlayers
+        }
+        pool.sortedByDescending { it.overallRating }.take(100)
     }
 
     val filteredTopRookies = remember(allPlayers, selectedPositionFilter) {
-        val rookies = allPlayers.filter { it.teamId != null && it.teamId!! > 0 && it.yearsExperience == 0 }
-        val filtered = if (selectedPositionFilter == null) rookies
-        else rookies.filter { it.positionFirst == selectedPositionFilter || it.positionSecond == selectedPositionFilter }
-        filtered.sortedByDescending { it.overallRating }.take(100)
+        val pool = allPlayers.filter { it.yearsExperience == 0 }
+        val posFiltered = if (selectedPositionFilter != null) {
+            pool.filter { it.positionFirst == selectedPositionFilter || it.positionSecond == selectedPositionFilter }
+        } else {
+            pool
+        }
+        posFiltered.sortedByDescending { it.overallRating }.take(100)
     }
 
-    val statLeaders = remember(playerStats, selectedLeaderCategory, selectedPositionFilter) {
-        val filtered = if (selectedPositionFilter == null) playerStats
-        else playerStats.filter { it.player.positionFirst == selectedPositionFilter || it.player.positionSecond == selectedPositionFilter }
+    val activeStatsList = if (selectedStatsScope == 0) regularStatsList else playoffStatsList
 
+    val statLeaders = remember(activeStatsList, selectedLeaderCategory) {
+        val qualified = activeStatsList.filter { it.gamesPlayed >= 1 }
         when (selectedLeaderCategory) {
-            "PTS" -> filtered.sortedByDescending { it.ppg }
-            "REB" -> filtered.sortedByDescending { it.rpg }
-            "AST" -> filtered.sortedByDescending { it.apg }
-            "STL" -> filtered.sortedByDescending { it.spg }
-            "BLK" -> filtered.sortedByDescending { it.bpg }
-            "PER" -> filtered.sortedByDescending { it.avgPer }
-            else -> filtered.sortedByDescending { it.ppg }
-        }.take(100)
+            "PTS" -> qualified.sortedByDescending { it.ppg }.take(50)
+            "REB" -> qualified.sortedByDescending { it.rpg }.take(50)
+            "AST" -> qualified.sortedByDescending { it.apg }.take(50)
+            "STL" -> qualified.sortedByDescending { it.spg }.take(50)
+            "BLK" -> qualified.sortedByDescending { it.bpg }.take(50)
+            "PER" -> qualified.sortedByDescending { it.avgPer }.take(50)
+            else -> qualified.sortedByDescending { it.ppg }.take(50)
+        }
     }
 
     Column(
@@ -80,74 +87,52 @@ fun LeagueStatsScreen(
             fontWeight = FontWeight.Bold
         )
         Text(
-            text = "Top players by position, ROY candidates, and statistical leaders",
+            text = "Browse all-time superstars, rising rookies, and statistical leaders",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
-        // Navigation Tabs
-        TabRow(selectedTabIndex = selectedTab) {
-            Tab(
-                selected = selectedTab == 0,
-                onClick = { selectedTab = 0 },
-                text = { Text("Top 100 Players") }
-            )
-            Tab(
-                selected = selectedTab == 1,
-                onClick = { selectedTab = 1 },
-                text = { Text("Top Rookies") }
-            )
-            Tab(
-                selected = selectedTab == 2,
-                onClick = { selectedTab = 2 },
-                text = { Text("Stat Leaders") }
-            )
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Position Filter Chips (Applies to all tabs)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
+        TabRow(
+            selectedTabIndex = selectedTab,
+            modifier = Modifier.clip(RoundedCornerShape(8.dp))
         ) {
-            Text(
-                text = "Position:",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            FilterChip(
-                selected = selectedPositionFilter == null,
-                onClick = { selectedPositionFilter = null },
-                label = { Text("All Positions") }
-            )
-            listOf(
-                Position.POINT_GUARD,
-                Position.SHOOTING_GUARD,
-                Position.SMALL_FORWARD,
-                Position.POWER_FORWARD,
-                Position.CENTER
-            ).forEach { pos ->
-                FilterChip(
-                    selected = selectedPositionFilter == pos,
-                    onClick = { selectedPositionFilter = if (selectedPositionFilter == pos) null else pos },
-                    label = { Text(pos.shortName) }
-                )
-            }
+            Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Top 100") })
+            Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Rookies") })
+            Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }, text = { Text("Leaders") })
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Position Filter Chips for Tab 0 and Tab 1
+        if (selectedTab == 0 || selectedTab == 1) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilterChip(
+                    selected = selectedPositionFilter == null,
+                    onClick = { selectedPositionFilter = null },
+                    label = { Text("ALL") }
+                )
+                listOf(Position.PG, Position.SG, Position.SF, Position.PF, Position.C).forEach { pos ->
+                    FilterChip(
+                        selected = selectedPositionFilter == pos,
+                        onClick = { selectedPositionFilter = if (selectedPositionFilter == pos) null else pos },
+                        label = { Text(pos.shortName) }
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+        }
 
         when (selectedTab) {
             0 -> {
-                val headerTitle = if (selectedPositionFilter == null) "Top 100 Players in League"
-                else "Top 100 ${selectedPositionFilter!!.shortName} Players in League"
+                val headerTitle = if (selectedPositionFilter == null) "Top 100 League Players"
+                else "Top 100 ${selectedPositionFilter!!.shortName} Players"
 
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
@@ -205,6 +190,29 @@ fun LeagueStatsScreen(
 
             2 -> {
                 Column(modifier = Modifier.fillMaxSize()) {
+                    // Regular vs Playoff Scope Selector
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TabRow(
+                            selectedTabIndex = selectedStatsScope,
+                            modifier = Modifier.width(220.dp).clip(RoundedCornerShape(6.dp))
+                        ) {
+                            Tab(selected = selectedStatsScope == 0, onClick = { selectedStatsScope = 0 }, text = { Text("Regular", fontSize = 12.sp) })
+                            Tab(selected = selectedStatsScope == 1, onClick = { selectedStatsScope = 1 }, text = { Text("Playoffs", fontSize = 12.sp) })
+                        }
+
+                        Text(
+                            text = "${statLeaders.size} Qualifiers",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -229,27 +237,41 @@ fun LeagueStatsScreen(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        itemsIndexed(statLeaders) { index, stat ->
-                            val team = teamMap[stat.player.teamId]
-                            val statVal = when (selectedLeaderCategory) {
-                                "PTS" -> String.format("%.1f PPG", stat.ppg)
-                                "REB" -> String.format("%.1f RPG", stat.rpg)
-                                "AST" -> String.format("%.1f APG", stat.apg)
-                                "STL" -> String.format("%.1f SPG", stat.spg)
-                                "BLK" -> String.format("%.1f BPG", stat.bpg)
-                                "PER" -> String.format("%.1f PER", stat.avgPer)
-                                else -> String.format("%.1f", stat.ppg)
+                    if (statLeaders.isNotEmpty()) {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            itemsIndexed(statLeaders) { index, stat ->
+                                val team = teamMap[stat.player.teamId]
+                                val statVal = when (selectedLeaderCategory) {
+                                    "PTS" -> String.format("%.1f PPG", stat.ppg)
+                                    "REB" -> String.format("%.1f RPG", stat.rpg)
+                                    "AST" -> String.format("%.1f APG", stat.apg)
+                                    "STL" -> String.format("%.1f SPG", stat.spg)
+                                    "BLK" -> String.format("%.1f BPG", stat.bpg)
+                                    "PER" -> String.format("%.1f PER", stat.avgPer)
+                                    else -> String.format("%.1f", stat.ppg)
+                                }
+                                LeaguePlayerRankRow(
+                                    rank = index + 1,
+                                    player = stat.player,
+                                    teamName = team?.name ?: "FA",
+                                    trailingText = "$statVal (${stat.gamesPlayed} GP)",
+                                    onClick = { selectedPlayerForDetail = stat.player }
+                                )
                             }
-                            LeaguePlayerRankRow(
-                                rank = index + 1,
-                                player = stat.player,
-                                teamName = team?.name ?: "FA",
-                                trailingText = "$statVal (${stat.gamesPlayed} GP)",
-                                onClick = { selectedPlayerForDetail = stat.player }
+                        }
+                    } else {
+                        Box(
+                            modifier = Modifier.fillMaxSize().padding(32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = if (selectedStatsScope == 0) "No regular season game stats recorded yet"
+                                else "Playoffs have not started yet (Day 167+)",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -262,6 +284,7 @@ fun LeagueStatsScreen(
         PlayerDetailBottomSheet(
             player = player,
             stats = viewModel.getPlayerSeasonStats(player.id),
+            playoffStats = viewModel.getPlayerPlayoffStats(player.id),
             onDismiss = { selectedPlayerForDetail = null }
         )
     }
