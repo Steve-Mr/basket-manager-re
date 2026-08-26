@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="primary">#1E88E5</color>
+    <color name="primary_dark">#1565C0</color>
+    <color name="accent">#FF9800</color>
+    
+    <color name="team_atl">#01244C</color>
+    <color name="team_bos">#05854C</color>
+    <color name="team_cha">#29588B</color>
+    <color name="team_chi">#D4001F</color>
+    <color name="team_cle">#9F1425</color>
+    <color name="team_dal">#006AB5</color>
+    <color name="team_den">#4393D1</color>
+    <color name="team_det">#006BB6</color>
+    <color name="team_gsw">#002942</color>
+    <color name="team_hou">#CC0000</color>
+    <color name="team_ind">#002E62</color>
+    <color name="team_lac">#EE2944</color>
+    <color name="team_lal">#4A2583</color>
+    <color name="team_mem">#001B41</color>
+    <color name="team_mia">#B62630</color>
+    <color name="team_mil">#00330A</color>
+    <color name="team_min">#015287</color>
+    <color name="team_bro">#000000</color>
+    <color name="team_nor">#002B5C</color>
+    <color name="team_nyk">#0953A0</color>
+    <color name="team_okc">#007DC3</color>
+    <color name="team_orl">#0047AB</color>
+    <color name="team_phi">#D0103A</color>
+    <color name="team_pho">#1C105E</color>
+    <color name="team_por">#000000</color>
+    <color name="team_sac">#753BBD</color>
+    <color name="team_san">#000000</color>
+    <color name="team_tor">#B31B1B</color>
+    <color name="team_uta">#00275D</color>
+    <color name="team_was">#002244</color>
+</resources>
