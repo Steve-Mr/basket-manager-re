@@ -1,7 +1,6 @@
 package com.basketmanager.re.domain.engine
 
 import com.basketmanager.re.domain.model.*
-import kotlin.math.abs
 import kotlin.random.Random
 
 data class MatchSimulationResult(
@@ -25,7 +24,6 @@ object MatchSimulationEngine {
         isPlayoffs: Boolean = false,
         userTeamId: Long = 0
     ): MatchSimulationResult {
-        // 1. Prepare lineups
         val localStarters = getPlayersByIds(localPlayers, localTactic.starterIds)
         val localReserves = getPlayersByIds(localPlayers, localTactic.reserveIds)
         val visitorStarters = getPlayersByIds(visitorPlayers, visitorTactic.starterIds)
@@ -57,11 +55,11 @@ object MatchSimulationEngine {
             )
         }
 
-        // Calculate minutes played based on bench importance
+        // Calculate authentic minutes played based on bench importance
         assignMinutes(localStarters, localReserves, localTactic.benchImportance, boxScores)
         assignMinutes(visitorStarters, visitorReserves, visitorTactic.benchImportance, boxScores)
 
-        // Base match modifiers
+        // Match modifiers (+1 / +2 for home / playoffs, star player bonuses +3, +2, +1)
         val localBaseMod = if (isPlayoffs) 2 else 1
         val visitorBaseMod = 0
 
@@ -90,56 +88,74 @@ object MatchSimulationEngine {
             visitorModDefense[p.id] = (-visitorTactic.gameType) + visitorBaseMod + p.getPenalty(p.positionFirst) + bonus
         }
 
-        // 2. Play 120 possessions (60 each)
+        val ruleteEngine = RuleteEngine(
+            localTeam = localTeam,
+            visitorTeam = visitorTeam,
+            localTitulars = localStarters,
+            localReserves = localReserves,
+            visitorTitulars = visitorStarters,
+            visitorReserves = visitorReserves,
+            localTactic = localTactic,
+            visitorTactic = visitorTactic,
+            localAttackMods = localModAttack,
+            localDefenseMods = localModDefense,
+            visitorAttackMods = visitorModAttack,
+            visitorDefenseMods = visitorModDefense,
+            boxScores = boxScores
+        )
+
+        // Injury tracking map during game
+        val injuryMap = mutableMapOf<Long, Int>()
+        localPlayers.forEach { injuryMap[it.id] = it.stateInjury }
+        visitorPlayers.forEach { injuryMap[it.id] = it.stateInjury }
+
+        // 2. Play 120 possessions
         var possessions = 120
         var isOvertime = false
         var otPossessions = 0
-
-        var localTotalPts = 0
-        var visitorTotalPts = 0
 
         fun getTeamPoints(isLocal: Boolean): Int {
             val tId = if (isLocal) localTeam.id else visitorTeam.id
             return boxScores.values.filter { it.teamId == tId }.sumOf { it.calculatePoints() }
         }
 
-        for (pos in 0 until possessions) {
-            val isLocalAttack = (pos % 2 == 1)
+        var posIdx = 0
+        while (posIdx < possessions) {
+            val isLocalAttack = (posIdx % 2 == 1)
             val attackTeam = if (isLocalAttack) localTeam else visitorTeam
             val defenseTeam = if (isLocalAttack) visitorTeam else localTeam
-            val attackPlayers = if (isLocalAttack) localRotation else visitorRotation
-            val defensePlayers = if (isLocalAttack) visitorRotation else localRotation
             val attackTactic = if (isLocalAttack) localTactic else visitorTactic
             val attackMods = if (isLocalAttack) localModAttack else visitorModAttack
-            val defenseMods = if (isLocalAttack) visitorModDefense else localModDefense
+            val defenseMods = if (isLocalAttack) localDefenseMods else visitorDefenseMods
 
-            if (attackPlayers.isEmpty() || defensePlayers.isEmpty()) continue
-
-            playSinglePossession(
-                attackPlayers = attackPlayers,
-                defensePlayers = defensePlayers,
+            playSinglePossessionAuthentic(
+                attackTeam = attackTeam,
+                defenseTeam = defenseTeam,
                 attackTactic = attackTactic,
                 attackMods = attackMods,
                 defenseMods = defenseMods,
-                boxScores = boxScores
+                rulete = ruleteEngine,
+                boxScores = boxScores,
+                injuryMap = injuryMap
             )
 
             // Overtime check at final possession
-            if (pos == possessions - 1) {
-                localTotalPts = getTeamPoints(isLocal = true)
-                visitorTotalPts = getTeamPoints(isLocal = false)
-                if (localTotalPts == visitorTotalPts) {
-                    possessions += 6 // 3 extra possessions each
+            if (posIdx == possessions - 1) {
+                val lPts = getTeamPoints(isLocal = true)
+                val vPts = getTeamPoints(isLocal = false)
+                if (lPts == vPts) {
+                    possessions += 6 // 3 extra possessions per team
                     isOvertime = true
                     otPossessions += 6
                 }
             }
+            posIdx++
         }
 
-        localTotalPts = getTeamPoints(isLocal = true)
-        visitorTotalPts = getTeamPoints(isLocal = false)
+        var localTotalPts = getTeamPoints(isLocal = true)
+        var visitorTotalPts = getTeamPoints(isLocal = false)
 
-        // Safety check if still tied after overtime
+        // Tiebreaker safety check
         if (localTotalPts == visitorTotalPts) {
             val randomScorer = localRotation.randomOrNull()
             if (randomScorer != null) {
@@ -148,9 +164,9 @@ object MatchSimulationEngine {
             }
         }
 
-        // 3. Quarter Breakdown
-        val (lQ1, lQ2, lQ3, lQ4, lOt) = distributeQuarters(localTotalPts, isOvertime)
-        val (vQ1, vQ2, vQ3, vQ4, vOt) = distributeQuarters(visitorTotalPts, isOvertime)
+        // 3. Authentic Quarter Distribution
+        val (lQ1, lQ2, lQ3, lQ4, lOt) = distributeQuartersAuthentic(localTotalPts, isOvertime)
+        val (vQ1, vQ2, vQ3, vQ4, vOt) = distributeQuartersAuthentic(visitorTotalPts, isOvertime)
 
         val updatedMatch = match.copy(
             name = "$visitorTotalPts ${visitorTeam.name} @ $localTotalPts ${localTeam.name}",
@@ -169,7 +185,7 @@ object MatchSimulationEngine {
             isPlayed = true
         )
 
-        // 4. Update player energy, form, fatigue
+        // 4. Update player energy, form, and injuries post-match
         val updatedPlayers = mutableListOf<Player>()
         val winnerTeamId = if (localTotalPts > visitorTotalPts) localTeam.id else visitorTeam.id
 
@@ -182,6 +198,7 @@ object MatchSimulationEngine {
 
                 val newForm: Int
                 val newEnergy: Int
+                val newInjury = injuryMap[p.id] ?: p.stateInjury
 
                 when {
                     isStarter -> {
@@ -197,7 +214,7 @@ object MatchSimulationEngine {
                         newEnergy = (p.stateEnergy + Random.nextInt(2, 6)).coerceIn(20, 99)
                     }
                 }
-                updatedPlayers.add(p.copy(stateForm = newForm, stateEnergy = newEnergy))
+                updatedPlayers.add(p.copy(stateForm = newForm, stateEnergy = newEnergy, stateInjury = newInjury))
             }
         }
 
@@ -230,6 +247,21 @@ object MatchSimulationEngine {
             )
         }
 
+        // Injury news if user player injured
+        updatedPlayers.filter { it.teamId == userTeamId && it.stateInjury > 0 && (injuryMap[it.id] ?: 0) > 0 }.forEach { injP ->
+            newsItems.add(
+                NewsItem(
+                    gameId = match.gameId,
+                    matchday = match.matchday,
+                    type = NewsType.INJURED,
+                    title = "Injury: ${injP.shortName}",
+                    body = "${injP.name} suffered an injury and will miss ${injP.stateInjury} days.",
+                    team1Id = injP.teamId,
+                    playerId = injP.id
+                )
+            )
+        }
+
         return MatchSimulationResult(
             match = updatedMatch,
             playerResults = finalBoxScores,
@@ -239,125 +271,175 @@ object MatchSimulationEngine {
         )
     }
 
-    private fun playSinglePossession(
-        attackPlayers: List<Player>,
-        defensePlayers: List<Player>,
+    private fun playSinglePossessionAuthentic(
+        attackTeam: Team,
+        defenseTeam: Team,
         attackTactic: Tactic,
         attackMods: Map<Long, Int>,
         defenseMods: Map<Long, Int>,
-        boxScores: MutableMap<Long, MatchResultBuilder>
+        rulete: RuleteEngine,
+        boxScores: MutableMap<Long, MatchResultBuilder>,
+        injuryMap: MutableMap<Long, Int>
     ) {
-        val ballHandler = attackPlayers.random()
-        val defender = defensePlayers.random()
-
-        // 1. Steal check (15% chance)
-        if (Random.nextInt(100) < 15) {
-            val stealPower = defender.skillSteal + (defenseMods[defender.id] ?: 0)
-            val protectPower = ballHandler.skillPass + (attackMods[ballHandler.id] ?: 0)
-            if (Random.nextInt(100) < (stealPower - protectPower + 40).coerceIn(10, 80)) {
-                boxScores[defender.id]?.steals = (boxScores[defender.id]?.steals ?: 0) + 1
-                boxScores[ballHandler.id]?.passesKo = (boxScores[ballHandler.id]?.passesKo ?: 0) + 1
-                return
+        // 1. In-game injury roll (4% attempt chance)
+        if (skillAttempt(4)) {
+            val injuredCandidate = rulete.getRulete(0, attackTeam.id)
+            if (injuredCandidate != null) {
+                val defMod = defenseMods[injuredCandidate.id] ?: 0
+                val check = (injuredCandidate.stateEnergy * (injuredCandidate.skillPhysique + defMod)) / 100
+                if (!accomplishedAction(check, 1.0f)) {
+                    val damageType = Random.nextInt(100)
+                    val days = when {
+                        damageType <= 80 -> Random.nextInt(2, 8)
+                        damageType <= 99 -> Random.nextInt(8, 50)
+                        else -> Random.nextInt(50, 181)
+                    }
+                    injuryMap[injuredCandidate.id] = days
+                }
             }
         }
 
-        // 2. Turnover check (10% chance)
-        if (Random.nextInt(100) < 10) {
-            if (Random.nextInt(100) > (ballHandler.skillPass + (attackMods[ballHandler.id] ?: 0)).coerceIn(30, 95)) {
-                boxScores[ballHandler.id]?.passesKo = (boxScores[ballHandler.id]?.passesKo ?: 0) + 1
-                return
+        // 2. Steal attempt (15% chance)
+        if (skillAttempt(15)) {
+            val ballHandler = rulete.getRulete(5, attackTeam.id)
+            val stealer = rulete.getRulete(3, defenseTeam.id)
+            if (ballHandler != null && stealer != null) {
+                val stealVal = stealer.skillSteal + (defenseMods[stealer.id] ?: 0) + getRandomGauss()
+                val passVal = ballHandler.skillPass + (attackMods[ballHandler.id] ?: 0) + getRandomGauss()
+                if (stealVal > passVal) {
+                    boxScores[stealer.id]?.steals = (boxScores[stealer.id]?.steals ?: 0) + 1
+                    boxScores[ballHandler.id]?.passesKo = (boxScores[ballHandler.id]?.passesKo ?: 0) + 1
+                    return
+                }
             }
         }
 
-        // 3. Assist check
+        // 3. Turnover / Bad pass (17% chance)
+        if (skillAttempt(17)) {
+            val passer = rulete.getRulete(5, attackTeam.id)
+            if (passer != null) {
+                val passVal = passer.skillPass + (attackMods[passer.id] ?: 0)
+                if (!accomplishedAction(passVal, 0.6f)) {
+                    boxScores[passer.id]?.passesKo = (boxScores[passer.id]?.passesKo ?: 0) + 1
+                    return
+                }
+            }
+        }
+
+        // 4. Defensive foul check (10% chance)
+        if (skillAttempt(10)) {
+            val fouler = rulete.getRulete(1, defenseTeam.id)
+            if (fouler != null) {
+                boxScores[fouler.id]?.fouls = (boxScores[fouler.id]?.fouls ?: 0) + 1
+            }
+        }
+
+        // 5. Assist check (34% chance)
         var assistBonus = 0
         var assistPlayer: Player? = null
-        if (Random.nextInt(100) < 35) {
-            val passer = attackPlayers.random()
-            if (Random.nextInt(100) < (passer.skillPass + (attackMods[passer.id] ?: 0))) {
+        if (skillAttempt(34)) {
+            val passer = rulete.getRulete(5, attackTeam.id)
+            if (passer != null && accomplishedAction(passer.skillPass + (attackMods[passer.id] ?: 0), 1.0f)) {
                 assistBonus = 5
                 assistPlayer = passer
             }
         }
 
-        // 4. Shot Selection
-        val shooter = attackPlayers.random()
-        val interiorChance = attackTactic.shotInteriorPercent
-        val tripleChance = attackTactic.shotTriplePercent
-        val roll = Random.nextInt(100)
+        // 6. Shot selection
+        val shotType: Int // 6 = Interior 2pt, 7 = Triple 3pt, 8 = Double 2pt
+        val shotModifier: Float
+        val blockAttemptChance: Int
 
-        val shotType: Int // 1 = Interior 2pt, 2 = Exterior 2pt, 3 = 3pt
-        val baseAccuracy: Double
-        val shotSkill: Int
-
-        if (roll < interiorChance) {
-            shotType = 1
-            baseAccuracy = 0.65
-            shotSkill = shooter.skillShotInterior + (attackMods[shooter.id] ?: 0)
-        } else if (roll < interiorChance + tripleChance) {
-            shotType = 3
-            baseAccuracy = 0.45
-            shotSkill = shooter.skillShotExterior + (attackMods[shooter.id] ?: 0)
-        } else {
-            shotType = 2
-            baseAccuracy = 0.55
-            shotSkill = shooter.skillShotExterior + (attackMods[shooter.id] ?: 0)
-        }
-
-        // Block check (10% chance)
-        val shotBlocker = defensePlayers.random()
-        if (Random.nextInt(100) < 10) {
-            val blockPower = shotBlocker.skillBlock + (defenseMods[shotBlocker.id] ?: 0)
-            if (Random.nextInt(100) < (blockPower - shotSkill + 30).coerceIn(5, 60)) {
-                boxScores[shotBlocker.id]?.blocks = (boxScores[shotBlocker.id]?.blocks ?: 0) + 1
-                when (shotType) {
-                    1 -> boxScores[shooter.id]?.shotsInteriorKo = (boxScores[shooter.id]?.shotsInteriorKo ?: 0) + 1
-                    2 -> boxScores[shooter.id]?.shotsExteriorDoubleKo = (boxScores[shooter.id]?.shotsExteriorDoubleKo ?: 0) + 1
-                    3 -> boxScores[shooter.id]?.shotsExteriorTripleKo = (boxScores[shooter.id]?.shotsExteriorTripleKo ?: 0) + 1
-                }
-                return
+        when {
+            skillAttempt(attackTactic.shotInteriorPercent) -> {
+                shotType = 6
+                shotModifier = 0.65f
+                blockAttemptChance = 11
+            }
+            skillAttempt(attackTactic.shotTriplePercent) -> {
+                shotType = 7
+                shotModifier = 0.45f
+                blockAttemptChance = 9
+            }
+            else -> {
+                shotType = 8
+                shotModifier = 0.55f
+                blockAttemptChance = 9
             }
         }
 
-        // Foul check (12% chance)
-        val isFoul = Random.nextInt(100) < 12
-        if (isFoul) {
-            boxScores[defender.id]?.fouls = (boxScores[defender.id]?.fouls ?: 0) + 1
+        val shooter = rulete.getRulete(shotType, attackTeam.id) ?: return
+        var shotValue = (when (shotType) {
+            6 -> shooter.skillShotInterior
+            7 -> shooter.skillShotExterior
+            else -> shooter.skillShotExterior
+        } + (attackMods[shooter.id] ?: 0) + assistBonus)
+
+        // Block contest
+        if (skillAttempt(blockAttemptChance)) {
+            val blocker = rulete.getRulete(2, defenseTeam.id)
+            if (blocker != null) {
+                val blockVal = blocker.skillBlock + (defenseMods[blocker.id] ?: 0) + getRandomGauss()
+                if (blockVal > getRandomGauss() + shotValue) {
+                    boxScores[blocker.id]?.blocks = (boxScores[blocker.id]?.blocks ?: 0) + 1
+                    when (shotType) {
+                        6 -> boxScores[shooter.id]?.shotsInteriorKo = (boxScores[shooter.id]?.shotsInteriorKo ?: 0) + 1
+                        7 -> boxScores[shooter.id]?.shotsExteriorTripleKo = (boxScores[shooter.id]?.shotsExteriorTripleKo ?: 0) + 1
+                        else -> boxScores[shooter.id]?.shotsExteriorDoubleKo = (boxScores[shooter.id]?.shotsExteriorDoubleKo ?: 0) + 1
+                    }
+                    return
+                }
+            }
         }
 
-        val effectiveSkill = (shotSkill * (1.0 + assistBonus / 100.0)).toInt()
-        val isMade = Random.nextInt(100) < (effectiveSkill * baseAccuracy).toInt().coerceIn(15, 92)
+        // Shooting foul check
+        var isShootingFoul = false
+        if (skillAttempt(15)) {
+            val fouler = rulete.getRulete(1, defenseTeam.id)
+            if (fouler != null) {
+                val blockVal = fouler.skillBlock + (defenseMods[fouler.id] ?: 0) + getRandomGauss()
+                if (getRandomGauss() + shotValue > blockVal) {
+                    boxScores[fouler.id]?.fouls = (boxScores[fouler.id]?.fouls ?: 0) + 1
+                    isShootingFoul = true
+                    shotValue -= 10
+                }
+            }
+        }
 
+        // Shot resolution
+        val isMade = accomplishedAction(shotValue, shotModifier)
         if (isMade) {
             when (shotType) {
-                1 -> boxScores[shooter.id]?.shotsInteriorOk = (boxScores[shooter.id]?.shotsInteriorOk ?: 0) + 1
-                2 -> boxScores[shooter.id]?.shotsExteriorDoubleOk = (boxScores[shooter.id]?.shotsExteriorDoubleOk ?: 0) + 1
-                3 -> boxScores[shooter.id]?.shotsExteriorTripleOk = (boxScores[shooter.id]?.shotsExteriorTripleOk ?: 0) + 1
+                6 -> boxScores[shooter.id]?.shotsInteriorOk = (boxScores[shooter.id]?.shotsInteriorOk ?: 0) + 1
+                7 -> boxScores[shooter.id]?.shotsExteriorTripleOk = (boxScores[shooter.id]?.shotsExteriorTripleOk ?: 0) + 1
+                else -> boxScores[shooter.id]?.shotsExteriorDoubleOk = (boxScores[shooter.id]?.shotsExteriorDoubleOk ?: 0) + 1
             }
             if (assistPlayer != null && assistPlayer.id != shooter.id) {
                 boxScores[assistPlayer.id]?.passesOk = (boxScores[assistPlayer.id]?.passesOk ?: 0) + 1
             }
-            if (isFoul) {
-                // And-one free throw
+            if (isShootingFoul) {
                 simulateFreeThrows(shooter, 1, attackMods, boxScores)
             }
         } else {
             when (shotType) {
-                1 -> boxScores[shooter.id]?.shotsInteriorKo = (boxScores[shooter.id]?.shotsInteriorKo ?: 0) + 1
-                2 -> boxScores[shooter.id]?.shotsExteriorDoubleKo = (boxScores[shooter.id]?.shotsExteriorDoubleKo ?: 0) + 1
-                3 -> boxScores[shooter.id]?.shotsExteriorTripleKo = (boxScores[shooter.id]?.shotsExteriorTripleKo ?: 0) + 1
+                6 -> boxScores[shooter.id]?.shotsInteriorKo = (boxScores[shooter.id]?.shotsInteriorKo ?: 0) + 1
+                7 -> boxScores[shooter.id]?.shotsExteriorTripleKo = (boxScores[shooter.id]?.shotsExteriorTripleKo ?: 0) + 1
+                else -> boxScores[shooter.id]?.shotsExteriorDoubleKo = (boxScores[shooter.id]?.shotsExteriorDoubleKo ?: 0) + 1
             }
-            if (isFoul) {
-                val numFt = if (shotType == 3) 3 else 2
+            if (isShootingFoul) {
+                val numFt = if (shotType == 7) 3 else 2
                 simulateFreeThrows(shooter, numFt, attackMods, boxScores)
             } else {
-                // Rebound battle (75% defensive, 25% offensive)
-                if (Random.nextInt(100) < 75) {
-                    val reb = defensePlayers.maxByOrNull { it.skillRebound + Random.nextInt(20) } ?: defender
-                    boxScores[reb.id]?.rebounds = (boxScores[reb.id]?.rebounds ?: 0) + 1
-                } else {
-                    val reb = attackPlayers.maxByOrNull { it.skillRebound + Random.nextInt(20) } ?: shooter
-                    boxScores[reb.id]?.rebounds = (boxScores[reb.id]?.rebounds ?: 0) + 1
+                // Rebound roll
+                val rebounderDef = rulete.getRulete(4, defenseTeam.id)
+                val rebounderAtt = rulete.getRulete(4, attackTeam.id)
+                val defVal = (rebounderDef?.skillRebound ?: 50) + (if (rebounderDef != null) defenseMods[rebounderDef.id] ?: 0 else 0) + getRandomGauss() + 15
+                val attVal = (rebounderAtt?.skillRebound ?: 50) + (if (rebounderAtt != null) attackMods[rebounderAtt.id] ?: 0 else 0) + getRandomGauss()
+
+                if (defVal >= attVal && rebounderDef != null) {
+                    boxScores[rebounderDef.id]?.rebounds = (boxScores[rebounderDef.id]?.rebounds ?: 0) + 1
+                } else if (rebounderAtt != null) {
+                    boxScores[rebounderAtt.id]?.rebounds = (boxScores[rebounderAtt.id]?.rebounds ?: 0) + 1
                 }
             }
         }
@@ -369,9 +451,9 @@ object MatchSimulationEngine {
         attackMods: Map<Long, Int>,
         boxScores: MutableMap<Long, MatchResultBuilder>
     ) {
-        val ftSkill = (shooter.skillShotFree + (attackMods[shooter.id] ?: 0)).coerceIn(40, 95)
+        val ftSkill = shooter.skillShotFree + (attackMods[shooter.id] ?: 0)
         for (i in 0 until numThrows) {
-            if (Random.nextInt(100) < ftSkill) {
+            if (accomplishedAction(ftSkill, 1.0f)) {
                 boxScores[shooter.id]?.shotsFreeOk = (boxScores[shooter.id]?.shotsFreeOk ?: 0) + 1
             } else {
                 boxScores[shooter.id]?.shotsFreeKo = (boxScores[shooter.id]?.shotsFreeKo ?: 0) + 1
@@ -385,83 +467,56 @@ object MatchSimulationEngine {
         benchImportance: Int,
         boxScores: MutableMap<Long, MatchResultBuilder>
     ) {
-        val benchMinPerPlayer = (benchImportance * 4) + Random.nextInt(-2, 3)
+        val minLow = (benchImportance - 1) * 4
+        val minHigh = benchImportance * 4
         reserves.forEach { r ->
-            boxScores[r.id]?.minutesPlayed = benchMinPerPlayer.coerceIn(8, 24)
+            val reserveMin = benchImportance + Random.nextInt(minLow, minHigh + 1)
+            boxScores[r.id]?.minutesPlayed = reserveMin.coerceIn(4, 24)
         }
         starters.forEach { s ->
-            boxScores[s.id]?.minutesPlayed = (48 - benchMinPerPlayer).coerceIn(24, 40)
+            val benchAvg = (benchImportance * 3) + Random.nextInt(1, 4)
+            val starterMin = (48 - benchAvg).coerceIn(24, 42)
+            boxScores[s.id]?.minutesPlayed = starterMin
         }
     }
 
-    private fun distributeQuarters(totalPts: Int, isOvertime: Boolean): List<Int> {
-        val basePts = if (isOvertime) (totalPts * 0.9).toInt() else totalPts
-        val otPts = totalPts - basePts
+    private fun distributeQuartersAuthentic(totalPts: Int, isOvertime: Boolean): List<Int> {
+        val distributions = listOf(
+            listOf(21, 24, 29),
+            listOf(17, 24, 28),
+            listOf(22, 26, 33)
+        )
+        val selected = distributions.random().shuffled()
+        val p1 = (totalPts * selected[0]) / 100
+        val p2 = (totalPts * selected[1]) / 100
+        val p3 = (totalPts * selected[2]) / 100
+        var p4 = totalPts - p1 - p2 - p3
+        var otPts = 0
 
-        val q1 = (basePts * Random.nextDouble(0.22, 0.28)).toInt()
-        val q2 = (basePts * Random.nextDouble(0.22, 0.28)).toInt()
-        val q3 = (basePts * Random.nextDouble(0.22, 0.28)).toInt()
-        val q4 = basePts - q1 - q2 - q3
+        if (isOvertime) {
+            otPts = (totalPts * 0.08).toInt().coerceAtLeast(2)
+            p4 -= otPts
+        }
 
-        return listOf(q1, q2, q3, q4, if (isOvertime) otPts else 0)
+        return listOf(p1, p2, p3, p4, otPts)
+    }
+
+    private fun skillAttempt(percent: Int): Boolean = Random.nextInt(100) < percent
+
+    private fun accomplishedAction(skillValue: Int, multiplier: Float): Boolean {
+        val effective = (skillValue * multiplier).toInt().coerceIn(10, 95)
+        return Random.nextInt(100) < effective
+    }
+
+    private fun getRandomGauss(): Int {
+        val r1 = Random.nextInt(100)
+        val r2 = Random.nextInt(100)
+        val r3 = Random.nextInt(100)
+        // Median of 3 rolls approximates gaussian distribution
+        return listOf(r1, r2, r3).sorted()[1]
     }
 
     private fun getPlayersByIds(players: List<Player>, ids: List<Long>): List<Player> {
         return ids.mapNotNull { id -> players.find { it.id == id } }
-    }
-}
-
-class MatchResultBuilder(
-    val matchId: Long,
-    val gameId: Long,
-    val playerId: Long,
-    val playerName: String,
-    val teamId: Long,
-    val matchday: Int,
-    var minutesPlayed: Int = 0,
-    var fouls: Int = 0,
-    var blocks: Int = 0,
-    var steals: Int = 0,
-    var rebounds: Int = 0,
-    var passesOk: Int = 0,
-    var passesKo: Int = 0,
-    var shotsFreeOk: Int = 0,
-    var shotsFreeKo: Int = 0,
-    var shotsInteriorOk: Int = 0,
-    var shotsInteriorKo: Int = 0,
-    var shotsExteriorDoubleOk: Int = 0,
-    var shotsExteriorDoubleKo: Int = 0,
-    var shotsExteriorTripleOk: Int = 0,
-    var shotsExteriorTripleKo: Int = 0
-) {
-    fun calculatePoints(): Int {
-        return (shotsFreeOk * 1) + (shotsInteriorOk * 2) + (shotsExteriorDoubleOk * 2) + (shotsExteriorTripleOk * 3)
-    }
-
-    fun build(): MatchResult {
-        return MatchResult(
-            matchId = matchId,
-            gameId = gameId,
-            playerId = playerId,
-            playerName = playerName,
-            teamId = teamId,
-            matchday = matchday,
-            minutesPlayed = minutesPlayed,
-            points = calculatePoints(),
-            fouls = fouls,
-            blocks = blocks,
-            steals = steals,
-            rebounds = rebounds,
-            passesOk = passesOk,
-            passesKo = passesKo,
-            shotsFreeOk = shotsFreeOk,
-            shotsFreeKo = shotsFreeKo,
-            shotsInteriorOk = shotsInteriorOk,
-            shotsInteriorKo = shotsInteriorKo,
-            shotsExteriorDoubleOk = shotsExteriorDoubleOk,
-            shotsExteriorDoubleKo = shotsExteriorDoubleKo,
-            shotsExteriorTripleOk = shotsExteriorTripleOk,
-            shotsExteriorTripleKo = shotsExteriorTripleKo
-        )
     }
 }

@@ -139,10 +139,7 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
 
             // 3. Load and Insert Players from CSV
             val rawPlayers = RosterParser.parseRostersCsv(rosterStream, gameId)
-            val teamMap = createdTeams.associateBy { it.name }
-
             rawPlayers.forEach { p ->
-                // Map team name to teamId
                 val matchedTeam = createdTeams.find { p.name.contains(it.name, ignoreCase = true) } ?: createdTeams.random()
                 val playerEntity = p.copy(gameId = gameId, teamId = matchedTeam.id).toEntity()
                 insertPlayerDirect(db, playerEntity)
@@ -609,7 +606,7 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
     }
 
     // ==========================================
-    // Day Advancement & Season Simulation
+    // Authentic Day Advancement & Multi-Season Loop
     // ==========================================
 
     override suspend fun advanceMatchday(gameId: Long): GameSession = withContext(Dispatchers.IO) {
@@ -619,6 +616,48 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
         val db = dbHelper.writableDatabase
         db.beginTransaction()
         try {
+            // 1. Daily Player State Evolution (Injury recovery, natural form & energy recovery)
+            val allPlayers = getPlayers(gameId)
+            allPlayers.forEach { p ->
+                var newInjury = p.stateInjury
+                var newForm = p.stateForm
+                var newEnergy = p.stateEnergy
+
+                if (newInjury > 0) {
+                    newInjury--
+                    newForm = (newForm - Random.nextInt(0, 4)).coerceIn(30, 99)
+                    if (newInjury == 0 && p.teamId == game.userTeamId) {
+                        val recNews = NewsItem(
+                            gameId = gameId,
+                            matchday = currentDay,
+                            type = NewsType.RECOVERY,
+                            title = "Medical Clearance: ${p.shortName}",
+                            body = "${p.name} has fully recovered from injury and is cleared to play.",
+                            team1Id = p.teamId,
+                            playerId = p.id
+                        )
+                        insertNewsDirect(db, recNews.toEntity())
+                    }
+                } else {
+                    newForm = (newForm + Random.nextInt(-17, 16) + ((100 - newForm) / 20)).coerceIn(30, 99)
+                    newEnergy = (newEnergy + Random.nextInt(-3, 9) + ((100 - newEnergy) / 20)).coerceIn(20, 99)
+                }
+
+                if (newInjury != p.stateInjury || newForm != p.stateForm || newEnergy != p.stateEnergy) {
+                    db.execSQL("UPDATE ${DB.TABLE_PLAYER} SET stateInjury = ?, stateForm = ?, stateEnergy = ? WHERE id = ?", arrayOf(newInjury, newForm, newEnergy, p.id))
+                }
+            }
+
+            // 2. Player Development Tick (every matchday for players where id % 10 == matchday % 10)
+            val devCandidates = allPlayers.filter { (it.id % 10) == (currentDay.toLong() % 10) }
+            val statsMap = getAllPlayerStats(gameId)
+            devCandidates.forEach { p ->
+                val recentBoxScores = statsMap[p.id]?.takeLast(10) ?: emptyList()
+                val devReport = PlayerDevelopmentEngine.developPlayerAuthentic(p, recentBoxScores, currentDay, game.userTeamId)
+                db.update(DB.TABLE_PLAYER, playerToContentValues(devReport.updatedPlayer.toEntity()), "id = ?", arrayOf(p.id.toString()))
+                devReport.generatedNews.forEach { n -> insertNewsDirect(db, n.toEntity()) }
+            }
+
             when {
                 // Regular season matchdays 1..166
                 currentDay <= 166 -> {
@@ -646,53 +685,39 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
                             userTeamId = game.userTeamId
                         )
 
-                        // Save match result
                         updateMatchDirect(db, simResult.match.toEntity())
-                        simResult.playerResults.forEach { pr ->
-                            insertMatchResultDirect(db, pr.toEntity())
-                        }
+                        simResult.playerResults.forEach { pr -> insertMatchResultDirect(db, pr.toEntity()) }
                         simResult.updatedPlayers.forEach { p ->
                             db.update(DB.TABLE_PLAYER, playerToContentValues(p.toEntity()), "id = ?", arrayOf(p.id.toString()))
                         }
-                        simResult.generatedNews.forEach { n ->
-                            insertNewsDirect(db, n.toEntity())
-                        }
+                        simResult.generatedNews.forEach { n -> insertNewsDirect(db, n.toEntity()) }
 
-                        // Update Standings
                         val localWon = (simResult.match.localScore ?: 0) > (simResult.match.visitorScore ?: 0)
                         updateStandingsAfterMatch(db, gameId, localTeam.id, localWon, simResult.match.localScore ?: 0, simResult.match.visitorScore ?: 0)
                         updateStandingsAfterMatch(db, gameId, visitorTeam.id, !localWon, simResult.match.visitorScore ?: 0, simResult.match.localScore ?: 0)
                     }
 
-                    // Mid-season player development tick
-                    if (currentDay % 15 == 0) {
-                        val allPlayers = getPlayers(gameId)
-                        allPlayers.filter { it.isHealthy }.take(20).forEach { p ->
-                            val developed = PlayerDevelopmentEngine.developPlayer(p)
-                            db.update(DB.TABLE_PLAYER, playerToContentValues(developed.toEntity()), "id = ?", arrayOf(developed.id.toString()))
-                        }
-                    }
-
-                    // On matchday 166 finish -> Setup Playoffs on matchday 167
+                    // On matchday 166 completion -> Lock Playoff Seeds on Day 167
                     if (currentDay == 166) {
                         val standings = getStandings(gameId)
                         val east = standings.filter { it.conference == Conference.EAST }.sortedByDescending { it.gamesWon }
                         val west = standings.filter { it.conference == Conference.WEST }.sortedByDescending { it.gamesWon }
                         val seriesList = PlayoffsEngine.generatePlayoffFirstRound(gameId, east, west)
-                        seriesList.forEach { s ->
-                            insertPlayoffSeriesDirect(db, s)
-                        }
+                        seriesList.forEach { s -> insertPlayoffSeriesDirect(db, s) }
+
+                        val playoffNews = NewsItem(
+                            gameId = gameId,
+                            matchday = currentDay,
+                            type = NewsType.PLAYOFFS,
+                            title = "Playoff Field Set!",
+                            body = "The regular season has concluded. The top 8 teams in each conference have secured their playoff berths."
+                        )
+                        insertNewsDirect(db, playoffNews.toEntity())
                     }
                 }
 
-                // Playoffs matchdays 167..225
-                currentDay in 167..225 -> {
-                    // Simulate playoff matchups if applicable
-                }
-
-                // End of season awards & retirement (Matchday 226)
+                // Season Finish & Player Aging / Retirements (Matchday 226)
                 currentDay == 226 -> {
-                    val allPlayers = getPlayers(gameId)
                     val (active, retired) = PlayerDevelopmentEngine.handleSeasonRetirements(allPlayers)
                     active.forEach { p ->
                         db.update(DB.TABLE_PLAYER, playerToContentValues(p.toEntity()), "id = ?", arrayOf(p.id.toString()))
@@ -705,29 +730,57 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
                         matchday = currentDay,
                         type = NewsType.INFO,
                         title = "Season Concluded",
-                        body = "${retired.size} veteran players retired from the league."
+                        body = "${retired.size} veteran players retired from the league. Contract years decremented."
                     )
                     insertNewsDirect(db, news.toEntity())
                 }
 
-                // Rookie Draft Prospects Generated (Matchday 230)
-                currentDay == 230 -> {
-                    val prospects = DraftEngine.generateDraftProspects(gameId, 90)
-                    prospects.forEach { p ->
-                        insertPlayerDirect(db, p.toEntity())
+                // Contract Renewals & Salary Cap Performance Adjustments (Matchday 227..229)
+                currentDay == 227 -> {
+                    // Update salary caps based on playoff finish
+                    val standings = getStandings(gameId)
+                    val topTeams = standings.take(8).map { it.teamId }
+                    topTeams.forEach { tId ->
+                        db.execSQL("UPDATE ${DB.TABLE_TEAM} SET salaryCap = salaryCap + 3000000 WHERE id = ?", arrayOf(tId))
+                    }
+                    val botTeams = standings.takeLast(6).map { it.teamId }
+                    botTeams.forEach { tId ->
+                        db.execSQL("UPDATE ${DB.TABLE_TEAM} SET salaryCap = MAX(50000000, salaryCap - 2000000) WHERE id = ?", arrayOf(tId))
                     }
                 }
 
-                // New Season Reset (Matchday 234)
+                // Trade Day & Draft Prospect Generation (Matchday 230)
+                currentDay == 230 -> {
+                    val prospects = DraftEngine.generateDraftProspects(gameId, 90)
+                    prospects.forEach { p -> insertPlayerDirect(db, p.toEntity()) }
+                    val news = NewsItem(
+                        gameId = gameId,
+                        matchday = currentDay,
+                        type = NewsType.TRADE,
+                        title = "Trade Day & Draft Pool Announced",
+                        body = "90 rookie prospects entered the draft board. Front offices finalize draft boards."
+                    )
+                    insertNewsDirect(db, news.toEntity())
+                }
+
+                // CPU Free Agency Validation & New Season Reset (Matchday 234)
                 currentDay >= 234 -> {
-                    // Reset schedule & standings for Season + 1
+                    // CPU teams sign free agents
+                    val teams = getTeams(gameId)
+                    val freeAgents = getFreeAgents(gameId)
+                    val rosterMap = teams.associate { it.id to getTeamPlayersDirect(db, it.id) }
+                    val signings = FreeAgencyEngine.evaluateCpuSignings(teams, freeAgents, rosterMap, game.userTeamId)
+                    signings.forEach { (p, t) ->
+                        db.execSQL("UPDATE ${DB.TABLE_PLAYER} SET teamId = ?, salary = ?, yearsContract = ? WHERE id = ?", arrayOf(t.id, p.salary, p.yearsContract, p.id))
+                    }
+
+                    // Reset for new season
                     val newSeason = game.currentSeason + 1
                     db.delete(DB.TABLE_MATCH, "gameId = ?", arrayOf(gameId.toString()))
                     db.delete(DB.TABLE_MATCH_RESULT, "gameId = ?", arrayOf(gameId.toString()))
                     db.delete(DB.TABLE_PLAYOFF_SERIES, "gameId = ?", arrayOf(gameId.toString()))
                     db.execSQL("UPDATE ${DB.TABLE_STANDINGS} SET gamesWon = 0, gamesLost = 0, pointsScored = 0, pointsAllowed = 0 WHERE gameId = ?", arrayOf(gameId.toString()))
 
-                    val teams = getTeams(gameId)
                     val newSchedule = SeasonCalendarEngine.generateSeasonSchedule(gameId, teams)
                     newSchedule.forEach { m -> insertMatchDirect(db, m.toEntity()) }
 
