@@ -232,7 +232,7 @@ fun DashboardScaffold(
 
                 NavigationDrawerItem(
                     icon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
-                    label = { Text("Season Schedule") },
+                    label = { Text("Schedule & Playoffs 🏆") },
                     selected = primaryTab == PrimaryTab.LEAGUE && leagueSubTab == 1,
                     onClick = {
                         primaryTab = PrimaryTab.LEAGUE
@@ -248,17 +248,6 @@ fun DashboardScaffold(
                     onClick = {
                         primaryTab = PrimaryTab.LEAGUE
                         leagueSubTab = 2
-                        scope.launch { drawerState.close() }
-                    }
-                )
-
-                NavigationDrawerItem(
-                    icon = { Icon(Icons.Default.EmojiEvents, contentDescription = null) },
-                    label = { Text("Playoffs Bracket 🏆") },
-                    selected = primaryTab == PrimaryTab.LEAGUE && leagueSubTab == 3,
-                    onClick = {
-                        primaryTab = PrimaryTab.LEAGUE
-                        leagueSubTab = 3
                         scope.launch { drawerState.close() }
                     }
                 )
@@ -442,15 +431,13 @@ fun DashboardScaffold(
                         Column(modifier = Modifier.fillMaxSize()) {
                             TabRow(selectedTabIndex = leagueSubTab) {
                                 Tab(selected = leagueSubTab == 0, onClick = { leagueSubTab = 0 }, text = { Text("Standings") })
-                                Tab(selected = leagueSubTab == 1, onClick = { leagueSubTab = 1 }, text = { Text("Schedule") })
+                                Tab(selected = leagueSubTab == 1, onClick = { leagueSubTab = 1 }, text = { Text("Schedule & Playoffs 🏆") })
                                 Tab(selected = leagueSubTab == 2, onClick = { leagueSubTab = 2 }, text = { Text("Leaders") })
-                                Tab(selected = leagueSubTab == 3, onClick = { leagueSubTab = 3 }, text = { Text("Playoffs 🏆") })
                             }
                             when (leagueSubTab) {
                                 0 -> StandingsScreen(viewModel = viewModel, onNavigateToTeamDetail = { viewingTeamDetailId = it })
                                 1 -> ScheduleScreen(viewModel = viewModel)
                                 2 -> LeagueStatsScreen(viewModel = viewModel)
-                                3 -> PlayoffsScreen(viewModel = viewModel)
                             }
                         }
                     }
