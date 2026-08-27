@@ -1,15 +1,22 @@
 package top.maary.basketmanager.re.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import top.maary.basketmanager.re.domain.model.Player
@@ -17,7 +24,11 @@ import top.maary.basketmanager.re.ui.components.ContractNegotiationDialog
 import top.maary.basketmanager.re.ui.components.PlayerDetailBottomSheet
 import top.maary.basketmanager.re.ui.components.PositionBadge
 import top.maary.basketmanager.re.ui.components.RatingBadge
+import top.maary.basketmanager.re.ui.theme.RatingGreen
+import top.maary.basketmanager.re.ui.theme.RatingRed
 import top.maary.basketmanager.re.ui.viewmodel.GameDashboardViewModel
+import java.text.NumberFormat
+import java.util.Locale
 
 @Composable
 fun FinancesScreen(
@@ -30,16 +41,23 @@ fun FinancesScreen(
     var playerToExtend by remember { mutableStateOf<Player?>(null) }
     var negotiationFeedback by remember { mutableStateOf<Pair<Boolean, String>?>(null) }
 
-    val totalPayroll = remember(roster) { roster.sumOf { it.salary } }
-    val salaryCap = userTeam?.salaryCap ?: 70_000_000
-    val capSpace = salaryCap - totalPayroll
+    val sortedRoster = remember(roster) { roster.sortedByDescending { it.salary } }
+    val totalPayrollY1 = remember(roster) { roster.sumOf { if (it.yearsContract >= 1) it.salary else 0 } }
+    val totalPayrollY2 = remember(roster) { roster.sumOf { if (it.yearsContract >= 2) it.salary else 0 } }
+    val totalPayrollY3 = remember(roster) { roster.sumOf { if (it.yearsContract >= 3) it.salary else 0 } }
+    val totalPayrollY4 = remember(roster) { roster.sumOf { if (it.yearsContract >= 4) it.salary else 0 } }
 
-    fun formatMoney(amount: Int): String {
-        return if (amount >= 1_000_000 || amount <= -1_000_000) {
-            "$${amount / 1_000_000}M"
-        } else {
-            "$${amount / 1_000}K"
-        }
+    val salaryCap = userTeam?.salaryCap ?: 70_000_000
+    val capSpace = salaryCap - totalPayrollY1
+
+    fun formatExactSalary(amount: Int): String {
+        return "${NumberFormat.getNumberInstance(Locale.US).format(amount)} $"
+    }
+
+    fun formatCompactSalary(amount: Int): String {
+        return if (amount == 0) "0 $"
+        else if (amount >= 1_000_000) "$${String.format(Locale.US, "%.2f", amount / 1_000_000.0)}M"
+        else "$${amount / 1_000}K"
     }
 
     Column(
@@ -47,186 +65,316 @@ fun FinancesScreen(
             .fillMaxSize()
             .padding(horizontal = 16.dp, vertical = 10.dp)
     ) {
-        Text(
-            text = "Franchise Finances",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold
-        )
-        Text(
-            text = "Payroll management, luxury tax threshold, and contract books",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Financial Overview Cards
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Card(
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text("Total Payroll", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(
-                        text = formatMoney(totalPayroll),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
-
-            Card(
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text("Salary Cap", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(
-                        text = formatMoney(salaryCap),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.ExtraBold
-                    )
-                }
-            }
-
-            Card(
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = if (capSpace >= 0) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer
-                )
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text("Cap Room", fontSize = 11.sp)
-                    Text(
-                        text = formatMoney(capSpace),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.ExtraBold
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Salary Cap Progress
+        // Hero Header Card (Team Name, Cap, Payroll, Cap Room)
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(14.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Cap Space Utilization", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                    val pct = if (salaryCap > 0) (totalPayroll.toFloat() / salaryCap.toFloat()) * 100 else 0f
-                    Text("${pct.toInt()}%", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Column {
+                        Text(
+                            text = userTeam?.name ?: "TEAM",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Black
+                        )
+                        Text(
+                            text = "${userTeam?.conference?.name ?: ""} • ${userTeam?.division?.name ?: ""}",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    Column(horizontalAlignment = Alignment.End) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("Salary Cap:", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                text = formatExactSalary(salaryCap),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF0288D1)
+                            )
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("Total Payroll:", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                text = formatExactSalary(totalPayrollY1),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = RatingGreen
+                            )
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("Cap Space:", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(
+                                text = formatExactSalary(capSpace),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = if (capSpace >= 0) RatingGreen else RatingRed
+                            )
+                        }
+                    }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Cap Space Progress Bar
                 LinearProgressIndicator(
-                    progress = { (totalPayroll.toFloat() / salaryCap.toFloat()).coerceIn(0f, 1f) },
+                    progress = { if (salaryCap > 0) (totalPayrollY1.toFloat() / salaryCap.toFloat()).coerceIn(0f, 1f) else 0f },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(10.dp),
-                    color = if (capSpace >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                        .height(8.dp),
+                    color = if (capSpace >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                    trackColor = MaterialTheme.colorScheme.outlineVariant
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
-        Text(
-            text = "Player Contracts (Sorted by Salary)",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold
-        )
+        // Multi-Year Future Salary Ledger Table Header
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Future Salary Obligations (4-Year Outlook)",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = "Tap row to Negotiate / View",
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        LazyColumn(
+        // Multi-Year Scrollable Table
+        Card(
             modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            shape = RoundedCornerShape(10.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
-            items(roster.sortedByDescending { it.salary }) { player ->
-                val isExpiring = player.yearsContract <= 1
+            Column(modifier = Modifier.fillMaxSize()) {
+                val horizontalScrollState = rememberScrollState()
 
-                Card(
+                // Table Header Bar (Cyan / Blue Accent Strip)
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { selectedPlayerForDetail = player },
-                    shape = RoundedCornerShape(10.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                        .background(Color(0xFF0288D1))
+                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                        .horizontalScroll(horizontalScrollState),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            RatingBadge(rating = player.overallRating)
-                            Column {
-                                Text(text = player.name, fontWeight = FontWeight.Bold)
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    PositionBadge(position = player.positionFirst)
-                                    Text(
-                                        text = "${player.yearsContract} yr(s) left",
-                                        fontSize = 11.sp,
-                                        color = if (isExpiring) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                                        fontWeight = if (isExpiring) FontWeight.Bold else FontWeight.Normal
-                                    )
-                                }
-                            }
-                        }
+                    Text(
+                        text = "Player",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        modifier = Modifier.width(130.dp)
+                    )
+                    Text(
+                        text = "Year 1 (Current)",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.width(115.dp)
+                    )
+                    Text(
+                        text = "Year 2 (Next)",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.width(115.dp)
+                    )
+                    Text(
+                        text = "Year 3 (Y+2)",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.width(115.dp)
+                    )
+                    Text(
+                        text = "Year 4 (Y+3)",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.width(115.dp)
+                    )
+                }
+
+                // Table Rows (Zebra Striped)
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                ) {
+                    itemsIndexed(sortedRoster) { index, player ->
+                        val isExpiring = player.yearsContract <= 1
+                        val rowBg = if (index % 2 == 0) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
 
                         Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(rowBg)
+                                .clickable {
+                                    if (isExpiring) {
+                                        playerToExtend = player
+                                    } else {
+                                        selectedPlayerForDetail = player
+                                    }
+                                }
+                                .padding(horizontal = 8.dp, vertical = 6.dp)
+                                .horizontalScroll(horizontalScrollState),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
+                            // Player Column
+                            Row(
+                                modifier = Modifier.width(130.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                RatingBadge(rating = player.overallRating)
+                                Column {
+                                    Text(
+                                        text = player.shortName,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 1
+                                    )
+                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Text(
+                                            text = player.positionFirst.shortName,
+                                            fontSize = 10.sp,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        if (isExpiring) {
+                                            Text(
+                                                text = "• Expiring",
+                                                fontSize = 10.sp,
+                                                color = MaterialTheme.colorScheme.error,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Year 1 Column
                             Text(
-                                text = "${formatMoney(player.salary)}/yr",
-                                fontWeight = FontWeight.ExtraBold,
-                                color = MaterialTheme.colorScheme.primary
+                                text = formatExactSalary(if (player.yearsContract >= 1) player.salary else 0),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                textAlign = TextAlign.End,
+                                color = if (player.yearsContract >= 1) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline,
+                                modifier = Modifier.width(115.dp)
                             )
 
-                            if (isExpiring) {
-                                Button(
-                                    onClick = {
-                                        playerToExtend = player
-                                    },
-                                    shape = RoundedCornerShape(6.dp),
-                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
-                                ) {
-                                    Text("Extend", fontSize = 11.sp)
-                                }
-                            }
+                            // Year 2 Column
+                            Text(
+                                text = formatExactSalary(if (player.yearsContract >= 2) player.salary else 0),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                textAlign = TextAlign.End,
+                                color = if (player.yearsContract >= 2) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                                modifier = Modifier.width(115.dp)
+                            )
+
+                            // Year 3 Column
+                            Text(
+                                text = formatExactSalary(if (player.yearsContract >= 3) player.salary else 0),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                textAlign = TextAlign.End,
+                                color = if (player.yearsContract >= 3) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                                modifier = Modifier.width(115.dp)
+                            )
+
+                            // Year 4 Column
+                            Text(
+                                text = formatExactSalary(if (player.yearsContract >= 4) player.salary else 0),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                textAlign = TextAlign.End,
+                                color = if (player.yearsContract >= 4) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+                                modifier = Modifier.width(115.dp)
+                            )
                         }
                     }
+                }
+
+                // Total Summary Footer Row (Green / Accent Bar like original BM15)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFF2E7D32))
+                        .padding(horizontal = 8.dp, vertical = 8.dp)
+                        .horizontalScroll(horizontalScrollState),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Total Payroll",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White,
+                        modifier = Modifier.width(130.dp)
+                    )
+                    Text(
+                        text = formatExactSalary(totalPayrollY1),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White,
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.width(115.dp)
+                    )
+                    Text(
+                        text = formatExactSalary(totalPayrollY2),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White,
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.width(115.dp)
+                    )
+                    Text(
+                        text = formatExactSalary(totalPayrollY3),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White,
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.width(115.dp)
+                    )
+                    Text(
+                        text = formatExactSalary(totalPayrollY4),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White,
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.width(115.dp)
+                    )
                 }
             }
         }
     }
 
-    // Contract Extension Dialog with Live Acceptance Meter & 5 Quick Presets
+    // Contract Negotiation Dialog with Live Acceptance Meter & 5 Quick Presets
     playerToExtend?.let { player ->
         ContractNegotiationDialog(
             player = player,
+            isHomeTeamRenewal = true,
             onDismiss = { playerToExtend = null },
             onConfirmOffer = { years: Int, salary: Int, accepted: Boolean, feedbackMsg: String ->
                 if (accepted) {
@@ -243,6 +391,7 @@ fun FinancesScreen(
         )
     }
 
+    // Negotiation Result Feedback Dialog
     negotiationFeedback?.let { (accepted, msg) ->
         AlertDialog(
             onDismissRequest = { negotiationFeedback = null },
@@ -256,6 +405,7 @@ fun FinancesScreen(
         )
     }
 
+    // Player Detail Modal
     selectedPlayerForDetail?.let { player ->
         PlayerDetailBottomSheet(
             player = player,
