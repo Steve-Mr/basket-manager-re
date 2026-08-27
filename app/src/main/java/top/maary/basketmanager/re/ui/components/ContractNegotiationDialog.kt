@@ -17,6 +17,7 @@ import top.maary.basketmanager.re.domain.model.Position
 import top.maary.basketmanager.re.ui.theme.RatingGreen
 import top.maary.basketmanager.re.ui.theme.RatingRed
 import kotlin.math.pow
+import kotlin.math.roundToInt
 import kotlin.random.Random
 
 object ContractEngine {
@@ -30,7 +31,7 @@ object ContractEngine {
         var baseVal = (120.0 * ((subAvg.pow(4) / 400.0) * ((40 - age) + (potential * 2) + 75))) / 100.0
         baseVal *= pos2Bonus
         val rawSalary = (baseVal * 10.0).toInt()
-        val rounded = ((rawSalary / 100_000) * 100_000).coerceIn(1_000_000, 40_000_000)
+        val rounded = ((rawSalary / 100_000) * 100_000).coerceIn(1_000_000, 38_000_000)
         return rounded
     }
 
@@ -80,9 +81,15 @@ fun ContractNegotiationDialog(
 ) {
     val marketSalary = remember(player) { ContractEngine.calculateMarketDemandSalary(player) }
     var selectedYears by remember { mutableIntStateOf(if (player.age >= 34) 2 else 3) }
-    var offeredSalaryFloat by remember { mutableFloatStateOf(marketSalary / 1_000_000f) }
 
-    val currentOfferedSalaryInt = (offeredSalaryFloat * 1_000_000).toInt()
+    val marketM = marketSalary / 1_000_000f
+    val sliderMin = (marketM * 0.6f).coerceAtLeast(0.8f)
+    val sliderMax = (marketM * 1.5f).coerceIn(2.5f, 42.0f)
+    val sliderSteps = ((sliderMax - sliderMin) / 0.1f).roundToInt().coerceAtLeast(1)
+
+    var offeredSalaryFloat by remember { mutableFloatStateOf(marketM) }
+
+    val currentOfferedSalaryInt = ((offeredSalaryFloat * 10).roundToInt() * 100_000).coerceAtLeast(800_000)
     val ratio = currentOfferedSalaryInt.toDouble() / marketSalary.toDouble()
 
     val currentTier = when {
@@ -191,34 +198,34 @@ fun ContractNegotiationDialog(
 
                     FilterChip(
                         selected = currentTier == 0,
-                        onClick = { offeredSalaryFloat = pMinus20.coerceIn(1f, 40f) },
+                        onClick = { offeredSalaryFloat = pMinus20.coerceIn(sliderMin, sliderMax) },
                         label = { Text("-20% Cut (${formatMoney((pMinus20 * 1_000_000).toInt())})", fontSize = 11.sp) }
                     )
                     FilterChip(
                         selected = currentTier == 1,
-                        onClick = { offeredSalaryFloat = pMinus10.coerceIn(1f, 40f) },
+                        onClick = { offeredSalaryFloat = pMinus10.coerceIn(sliderMin, sliderMax) },
                         label = { Text("-10% (${formatMoney((pMinus10 * 1_000_000).toInt())})", fontSize = 11.sp) }
                     )
                     FilterChip(
                         selected = currentTier == 2,
-                        onClick = { offeredSalaryFloat = pBase.coerceIn(1f, 40f) },
+                        onClick = { offeredSalaryFloat = pBase.coerceIn(sliderMin, sliderMax) },
                         label = { Text("Market (${formatMoney((pBase * 1_000_000).toInt())})", fontSize = 11.sp) }
                     )
                     FilterChip(
                         selected = currentTier == 3,
-                        onClick = { offeredSalaryFloat = pPlus10.coerceIn(1f, 40f) },
+                        onClick = { offeredSalaryFloat = pPlus10.coerceIn(sliderMin, sliderMax) },
                         label = { Text("+10% (${formatMoney((pPlus10 * 1_000_000).toInt())})", fontSize = 11.sp) }
                     )
                     FilterChip(
                         selected = currentTier == 4,
-                        onClick = { offeredSalaryFloat = pPlus20.coerceIn(1f, 40f) },
+                        onClick = { offeredSalaryFloat = pPlus20.coerceIn(sliderMin, sliderMax) },
                         label = { Text("+20% Max (${formatMoney((pPlus20 * 1_000_000).toInt())})", fontSize = 11.sp) }
                     )
                 }
 
                 HorizontalDivider()
 
-                // Slider Adjustment
+                // Slider Adjustment with Dynamic Range Centered around Market Salary
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -234,10 +241,10 @@ fun ContractNegotiationDialog(
                 }
 
                 Slider(
-                    value = offeredSalaryFloat,
+                    value = offeredSalaryFloat.coerceIn(sliderMin, sliderMax),
                     onValueChange = { offeredSalaryFloat = it },
-                    valueRange = 1f..40f,
-                    steps = 77 // steps of ~0.5M
+                    valueRange = sliderMin..sliderMax,
+                    steps = sliderSteps
                 )
 
                 // Contract Duration (1 to 5 Years)
