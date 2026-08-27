@@ -622,14 +622,19 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
         var teamId = 0L
         var round = 1
         var pickPos = 1
+        var gameId = 0L
         pickCursor.use { c ->
             if (c.moveToFirst()) {
                 teamId = c.getLong(c.getColumnIndexOrThrow("currentTeamId"))
                 round = c.getInt(c.getColumnIndexOrThrow("round"))
                 pickPos = c.getInt(c.getColumnIndexOrThrow("position"))
+                gameId = c.getLong(c.getColumnIndexOrThrow("gameId"))
             }
         }
         if (teamId == 0L) return@withContext false
+
+        val player = getPlayer(prospectId) ?: return@withContext false
+        val team = getTeam(teamId) ?: return@withContext false
 
         val (salary, years) = DraftEngine.calculateRookieSalary(round, pickPos)
         val cv = ContentValues().apply {
@@ -639,7 +644,63 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
         }
         db.update(DB.TABLE_PLAYER, cv, "id = ?", arrayOf(prospectId.toString()))
         db.delete(DB.TABLE_DRAFT_PICK, "id = ?", arrayOf(pickId.toString()))
+
+        val news = NewsItem(
+            gameId = gameId,
+            matchday = 230,
+            type = NewsType.TRADE,
+            title = "Draft Pick: ${team.name}",
+            body = "${team.name} selected ${player.name} (${player.positionFirst.shortName}, Rating: ${player.overallRating}) with Pick #$pickPos in Round $round ($${salary / 1_000_000.0}M/yr for $years yrs).",
+            team1Id = teamId,
+            playerId = player.id
+        )
+        insertNewsDirect(db, news.toEntity())
         true
+    }
+
+    override suspend fun executeCpuDraftPick(gameId: Long, pickId: Long): Player? = withContext(Dispatchers.IO) {
+        val db = dbHelper.readableDatabase
+        val pickCursor = db.rawQuery("SELECT * FROM ${DB.TABLE_DRAFT_PICK} WHERE id = ?", arrayOf(pickId.toString()))
+        var teamId = 0L
+        var round = 1
+        var pickPos = 1
+        pickCursor.use { c ->
+            if (c.moveToFirst()) {
+                teamId = c.getLong(c.getColumnIndexOrThrow("currentTeamId"))
+                round = c.getInt(c.getColumnIndexOrThrow("round"))
+                pickPos = c.getInt(c.getColumnIndexOrThrow("position"))
+            }
+        }
+        if (teamId == 0L) return@withContext null
+
+        val availableProspects = getDraftProspects(gameId)
+        if (availableProspects.isEmpty()) return@withContext null
+
+        val roster = getTeamPlayers(teamId)
+        val selected = DraftEngine.cpuSelectProspect(roster, availableProspects, pickPos)
+
+        val success = selectDraftPick(selected.id, pickId)
+        if (success) selected else null
+    }
+
+    override suspend fun simulateDraftUntilUser(gameId: Long, userTeamId: Long): List<Pair<DraftPick, Player>> = withContext(Dispatchers.IO) {
+        val executed = mutableListOf<Pair<DraftPick, Player>>()
+        while (true) {
+            val remainingPicks = getDraftPicks(gameId)
+            if (remainingPicks.isEmpty()) break
+            val nextPick = remainingPicks.first()
+            if (nextPick.currentTeamId == userTeamId) {
+                // Stop! User is on the clock
+                break
+            }
+            val player = executeCpuDraftPick(gameId, nextPick.id)
+            if (player != null) {
+                executed.add(Pair(nextPick, player))
+            } else {
+                break
+            }
+        }
+        executed
     }
 
     // ==========================================
@@ -952,12 +1013,29 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
                 currentDay == 230 -> {
                     val prospects = DraftEngine.generateDraftProspects(gameId, 90)
                     prospects.forEach { p -> insertPlayerDirect(db, p.toEntity()) }
+
+                    // Setup Draft Order for Round 1 & Round 2 based on standings & lottery
+                    val standings = getStandings(gameId)
+                    val draftOrder = DraftEngine.calculateDraftOrder(standings)
+
+                    draftOrder.forEachIndexed { index, teamId ->
+                        val pickPos = index + 1
+                        db.execSQL(
+                            "UPDATE ${DB.TABLE_DRAFT_PICK} SET position = ? WHERE gameId = ? AND round = 1 AND originalTeamId = ?",
+                            arrayOf(pickPos, gameId, teamId)
+                        )
+                        db.execSQL(
+                            "UPDATE ${DB.TABLE_DRAFT_PICK} SET position = ? WHERE gameId = ? AND round = 2 AND originalTeamId = ?",
+                            arrayOf(pickPos, gameId, teamId)
+                        )
+                    }
+
                     val news = NewsItem(
                         gameId = gameId,
                         matchday = currentDay,
                         type = NewsType.TRADE,
-                        title = "Trade Day & Draft Pool Announced",
-                        body = "90 rookie prospects entered the draft board. Front offices finalize draft boards."
+                        title = "Rookie Draft Ceremony Begins!",
+                        body = "The draft order is set. 90 top rookie prospects are on the board across 2 rounds of selection."
                     )
                     insertNewsDirect(db, news.toEntity())
                 }

@@ -327,6 +327,34 @@ class GameDashboardViewModel(
         }
     }
 
+    fun getDraftProspects(onLoaded: (List<Player>) -> Unit) {
+        viewModelScope.launch {
+            val gameId = _game.value?.id ?: return@launch
+            val prospects = repository.getDraftProspects(gameId)
+            onLoaded(prospects)
+        }
+    }
+
+    fun executeCpuDraftPick(pickId: Long, onComplete: (Player?) -> Unit) {
+        viewModelScope.launch {
+            val gameId = _game.value?.id ?: return@launch
+            val player = repository.executeCpuDraftPick(gameId, pickId)
+            if (player != null) {
+                _game.value?.let { refreshGameData(it) }
+            }
+            onComplete(player)
+        }
+    }
+
+    fun simulateDraftUntilUser(onComplete: (List<Pair<DraftPick, Player>>) -> Unit) {
+        viewModelScope.launch {
+            val game = _game.value ?: return@launch
+            val results = repository.simulateDraftUntilUser(game.id, game.userTeamId)
+            refreshGameData(game)
+            onComplete(results)
+        }
+    }
+
     suspend fun getMatchBoxScores(matchId: Long): List<MatchResult> {
         return repository.getMatchResults(matchId)
     }

@@ -8,7 +8,7 @@ object DraftEngine {
     fun generateDraftProspects(gameId: Long, count: Int = 90): List<Player> {
         val prospects = mutableListOf<Player>()
         for (i in 0 until count) {
-            val isSpecial = (i < 2 && Random.nextInt(25) == 0)
+            val isSpecial = (i < 2 && Random.nextInt(20) == 0)
             val pos1 = Position.fromId(Random.nextInt(1, 6))
             val pos2 = if (Random.nextInt(5) < 2) {
                 when (pos1) {
@@ -109,13 +109,52 @@ object DraftEngine {
         }
     }
 
+    fun cpuSelectProspect(
+        teamRoster: List<Player>,
+        availableProspects: List<Player>,
+        pickPosition: Int
+    ): Player {
+        if (availableProspects.isEmpty()) throw IllegalStateException("No available draft prospects")
+        if (pickPosition <= 3) {
+            val topPool = availableProspects.take(3)
+            return topPool.random()
+        }
+
+        // Check if team has positions with <= 1 player
+        val posCounts = Position.entries.filter { it != Position.NONE }.associateWith { pos ->
+            teamRoster.count { it.positionFirst == pos }
+        }
+        val neededPositions = posCounts.filter { it.value <= 1 }.keys
+
+        val candidatePool = availableProspects.take(4)
+        val matchingNeed = candidatePool.find { it.positionFirst in neededPositions }
+        if (matchingNeed != null) {
+            return matchingNeed
+        }
+
+        return candidatePool.take(3).random()
+    }
+
+    fun calculateDraftOrder(standings: List<StandingsItem>): List<Long> {
+        val sorted = standings.sortedBy { it.gamesWon }
+        val nonPlayoff = sorted.take(14).map { it.teamId }
+        val playoff = sorted.drop(14).map { it.teamId }
+
+        val b1 = nonPlayoff.subList(0, minOf(4, nonPlayoff.size)).shuffled()
+        val b2 = if (nonPlayoff.size > 4) nonPlayoff.subList(4, minOf(8, nonPlayoff.size)).shuffled() else emptyList()
+        val b3 = if (nonPlayoff.size > 8) nonPlayoff.subList(8, minOf(12, nonPlayoff.size)).shuffled() else emptyList()
+        val b4 = if (nonPlayoff.size > 12) nonPlayoff.subList(12, nonPlayoff.size).shuffled() else emptyList()
+
+        return b1 + b2 + b3 + b4 + playoff
+    }
+
     private fun getSpecialProspectName(pos: Position): String {
         return when (pos) {
-            Position.POINT_GUARD -> listOf("Magic Johnson", "Allen Iverson", "John Stockton", "Isiah Thomas").random()
-            Position.SHOOTING_GUARD -> listOf("Michael Jordan", "Kobe Bryant", "Dwyane Wade", "Reggie Miller").random()
-            Position.SMALL_FORWARD -> listOf("Larry Bird", "Scottie Pippen", "Julius Erving", "Dominique Wilkins").random()
-            Position.POWER_FORWARD -> listOf("Charles Barkley", "Karl Malone", "Kevin McHale", "Tim Duncan").random()
-            Position.CENTER -> listOf("Shaquille O'Neal", "Hakeem Olajuwon", "Wilt Chamberlain", "Kareem Abdul-Jabbar").random()
+            Position.POINT_GUARD -> listOf("Magic Johnson", "Allen Iverson", "John Stockton", "Isiah Thomas", "Oscar Robertson").random()
+            Position.SHOOTING_GUARD -> listOf("Michael Jordan", "Kobe Bryant", "Dwyane Wade", "Reggie Miller", "Pete Maravich").random()
+            Position.SMALL_FORWARD -> listOf("Larry Bird", "Scottie Pippen", "Julius Erving", "Dominique Wilkins", "Len Bias").random()
+            Position.POWER_FORWARD -> listOf("Charles Barkley", "Karl Malone", "Kevin McHale", "Tim Duncan", "Dennis Rodman").random()
+            Position.CENTER -> listOf("Shaquille O'Neal", "Hakeem Olajuwon", "Wilt Chamberlain", "Kareem Abdul-Jabbar", "Bill Russell").random()
             else -> ProceduralNames.getRandomFullName()
         }
     }

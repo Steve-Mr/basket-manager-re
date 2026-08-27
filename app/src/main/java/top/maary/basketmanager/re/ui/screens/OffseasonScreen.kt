@@ -286,8 +286,8 @@ fun OffseasonScreen(
             }
 
             2 -> {
-                // Tab 2: Draft
-                DraftScreen(viewModel = viewModel)
+                // Tab 2: Live Draft Ceremony
+                LiveDraftCeremonyScreen(viewModel = viewModel)
             }
 
             3 -> {
