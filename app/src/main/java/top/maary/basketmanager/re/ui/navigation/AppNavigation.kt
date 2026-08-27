@@ -1,10 +1,13 @@
 package top.maary.basketmanager.re.ui.navigation
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -26,7 +29,8 @@ enum class PrimaryTab(val title: String, val icon: ImageVector) {
     HOME("Home", Icons.Default.Home),
     SQUAD("Squad", Icons.Default.People),
     LEAGUE("League", Icons.Default.FormatListNumbered),
-    OFFICE("Office", Icons.Default.BusinessCenter)
+    OFFICE("Office", Icons.Default.BusinessCenter),
+    OFFSEASON("Offseason", Icons.Default.Celebration)
 }
 
 @Composable
@@ -94,6 +98,20 @@ fun DashboardScaffold(
 
     var viewingTeamDetailId by remember { mutableStateOf<Long?>(null) }
 
+    BackHandler {
+        when {
+            drawerState.isOpen -> {
+                scope.launch { drawerState.close() }
+            }
+            viewingTeamDetailId != null -> {
+                viewingTeamDetailId = null
+            }
+            primaryTab != PrimaryTab.HOME -> {
+                primaryTab = PrimaryTab.HOME
+            }
+        }
+    }
+
     if (viewingTeamDetailId != null) {
         TeamDetailScreen(
             teamId = viewingTeamDetailId!!,
@@ -106,8 +124,16 @@ fun DashboardScaffold(
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
-            ModalDrawerSheet {
-                Spacer(modifier = Modifier.height(16.dp))
+            ModalDrawerSheet(
+                modifier = Modifier.width(310.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .verticalScroll(rememberScrollState())
+                        .padding(bottom = 32.dp)
+                ) {
+                    Spacer(modifier = Modifier.height(16.dp))
                 Text(
                     text = userTeam?.name ?: "Basket Manager",
                     style = MaterialTheme.typography.titleLarge,
@@ -289,8 +315,23 @@ fun DashboardScaffold(
                     }
                 )
 
-                Spacer(modifier = Modifier.weight(1f))
+                if ((game?.currentMatchday ?: 1) in 226..234) {
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.Celebration, contentDescription = null) },
+                        label = { Text("Offseason Hub 🏆") },
+                        selected = primaryTab == PrimaryTab.OFFSEASON,
+                        onClick = {
+                            primaryTab = PrimaryTab.OFFSEASON
+                            scope.launch { drawerState.close() }
+                        }
+                    )
+                }
+
+                
+
+                Spacer(modifier = Modifier.height(16.dp))
                 HorizontalDivider()
+                Spacer(modifier = Modifier.height(8.dp))
 
                 NavigationDrawerItem(
                     icon = { Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null) },
@@ -303,7 +344,8 @@ fun DashboardScaffold(
                         }
                     }
                 )
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(24.dp))
+                }
             }
         }
     ) {
@@ -333,8 +375,11 @@ fun DashboardScaffold(
                 )
             },
             bottomBar = {
+                val isOffseason = (game?.currentMatchday ?: 1) in 226..234
+                val visibleTabs = if (isOffseason) PrimaryTab.entries else PrimaryTab.entries.filter { it != PrimaryTab.OFFSEASON }
+
                 NavigationBar {
-                    PrimaryTab.entries.forEach { tab ->
+                    visibleTabs.forEach { tab ->
                         NavigationBarItem(
                             icon = { Icon(tab.icon, contentDescription = tab.title) },
                             label = { Text(tab.title) },
@@ -360,6 +405,18 @@ fun DashboardScaffold(
                             },
                             onNavigateToTeamDetail = { teamId ->
                                 viewingTeamDetailId = teamId
+                            },
+                            onNavigateToOffseason = {
+                                primaryTab = PrimaryTab.OFFSEASON
+                            }
+                        )
+                    }
+
+                    PrimaryTab.OFFSEASON -> {
+                        OffseasonScreen(
+                            viewModel = viewModel,
+                            onNavigateToNewSeason = {
+                                primaryTab = PrimaryTab.HOME
                             }
                         )
                     }

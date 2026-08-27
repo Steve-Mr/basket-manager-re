@@ -226,9 +226,18 @@ object MatchSimulationEngine {
 
         val newsItems = mutableListOf<NewsItem>()
         if (localTeam.id == userTeamId || visitorTeam.id == userTeamId || isPlayoffs) {
+            val isUserGame = (localTeam.id == userTeamId || visitorTeam.id == userTeamId)
             val userWon = (winnerTeamId == userTeamId)
-            val type = if (isPlayoffs) NewsType.PLAYOFFS else if (userWon) NewsType.WON else NewsType.LOST
-            val title = if (userWon) "Victory: ${updatedMatch.name}" else "Defeat: ${updatedMatch.name}"
+            val type = if (isUserGame) {
+                if (userWon) NewsType.WON else NewsType.LOST
+            } else {
+                NewsType.PLAYOFFS
+            }
+            val title = if (isPlayoffs) {
+                if (userWon) "Playoffs Victory: ${updatedMatch.name}" else "Playoffs Defeat: ${updatedMatch.name}"
+            } else {
+                if (userWon) "Victory: ${updatedMatch.name}" else "Defeat: ${updatedMatch.name}"
+            }
             val topScorer = finalBoxScores.maxByOrNull { it.points }
             val topRebounder = finalBoxScores.maxByOrNull { it.rebounds }
             val topPasser = finalBoxScores.maxByOrNull { it.passesOk }

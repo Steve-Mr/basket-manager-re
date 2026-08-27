@@ -818,8 +818,10 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
                                 userTeamId = game.userTeamId
                             )
 
-                            insertMatchDirect(db, simResult.match.toEntity())
-                            simResult.playerResults.forEach { pr -> insertMatchResultDirect(db, pr.toEntity()) }
+                            val insertedMatchId = insertMatchDirect(db, simResult.match.toEntity())
+                            simResult.playerResults.forEach { pr ->
+                                insertMatchResultDirect(db, pr.copy(matchId = insertedMatchId).toEntity())
+                            }
                             simResult.updatedPlayers.forEach { p ->
                                 db.update(DB.TABLE_PLAYER, playerToContentValues(p.toEntity()), "id = ?", arrayOf(p.id.toString()))
                             }

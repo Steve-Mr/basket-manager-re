@@ -31,7 +31,8 @@ fun DashboardScreen(
     viewModel: GameDashboardViewModel,
     onNavigateToRoster: () -> Unit,
     onNavigateToStandings: () -> Unit,
-    onNavigateToTeamDetail: (Long) -> Unit
+    onNavigateToTeamDetail: (Long) -> Unit,
+    onNavigateToOffseason: () -> Unit = {}
 ) {
     val game by viewModel.game.collectAsState()
     val userTeam by viewModel.userTeam.collectAsState()
@@ -69,9 +70,57 @@ fun DashboardScreen(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
+            .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        // Offseason Banner (if Day 226..234)
+        if ((game?.currentMatchday ?: 1) in 226..234) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text("🏆", fontSize = 18.sp)
+                                Text(
+                                    text = "OFFSEASON IN PROGRESS",
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = MaterialTheme.colorScheme.onTertiaryContainer
+                                )
+                            }
+                            Text(
+                                text = when (game?.currentMatchday ?: 226) {
+                                    226 -> "Phase 1: Veteran Retirements"
+                                    in 227..229 -> "Phase 2: Contract Negotiations"
+                                    230 -> "Phase 3: Rookie Draft Day"
+                                    in 231..233 -> "Phase 4: Free Agency Market"
+                                    else -> "Phase 5: Ready for Next Season"
+                                },
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.85f)
+                            )
+                        }
+
+                        Button(
+                            onClick = onNavigateToOffseason,
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Enter Hub >", fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+        }
+
         // Main Dashboard Card
         item {
             Card(
@@ -274,10 +323,10 @@ fun DashboardScreen(
 
         // News Feed with Visual Color Coding
         items(newsList.take(30)) { news ->
-            val isWin = news.type == NewsType.WON
-            val isLoss = news.type == NewsType.LOST
+            val isWin = news.type == NewsType.WON || (news.type == NewsType.PLAYOFFS && news.title.contains("Victory"))
+            val isLoss = news.type == NewsType.LOST || (news.type == NewsType.PLAYOFFS && news.title.contains("Defeat"))
             val isInj = news.type == NewsType.INJURED
-            val isPlayoff = news.type == NewsType.PLAYOFFS
+            val isPlayoff = news.type == NewsType.PLAYOFFS && !news.title.contains("Victory") && !news.title.contains("Defeat")
 
             val borderColor = when {
                 isWin -> RatingGreen
