@@ -136,44 +136,62 @@ data class Player(
     companion object {
         fun getBaseOfPosition(pos: Int, skill: Int): Int {
             return when (skill) {
-                1 -> if (pos == 1 || pos == 2) 25 else if (pos == 3) 27 else 31
-                2 -> when (pos) {
-                    1 -> 10
-                    2 -> 15
-                    3 -> 27
-                    else -> 31
+                1 -> when (pos) { // Physique (Body & Stamina)
+                    1 -> 25
+                    2 -> 26
+                    3 -> 28
+                    4 -> 32
+                    else -> 34
                 }
-                3 -> when (pos) {
+                2 -> when (pos) { // Block
+                    1 -> 10
+                    2 -> 14
+                    3 -> 24
+                    4 -> 31
+                    else -> 35
+                }
+                3 -> when (pos) { // Steal
                     1 -> 30
-                    4 -> 15
-                    5 -> 10
-                    else -> 27
-                }
-                4 -> when (pos) {
-                    1 -> 10
-                    2 -> 15
-                    3 -> 27
-                    else -> 31
-                }
-                5 -> when (pos) {
-                    1 -> 31
-                    2 -> 27
-                    3 -> 20
-                    else -> 10
-                }
-                6 -> when (pos) {
-                    1 -> 10
-                    2 -> 20
+                    2 -> 28
                     3 -> 25
-                    else -> 31
+                    4 -> 18
+                    else -> 12
                 }
-                7 -> when (pos) {
-                    1 -> 31
-                    2 -> 31
-                    3 -> 27
-                    else -> 10
+                4 -> when (pos) { // Rebound
+                    1 -> 14
+                    2 -> 18
+                    3 -> 26
+                    4 -> 32
+                    else -> 35
                 }
-                8 -> 27
+                5 -> when (pos) { // Pass
+                    1 -> 35
+                    2 -> 28
+                    3 -> 25
+                    4 -> 18
+                    else -> 16
+                }
+                6 -> when (pos) { // Shot Interior (2PT / Mid-range & Paint Scoring)
+                    1 -> 25 // Calibrated PG mid-range & slashing
+                    2 -> 27 // Calibrated SG scoring
+                    3 -> 28
+                    4 -> 32
+                    else -> 35
+                }
+                7 -> when (pos) { // Shot Exterior (3PT)
+                    1 -> 30
+                    2 -> 33
+                    3 -> 28
+                    4 -> 22
+                    else -> 14
+                }
+                8 -> when (pos) { // Free Throw
+                    1 -> 30
+                    2 -> 30
+                    3 -> 28
+                    4 -> 24
+                    else -> 20
+                }
                 else -> 20
             }
         }

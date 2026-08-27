@@ -187,6 +187,33 @@ class SimulationEngineTest {
     }
 
     @Test
+    fun testDraftProspectBalance() {
+        val prospects = DraftEngine.generateDraftProspects(gameId = 1, count = 200)
+        assertEquals(200, prospects.size)
+
+        val pgProspects = prospects.filter { it.positionFirst == Position.POINT_GUARD }
+        assertTrue("Should generate point guards", pgProspects.isNotEmpty())
+
+        val avgPgMid = pgProspects.map { it.skillShotInterior }.average()
+        val avgPg3pt = pgProspects.map { it.skillShotExterior }.average()
+        val avgPgPass = pgProspects.map { it.skillPass }.average()
+
+        assertTrue("PG mid-range (Shot Interior) should be balanced (avg >= 55), actual: $avgPgMid", avgPgMid >= 55.0)
+        assertTrue("PG 3PT (Shot Exterior) should be strong (avg >= 60), actual: $avgPg3pt", avgPg3pt >= 60.0)
+        assertTrue("PG Passing should be elite (avg >= 65), actual: $avgPgPass", avgPgPass >= 65.0)
+
+        // Check center dominance in paint & rebounds
+        val cProspects = prospects.filter { it.positionFirst == Position.CENTER }
+        assertTrue("Should generate centers", cProspects.isNotEmpty())
+        val avgCMid = cProspects.map { it.skillShotInterior }.average()
+        val avgCReb = cProspects.map { it.skillRebound }.average()
+        val avgCBlk = cProspects.map { it.skillBlock }.average()
+        assertTrue("Center paint scoring should be high (avg >= 65), actual: $avgCMid", avgCMid >= 65.0)
+        assertTrue("Center rebounding should be high (avg >= 65), actual: $avgCReb", avgCReb >= 65.0)
+        assertTrue("Center blocking should be high (avg >= 65), actual: $avgCBlk", avgCBlk >= 65.0)
+    }
+
+    @Test
     fun testTradeEvaluation() {
         val teamA = Team(id = 1, gameId = 1, name = "BOS", conference = Conference.EAST, division = Division.E1_ATLANTIC, salaryCap = 70000000)
         val teamB = Team(id = 2, gameId = 1, name = "LAL", conference = Conference.WEST, division = Division.W3_PACIFIC, salaryCap = 70000000)
