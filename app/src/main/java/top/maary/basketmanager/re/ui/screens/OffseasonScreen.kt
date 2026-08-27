@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import top.maary.basketmanager.re.domain.model.Player
+import top.maary.basketmanager.re.ui.components.ContractNegotiationDialog
 import top.maary.basketmanager.re.ui.components.PlayerDetailBottomSheet
 import top.maary.basketmanager.re.ui.components.PositionBadge
 import top.maary.basketmanager.re.ui.components.RatingBadge
@@ -346,73 +347,20 @@ fun OffseasonScreen(
         }
     }
 
-    // Negotiation Dialog (Authentic BM15 Algorithm)
+    // Negotiation Dialog with Live Acceptance Meter & 5 Quick Presets
     negotiatingPlayer?.let { player ->
-        val offeredSalaryInt = (offerSalarySlider * 1_000_000).toInt()
-
-        AlertDialog(
-            onDismissRequest = { negotiatingPlayer = null },
-            title = { Text("Contract Offer: ${player.name}") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Current Base Salary: ${formatMoney(player.salary)}/yr")
-                    Text("Offered Salary: ${formatMoney(offeredSalaryInt)}/yr", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-
-                    Slider(
-                        value = offerSalarySlider,
-                        onValueChange = { offerSalarySlider = it },
-                        valueRange = 1f..35f,
-                        steps = 34
-                    )
-
-                    Text("Contract Duration ($offerYears Years):", fontSize = 12.sp)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        (1..5).forEach { y ->
-                            FilterChip(
-                                selected = offerYears == y,
-                                onClick = { offerYears = y },
-                                label = { Text("$y Yrs") }
-                            )
-                        }
+        ContractNegotiationDialog(
+            player = player,
+            onDismiss = { negotiatingPlayer = null },
+            onConfirmOffer = { years: Int, salary: Int, accepted: Boolean, feedbackMsg: String ->
+                if (accepted) {
+                    viewModel.extendContract(player.id, years, salary) {
+                        negotiatingPlayer = null
+                        negotiationFeedback = Pair(true, feedbackMsg)
                     }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val p = player
-                        val base = p.salary.coerceAtLeast(1_000_000)
-                        val salaryRatio = offeredSalaryInt.toDouble() / base.toDouble()
-                        val tier = when {
-                            salaryRatio >= 1.20 -> 4
-                            salaryRatio >= 1.05 -> 3
-                            salaryRatio >= 0.95 -> 2
-                            salaryRatio >= 0.85 -> 1
-                            else -> 0
-                        }
-                        val roll = (0..10).random()
-                        val accepted = roll <= (p.loyalty + tier)
-
-                        if (accepted) {
-                            viewModel.extendContract(p.id, offerYears, offeredSalaryInt) {
-                                negotiatingPlayer = null
-                                negotiationFeedback = Pair(true, "${p.name} has ACCEPTED your contract extension offer of ${formatMoney(offeredSalaryInt)}/yr for $offerYears years!")
-                            }
-                        } else {
-                            negotiatingPlayer = null
-                            negotiationFeedback = Pair(false, "${p.name} has REJECTED your contract offer! He requests higher annual compensation or intends to enter Free Agency.")
-                        }
-                    }
-                ) {
-                    Text("Submit Offer")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { negotiatingPlayer = null }) {
-                    Text("Cancel")
+                } else {
+                    negotiatingPlayer = null
+                    negotiationFeedback = Pair(false, feedbackMsg)
                 }
             }
         )

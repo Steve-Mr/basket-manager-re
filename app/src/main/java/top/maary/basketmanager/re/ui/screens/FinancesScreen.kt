@@ -13,6 +13,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import top.maary.basketmanager.re.domain.model.Player
+import top.maary.basketmanager.re.ui.components.ContractNegotiationDialog
 import top.maary.basketmanager.re.ui.components.PlayerDetailBottomSheet
 import top.maary.basketmanager.re.ui.components.PositionBadge
 import top.maary.basketmanager.re.ui.components.RatingBadge
@@ -27,7 +28,7 @@ fun FinancesScreen(
 
     var selectedPlayerForDetail by remember { mutableStateOf<Player?>(null) }
     var playerToExtend by remember { mutableStateOf<Player?>(null) }
-    var extensionYears by remember { mutableIntStateOf(2) }
+    var negotiationFeedback by remember { mutableStateOf<Pair<Boolean, String>?>(null) }
 
     val totalPayroll = remember(roster) { roster.sumOf { it.salary } }
     val salaryCap = userTeam?.salaryCap ?: 70_000_000
@@ -208,7 +209,6 @@ fun FinancesScreen(
                                 Button(
                                     onClick = {
                                         playerToExtend = player
-                                        extensionYears = 2
                                     },
                                     shape = RoundedCornerShape(6.dp),
                                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
@@ -223,48 +223,34 @@ fun FinancesScreen(
         }
     }
 
-    // Contract Extension Dialog
+    // Contract Extension Dialog with Live Acceptance Meter & 5 Quick Presets
     playerToExtend?.let { player ->
-        val extensionSalary = ((player.salary * 1.05).toInt()).coerceAtLeast(1_000_000)
+        ContractNegotiationDialog(
+            player = player,
+            onDismiss = { playerToExtend = null },
+            onConfirmOffer = { years: Int, salary: Int, accepted: Boolean, feedbackMsg: String ->
+                if (accepted) {
+                    val totalYears = player.yearsContract + years
+                    viewModel.extendContract(player.id, totalYears, salary) {
+                        playerToExtend = null
+                        negotiationFeedback = Pair(true, feedbackMsg)
+                    }
+                } else {
+                    playerToExtend = null
+                    negotiationFeedback = Pair(false, feedbackMsg)
+                }
+            }
+        )
+    }
 
+    negotiationFeedback?.let { (accepted, msg) ->
         AlertDialog(
-            onDismissRequest = { playerToExtend = null },
-            title = { Text("Extend Contract: ${player.name}") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Current Contract: ${player.yearsContract} year(s) left @ ${formatMoney(player.salary)}/yr")
-                    Text("Offered Extension: ${formatMoney(extensionSalary)} / year", fontWeight = FontWeight.Bold)
-
-                    Text("Contract Duration:", fontSize = 12.sp)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        (1..3).forEach { y ->
-                            FilterChip(
-                                selected = extensionYears == y,
-                                onClick = { extensionYears = y },
-                                label = { Text("$y Years") }
-                            )
-                        }
-                    }
-                }
-            },
+            onDismissRequest = { negotiationFeedback = null },
+            title = { Text(if (accepted) "Offer Accepted! ✅" else "Offer Rejected ❌") },
+            text = { Text(msg) },
             confirmButton = {
-                Button(
-                    onClick = {
-                        val totalYears = player.yearsContract + extensionYears
-                        viewModel.extendContract(player.id, totalYears, extensionSalary) {
-                            playerToExtend = null
-                        }
-                    }
-                ) {
-                    Text("Confirm Extension")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { playerToExtend = null }) {
-                    Text("Cancel")
+                Button(onClick = { negotiationFeedback = null }) {
+                    Text("OK")
                 }
             }
         )
