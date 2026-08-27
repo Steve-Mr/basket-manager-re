@@ -440,7 +440,7 @@ fun MatchBoxScoreDialog(
                 ) {
                     item {
                         Text(
-                            text = "STARTERS (首发阵容)",
+                            text = "STARTERS",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary,
@@ -455,7 +455,7 @@ fun MatchBoxScoreDialog(
                     if (currentReserves.isNotEmpty()) {
                         item {
                             Text(
-                                text = "BENCH ROTATION (替补轮换)",
+                                text = "BENCH RESERVES",
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -475,37 +475,90 @@ fun MatchBoxScoreDialog(
 
 @Composable
 fun BoxScorePlayerRow(stat: MatchResult) {
+    val fgTotal = stat.totalFgAttempted
+    val fgMade = stat.totalFgMade
+    val fgPct = kotlin.math.round(stat.fgPercentage).toInt()
+
+    val tpTotal = stat.total3PtAttempted
+    val tpMade = stat.shotsExteriorTripleOk
+
+    val ftTotal = stat.totalFtAttempted
+    val ftMade = stat.shotsFreeOk
+
+    val perFormatted = String.format(java.util.Locale.US, "%.1f", stat.per)
+
     Card(
         shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 10.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            Column {
-                Text(stat.playerName, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                Text(
-                    text = "${stat.minutesPlayed} MIN • PER: ${stat.per} • F: ${stat.fouls}",
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(stat.playerName, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = MaterialTheme.colorScheme.surface
+                    ) {
+                        Text(
+                            text = "${stat.minutesPlayed}m",
+                            fontSize = 10.sp,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "${stat.points} PTS",
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Text(
+                        text = "${stat.rebounds} REB",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "${stat.passesOk} AST",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
-            Column(horizontalAlignment = Alignment.End) {
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    text = "${stat.points} PTS",
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Text(
-                    text = "${stat.rebounds} REB, ${stat.passesOk} AST, ${stat.steals} STL, ${stat.blocks} BLK",
+                    text = "FG: $fgMade/$fgTotal ($fgPct%) • 3PT: $tpMade/$tpTotal • FT: $ftMade/$ftTotal",
                     fontSize = 10.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "STL: ${stat.steals} • BLK: ${stat.blocks} • PER: $perFormatted",
+                    fontSize = 10.sp,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Medium
                 )
             }
         }

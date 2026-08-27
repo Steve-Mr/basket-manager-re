@@ -46,7 +46,7 @@ fun ChallengesScreen(
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "Win an NBA Championship with all 30 franchises",
+                    text = "Win a World Championship with all 30 franchises",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

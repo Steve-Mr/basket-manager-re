@@ -234,7 +234,9 @@ object MatchSimulationEngine {
             val topPasser = finalBoxScores.maxByOrNull { it.passesOk }
             val topBlocker = finalBoxScores.maxByOrNull { it.blocks }
             val topStealer = finalBoxScores.maxByOrNull { it.steals }
-            val body = "MVP: ${mvpPlayer?.shortName ?: "N/A"} (${bestPerResult?.points ?: 0} PTS, ${bestPerResult?.rebounds ?: 0} REB, ${bestPerResult?.passesOk ?: 0} AST)\\nLeaders: PTS: ${topScorer?.playerName ?: "N/A"} (${topScorer?.points ?: 0}) • REB: ${topRebounder?.playerName ?: "N/A"} (${topRebounder?.rebounds ?: 0}) • AST: ${topPasser?.playerName ?: "N/A"} (${topPasser?.passesOk ?: 0})" + (if ((topBlocker?.blocks ?: 0) > 0) " • BLK: ${topBlocker?.playerName} (${topBlocker?.blocks})" else "") + (if ((topStealer?.steals ?: 0) > 0) " • STL: ${topStealer?.playerName} (${topStealer?.steals})" else "")
+            val mvpSummary = "MVP: " + (mvpPlayer?.shortName ?: "N/A") + " (" + (bestPerResult?.points ?: 0) + " PTS, " + (bestPerResult?.rebounds ?: 0) + " REB, " + (bestPerResult?.passesOk ?: 0) + " AST)"
+            val leadersSummary = "Leaders: PTS: " + (topScorer?.playerName ?: "N/A") + " (" + (topScorer?.points ?: 0) + ") • REB: " + (topRebounder?.playerName ?: "N/A") + " (" + (topRebounder?.rebounds ?: 0) + ") • AST: " + (topPasser?.playerName ?: "N/A") + " (" + (topPasser?.passesOk ?: 0) + ")" + (if ((topBlocker?.blocks ?: 0) > 0) " • BLK: " + topBlocker?.playerName + " (" + topBlocker?.blocks + ")" else "") + (if ((topStealer?.steals ?: 0) > 0) " • STL: " + topStealer?.playerName + " (" + topStealer?.steals + ")" else "")
+            val body = "$mvpSummary\n$leadersSummary"
             newsItems.add(
                 NewsItem(
                     gameId = match.gameId,

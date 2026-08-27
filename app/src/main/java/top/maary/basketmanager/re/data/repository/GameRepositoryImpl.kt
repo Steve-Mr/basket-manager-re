@@ -823,7 +823,9 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
                             simResult.updatedPlayers.forEach { p ->
                                 db.update(DB.TABLE_PLAYER, playerToContentValues(p.toEntity()), "id = ?", arrayOf(p.id.toString()))
                             }
-                            simResult.generatedNews.forEach { n -> insertNewsDirect(db, n.toEntity()) }
+                            simResult.generatedNews.filter { match.teamLocalId == game.userTeamId || match.teamVisitorId == game.userTeamId }.forEach { n ->
+                                insertNewsDirect(db, n.toEntity())
+                            }
 
                             val winnerTeamId = if ((simResult.match.localScore ?: 0) > (simResult.match.visitorScore ?: 0)) homeId else awayId
                             val updatedSeries = PlayoffsEngine.updateSeriesAfterMatch(series, winnerTeamId)
@@ -877,7 +879,7 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
                                             gameId = gameId,
                                             matchday = currentDay,
                                             type = NewsType.PLAYOFFS,
-                                            title = "NBA Finals Matchup: ${t1?.name} vs ${t2?.name}!",
+                                            title = "World Finals Matchup: ${t1?.name} vs ${t2?.name}!",
                                             body = "The battle for the World Championship trophy begins!"
                                         )
                                         insertNewsDirect(db, news.toEntity())

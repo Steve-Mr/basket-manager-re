@@ -69,7 +69,7 @@ fun TradeScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "NBA Trade Machine",
+                text = "Trade Machine",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )

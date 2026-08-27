@@ -59,7 +59,7 @@ fun PlayoffsScreen(
         ) {
             Column {
                 Text(
-                    text = "NBA Playoffs Tree",
+                    text = "Playoffs Tournament Tree",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold
                 )
@@ -103,7 +103,7 @@ fun PlayoffsScreen(
         ) {
             Tab(selected = selectedConferenceTab == 0, onClick = { selectedConferenceTab = 0 }, text = { Text("East Bracket") })
             Tab(selected = selectedConferenceTab == 1, onClick = { selectedConferenceTab = 1 }, text = { Text("West Bracket") })
-            Tab(selected = selectedConferenceTab == 2, onClick = { selectedConferenceTab = 2 }, text = { Text("NBA Finals 🏆") })
+            Tab(selected = selectedConferenceTab == 2, onClick = { selectedConferenceTab = 2 }, text = { Text("The World Finals 🏆") })
         }
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -258,7 +258,7 @@ fun NbaFinalsView(
         Spacer(modifier = Modifier.height(10.dp))
 
         Text(
-            text = "THE NBA FINALS",
+            text = "THE WORLD FINALS",
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Black,
             color = Color(0xFFFFD700)
@@ -316,7 +316,7 @@ fun NbaFinalsView(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = "NBA Finals matchup will be determined after the Eastern & Western Conference Finals conclude.",
+                        text = "World Finals matchup will be determined after the Eastern & Western Conference Finals conclude.",
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -463,7 +463,7 @@ fun ProjectedBracketView(
                 Icon(Icons.Default.EmojiEvents, contentDescription = null, modifier = Modifier.size(56.dp), tint = Color(0xFFFFD700))
                 Spacer(modifier = Modifier.height(10.dp))
                 Text(
-                    text = "NBA Finals is contested after Conference Finals",
+                    text = "World Finals is contested after Conference Finals",
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center
                 )

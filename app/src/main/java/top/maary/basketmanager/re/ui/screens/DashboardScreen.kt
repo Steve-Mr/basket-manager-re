@@ -338,8 +338,9 @@ fun DashboardScreen(
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = news.body,
-                        style = MaterialTheme.typography.bodySmall
+                        text = news.body.replace("\\n", "\n"),
+                        style = MaterialTheme.typography.bodySmall,
+                        lineHeight = 16.sp
                     )
                 }
             }

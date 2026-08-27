@@ -71,7 +71,7 @@ fun ScheduleScreen(
         ) {
             Column {
                 Text(
-                    text = "NBA Season Schedule",
+                    text = "Season Schedule",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold
                 )
