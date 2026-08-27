@@ -307,6 +307,26 @@ class GameDashboardViewModel(
         }
     }
 
+    fun extendContract(playerId: Long, years: Int, salary: Int, onComplete: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val success = repository.extendContract(playerId, years, salary)
+            if (success) {
+                _game.value?.let { refreshGameData(it) }
+            }
+            onComplete(success)
+        }
+    }
+
+    fun selectDraftPick(prospectId: Long, pickId: Long, onComplete: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val success = repository.selectDraftPick(prospectId, pickId)
+            if (success) {
+                _game.value?.let { refreshGameData(it) }
+            }
+            onComplete(success)
+        }
+    }
+
     suspend fun getMatchBoxScores(matchId: Long): List<MatchResult> {
         return repository.getMatchResults(matchId)
     }

@@ -54,6 +54,7 @@ interface GameRepository {
     suspend fun executeTrade(proposal: TradeProposal): TradeEvaluationResult
     suspend fun signFreeAgent(playerId: Long, teamId: Long, salary: Int, years: Int): Boolean
     suspend fun selectDraftPick(prospectId: Long, pickId: Long): Boolean
+    suspend fun extendContract(playerId: Long, years: Int, salary: Int): Boolean
 
     // Simulation Loop
     suspend fun advanceMatchday(gameId: Long): GameSession

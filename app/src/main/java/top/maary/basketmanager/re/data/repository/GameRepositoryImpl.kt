@@ -606,6 +606,16 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
         true
     }
 
+    override suspend fun extendContract(playerId: Long, years: Int, salary: Int): Boolean = withContext(Dispatchers.IO) {
+        val db = dbHelper.writableDatabase
+        val cv = ContentValues().apply {
+            put("yearsContract", years)
+            put("salary", salary)
+        }
+        val count = db.update(DB.TABLE_PLAYER, cv, "id = ?", arrayOf(playerId.toString()))
+        count > 0
+    }
+
     override suspend fun selectDraftPick(prospectId: Long, pickId: Long): Boolean = withContext(Dispatchers.IO) {
         val db = dbHelper.writableDatabase
         val pickCursor = db.rawQuery("SELECT * FROM ${DB.TABLE_DRAFT_PICK} WHERE id = ?", arrayOf(pickId.toString()))
@@ -878,17 +888,24 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
                                 val finals = allSeries.find { it.round == 4 }
                                 if (finals?.winnerTeamId != null) {
                                     val champTeam = teamMap[finals.winnerTeamId]
-                                    if (champTeam != null) {
-                                        db.execSQL("UPDATE ${DB.TABLE_CHALLENGE} SET completed = 1, completedSeason = ${game.currentSeason} WHERE teamName = ?", arrayOf(champTeam.name))
-                                    }
-                                    val champNews = NewsItem(
-                                        gameId = gameId,
-                                        matchday = currentDay,
-                                        type = NewsType.PLAYOFFS,
-                                        title = "🏆 NBA CHAMPIONS: ${champTeam?.name}!",
-                                        body = "${champTeam?.name} has won the NBA World Championship in Season ${game.currentSeason}!"
+                                    val countCursor = db.rawQuery(
+                                        "SELECT COUNT(*) FROM " + DB.TABLE_NEWS + " WHERE gameId = ? AND title LIKE '%WORLD CHAMPIONS%'",
+                                        arrayOf(gameId.toString())
                                     )
-                                    insertNewsDirect(db, champNews.toEntity())
+                                    val alreadyAnnounced = countCursor.use { if (it.moveToFirst()) it.getInt(0) > 0 else false }
+                                    if (!alreadyAnnounced) {
+                                        if (champTeam != null) {
+                                            db.execSQL("UPDATE ${DB.TABLE_CHALLENGE} SET completed = 1, completedSeason = ${game.currentSeason} WHERE teamName = ?", arrayOf(champTeam.name))
+                                        }
+                                        val champNews = NewsItem(
+                                            gameId = gameId,
+                                            matchday = currentDay,
+                                            type = NewsType.PLAYOFFS,
+                                            title = "🏆 WORLD CHAMPIONS: ${champTeam?.name}!",
+                                            body = "${champTeam?.name} has won the World Championship in Season ${game.currentSeason}!"
+                                        )
+                                        insertNewsDirect(db, champNews.toEntity())
+                                    }
                                 }
                             }
                         }
@@ -955,10 +972,20 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
                     db.delete(DB.TABLE_MATCH, "gameId = ?", arrayOf(gameId.toString()))
                     db.delete(DB.TABLE_MATCH_RESULT, "gameId = ?", arrayOf(gameId.toString()))
                     db.delete(DB.TABLE_PLAYOFF_SERIES, "gameId = ?", arrayOf(gameId.toString()))
+                    db.delete(DB.TABLE_NEWS, "gameId = ?", arrayOf(gameId.toString()))
                     db.execSQL("UPDATE ${DB.TABLE_STANDINGS} SET gamesWon = 0, gamesLost = 0, pointsScored = 0, pointsAllowed = 0 WHERE gameId = ?", arrayOf(gameId.toString()))
 
                     val newSchedule = SeasonCalendarEngine.generateSeasonSchedule(gameId, teams)
                     newSchedule.forEach { m -> insertMatchDirect(db, m.toEntity()) }
+
+                    val kickoffNews = NewsItem(
+                        gameId = gameId,
+                        matchday = 1,
+                        type = NewsType.INFO,
+                        title = "Season $newSeason Tip-Off!",
+                        body = "Welcome to Season $newSeason! 30 franchises compete across 82 regular season matchdays for the World Championship."
+                    )
+                    insertNewsDirect(db, kickoffNews.toEntity())
 
                     val updatedGame = game.copy(currentSeason = newSeason, currentMatchday = 1)
                     updateGame(updatedGame)

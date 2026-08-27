@@ -26,6 +26,8 @@ fun FinancesScreen(
     val roster by viewModel.userRoster.collectAsState()
 
     var selectedPlayerForDetail by remember { mutableStateOf<Player?>(null) }
+    var playerToExtend by remember { mutableStateOf<Player?>(null) }
+    var extensionYears by remember { mutableIntStateOf(2) }
 
     val totalPayroll = remember(roster) { roster.sumOf { it.salary } }
     val salaryCap = userTeam?.salaryCap ?: 70_000_000
@@ -154,6 +156,8 @@ fun FinancesScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(roster.sortedByDescending { it.salary }) { player ->
+                val isExpiring = player.yearsContract <= 1
+
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -175,32 +179,102 @@ fun FinancesScreen(
                             RatingBadge(rating = player.overallRating)
                             Column {
                                 Text(text = player.name, fontWeight = FontWeight.Bold)
-                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
                                     PositionBadge(position = player.positionFirst)
                                     Text(
-                                        text = "${player.yearsContract} years remaining",
+                                        text = "${player.yearsContract} yr(s) left",
                                         fontSize = 11.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        color = if (isExpiring) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontWeight = if (isExpiring) FontWeight.Bold else FontWeight.Normal
                                     )
                                 }
                             }
                         }
 
-                        Text(
-                            text = "${formatMoney(player.salary)} / yr",
-                            fontWeight = FontWeight.ExtraBold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = "${formatMoney(player.salary)}/yr",
+                                fontWeight = FontWeight.ExtraBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+
+                            if (isExpiring) {
+                                Button(
+                                    onClick = {
+                                        playerToExtend = player
+                                        extensionYears = 2
+                                    },
+                                    shape = RoundedCornerShape(6.dp),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Text("Extend", fontSize = 11.sp)
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
     }
 
+    // Contract Extension Dialog
+    playerToExtend?.let { player ->
+        val extensionSalary = ((player.salary * 1.05).toInt()).coerceAtLeast(1_000_000)
+
+        AlertDialog(
+            onDismissRequest = { playerToExtend = null },
+            title = { Text("Extend Contract: ${player.name}") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Current Contract: ${player.yearsContract} year(s) left @ ${formatMoney(player.salary)}/yr")
+                    Text("Offered Extension: ${formatMoney(extensionSalary)} / year", fontWeight = FontWeight.Bold)
+
+                    Text("Contract Duration:", fontSize = 12.sp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        (1..3).forEach { y ->
+                            FilterChip(
+                                selected = extensionYears == y,
+                                onClick = { extensionYears = y },
+                                label = { Text("$y Years") }
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val totalYears = player.yearsContract + extensionYears
+                        viewModel.extendContract(player.id, totalYears, extensionSalary) {
+                            playerToExtend = null
+                        }
+                    }
+                ) {
+                    Text("Confirm Extension")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { playerToExtend = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
     selectedPlayerForDetail?.let { player ->
         PlayerDetailBottomSheet(
             player = player,
-            stats = viewModel.getPlayerSeasonStats(player.id), playoffStats = viewModel.getPlayerPlayoffStats(player.id),
+            stats = viewModel.getPlayerSeasonStats(player.id),
+            playoffStats = viewModel.getPlayerPlayoffStats(player.id),
             onDismiss = { selectedPlayerForDetail = null }
         )
     }
