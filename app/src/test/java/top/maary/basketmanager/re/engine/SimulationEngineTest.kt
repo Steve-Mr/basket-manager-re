@@ -214,6 +214,81 @@ class SimulationEngineTest {
     }
 
     @Test
+    fun testSmoothVeteranAgingAndLoadManagement() {
+        val vet = Player(
+            id = 101,
+            gameId = 1,
+            teamId = 1,
+            name = "Veteran Star",
+            age = 32,
+            potential = 8,
+            yearsContract = 2,
+            salary = 12000000,
+            positionFirst = Position.POINT_GUARD,
+            skillPhysique = 82,
+            skillBlock = 65,
+            skillSteal = 75,
+            skillRebound = 65,
+            skillPass = 88,
+            skillShotInterior = 82,
+            skillShotExterior = 86,
+            skillShotFree = 88
+        )
+
+        // Moderate, controlled 20 minutes/game (load management)
+        val boxScores = (1..5).map { day ->
+            MatchResult(
+                matchId = day.toLong(), gameId = 1, playerId = 101, playerName = "Veteran Star",
+                teamId = 1, matchday = day, minutesPlayed = 20, points = 16, fouls = 1, blocks = 0,
+                steals = 1, rebounds = 3, passesOk = 6, passesKo = 1, shotsFreeOk = 2, shotsFreeKo = 0,
+                shotsInteriorOk = 4, shotsInteriorKo = 2, shotsExteriorDoubleOk = 1, shotsExteriorDoubleKo = 0,
+                shotsExteriorTripleOk = 2, shotsExteriorTripleKo = 1
+            )
+        }
+
+        val report = PlayerDevelopmentEngine.developPlayerAuthentic(
+            player = vet,
+            recentResults = boxScores,
+            currentMatchday = 5,
+            userTeamId = 1
+        )
+
+        // Rating should remain stable without steep drops
+        assertTrue("Veteran rating should stay high with controlled minutes", report.updatedPlayer.overallRating >= 80)
+    }
+
+    @Test
+    fun testDynamicRetirementWithoutHardAgeLimit() {
+        // High-rated 40-year-old legend under contract (e.g. LeBron tier)
+        val legend40 = Player(
+            id = 201, gameId = 1, teamId = 1, name = "Legendary Veteran", age = 40,
+            potential = 9, yearsContract = 2, salary = 25000000, positionFirst = Position.SMALL_FORWARD,
+            skillPhysique = 85, skillBlock = 78, skillSteal = 80, skillRebound = 82,
+            skillPass = 90, skillShotInterior = 88, skillShotExterior = 86, skillShotFree = 86
+        )
+
+        // Low-rated 36-year-old uncontracted player
+        val scrub36 = Player(
+            id = 202, gameId = 1, teamId = 1, name = "Scrub", age = 36,
+            potential = 2, yearsContract = 0, salary = 0, positionFirst = Position.CENTER,
+            skillPhysique = 50, skillBlock = 48, skillSteal = 40, skillRebound = 50,
+            skillPass = 40, skillShotInterior = 48, skillShotExterior = 40, skillShotFree = 50
+        )
+
+        var legendRetiredCount = 0
+        val iterations = 100
+        for (i in 1..iterations) {
+            val (active, retired) = PlayerDevelopmentEngine.handleSeasonRetirements(listOf(legend40, scrub36))
+            if (retired.any { it.id == legend40.id }) {
+                legendRetiredCount++
+            }
+        }
+
+        // Legend is NOT 100% hard-forced to retire at 40
+        assertTrue("Legend at 40 should not be 100% force retired (retired: $legendRetiredCount / $iterations)", legendRetiredCount < 60)
+    }
+
+    @Test
     fun testTradeEvaluation() {
         val teamA = Team(id = 1, gameId = 1, name = "BOS", conference = Conference.EAST, division = Division.E1_ATLANTIC, salaryCap = 70000000)
         val teamB = Team(id = 2, gameId = 1, name = "LAL", conference = Conference.WEST, division = Division.W3_PACIFIC, salaryCap = 70000000)

@@ -23,31 +23,53 @@ object PlayerDevelopmentEngine {
         val minutesAvg = if (matchesPlayed == 0) 0 else recentResults.sumOf { it.minutesPlayed } / matchesPlayed
         val perAvg = if (matchesPlayed == 0) 0.0 else recentResults.sumOf { it.per } / matchesPlayed
 
-        var loops = 3
-        if (player.potential <= 4 && player.age < 30) loops = 0
-        else if (player.potential <= 6 && player.age < 30) loops = 1
-        else if (player.potential <= 8 && player.age < 30) loops = 2
-        else if (player.potential <= 9 && player.age < 30) loops = 4
-        else if (player.potential <= 10 && player.age < 30) loops = 5
+        var loops = when {
+            player.age < 30 -> {
+                when {
+                    player.potential <= 4 -> 0
+                    player.potential <= 6 -> 1
+                    player.potential <= 8 -> 2
+                    player.potential <= 9 -> 4
+                    else -> 5
+                }
+            }
+            player.age in 30..33 -> 1 // Gentle prime-to-veteran transition (no cliff drop)
+            player.age in 34..36 -> 2 // Gradual veteran decline
+            else -> 3 // Late career
+        }
 
         if (player.overallRating > 90.0 && player.age < 30) loops--
         if (player.age < 21) loops++
 
         var curPlayer = player
 
+        // Load management bonus: 12-28 mins/game provides optimal veteran workload protection
+        val minutesFactor = when {
+            curPlayer.age >= 30 && minutesAvg in 12..28 -> 32
+            curPlayer.age >= 34 && minutesAvg > 32 -> (30 - (minutesAvg - 30)).coerceAtLeast(10) // Heavy workload fatigue
+            else -> minutesAvg
+        }
+
         for (i in 0 until loops) {
             val randomPot = Random.nextInt(1, 11)
-            if (curPlayer.age < 30 || randomPot < (curPlayer.potential - 4)) {
+            if (curPlayer.age < 30 || (curPlayer.age in 30..32 && perAvg >= 18.0 && randomPot < curPlayer.potential - 3)) {
                 val devRoll = perAvg.toInt() + Random.nextInt(
-                    (curPlayer.potential * (30 - curPlayer.age)) + minutesAvg,
+                    (curPlayer.potential * (30 - curPlayer.age).coerceAtLeast(1)) + minutesAvg,
                     151
                 )
                 if (devRoll > 138 && (Random.nextInt(1, 11) >= 6 || curPlayer.overallRating < 76.0)) {
                     curPlayer = applySkillChange(curPlayer, isIncrement = true)
                 }
-            } else if (curPlayer.age > 30) {
-                val declineRoll = Random.nextInt(curPlayer.potential + minutesAvg, 141)
-                if (declineRoll < 55) {
+            } else if (curPlayer.age >= 30) {
+                // Smooth age-tiered decline thresholds with high-skill superstar protection
+                val declineThreshold = when {
+                    curPlayer.age in 30..33 -> if (curPlayer.overallRating >= 80) 24 else 30
+                    curPlayer.age in 34..36 -> if (curPlayer.overallRating >= 80) 32 else 40
+                    else -> if (curPlayer.overallRating >= 80) 40 else 48
+                }
+
+                val declineRoll = Random.nextInt(curPlayer.potential + minutesFactor, 141)
+                if (declineRoll < declineThreshold) {
                     curPlayer = applySkillChange(curPlayer, isIncrement = false)
                 }
             }
@@ -106,8 +128,21 @@ object PlayerDevelopmentEngine {
 
     private fun applySkillChange(player: Player, isIncrement: Boolean): Player {
         val posId = player.positionFirst.id
-        val weights = (1..8).map { skillType ->
-            Player.getBaseOfPosition(posId, skillType)
+        val weights = if (isIncrement) {
+            // Growth favors position core skills
+            (1..8).map { skillType -> Player.getBaseOfPosition(posId, skillType) }
+        } else {
+            // Athleticism/Physique decays first; Shooting stroke and passing IQ are well preserved
+            listOf(
+                35, // 1: Physique (speed/stamina declines first)
+                28, // 2: Block
+                25, // 3: Steal
+                25, // 4: Rebound
+                15, // 5: Pass (vision & IQ preserved)
+                15, // 6: Shot Interior
+                12, // 7: Shot Exterior (shooting touch stays)
+                10  // 8: Free throw (muscle memory stays)
+            )
         }
         val total = weights.sum()
         var roll = Random.nextInt(total) + 1
@@ -142,11 +177,32 @@ object PlayerDevelopmentEngine {
         for (player in players) {
             val age = player.age + 1
             val contract = (player.yearsContract - 1).coerceAtLeast(0)
+            val ovr = player.overallRating
+
             val shouldRetire = when {
-                age >= 40 -> true
-                age >= 36 -> Random.nextInt(100) < 55
-                age >= 33 -> Random.nextInt(100) < 20
-                else -> false
+                ovr < 55 -> true // Unplayable in the league
+                age < 33 -> false
+                age in 33..36 -> {
+                    if (contract > 0 && ovr >= 70) false
+                    else if (ovr < 65) Random.nextInt(100) < 30
+                    else false
+                }
+                age in 37..39 -> {
+                    when {
+                        ovr >= 82 -> Random.nextInt(100) < 10 // Active elite superstar (e.g. LeBron tier)
+                        ovr >= 74 -> if (contract > 0) false else Random.nextInt(100) < 25
+                        ovr >= 65 -> Random.nextInt(100) < 50
+                        else -> Random.nextInt(100) < 80
+                    }
+                }
+                else -> { // age >= 40 (NO HARD LIMIT! Capability, contract, and health driven)
+                    when {
+                        ovr >= 82 -> Random.nextInt(100) < 15 // 40+ legends can keep playing!
+                        ovr >= 75 -> if (contract > 0) Random.nextInt(100) < 20 else Random.nextInt(100) < 45
+                        ovr >= 68 -> Random.nextInt(100) < 70
+                        else -> true
+                    }
+                }
             }
 
             if (shouldRetire) {
