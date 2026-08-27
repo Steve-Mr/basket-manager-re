@@ -68,11 +68,12 @@ data class Player(
             return if (mv < 0.0) mv / 4.0 else mv
         }
 
-    fun getPenalty(position: Position?): Int {
-        var mod = 0
-        if (position != null && position != Position.NONE && position != positionFirst) {
-            mod = if (position == positionSecond) -2 else -7
-        }
+    fun getPositionPenalty(position: Position?): Int {
+        if (position == null || position == Position.NONE || position == positionFirst) return 0
+        return if (position == positionSecond) -2 else -7
+    }
+
+    fun getConditionPenalty(): Int {
         val formMod = when {
             stateForm >= 80 -> 0
             stateForm >= 60 -> -1
@@ -87,10 +88,15 @@ data class Player(
             stateEnergy >= 20 -> -4
             else -> -8
         }
-        return mod + formMod + energyMod
+        return formMod + energyMod
+    }
+
+    fun getPenalty(position: Position?): Int {
+        return getPositionPenalty(position) + getConditionPenalty()
     }
 
     fun getMatchValue(position: Position? = null): Double = calculateValuation(position)
+
     fun calculateValuation(position: Position? = null): Double {
         val pos = position ?: positionFirst
         val penalty = getPenalty(pos)
