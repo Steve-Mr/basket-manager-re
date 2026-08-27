@@ -220,10 +220,36 @@ class GameDashboardViewModel(
         }
     }
 
-    fun advanceDay() {
+    fun getInjuredStartingPlayers(): List<Player> {
+        val tactic = _userTactic.value ?: return emptyList()
+        val rosterMap = _userRoster.value.associateBy { it.id }
+        val startingIds = listOfNotNull(
+            tactic.starterPgId,
+            tactic.starterSgId,
+            tactic.starterSfId,
+            tactic.starterPfId,
+            tactic.starterCId
+        )
+        return startingIds.mapNotNull { rosterMap[it] }.filter { it.stateInjury > 0 }
+    }
+
+    fun advanceDay(
+        autoAdjustIfInjured: Boolean = false,
+        onHaltOnInjury: (List<Player>) -> Unit = {}
+    ) {
         val currentGame = _game.value ?: return
+        val injuredStarters = getInjuredStartingPlayers()
+
+        if (injuredStarters.isNotEmpty() && !autoAdjustIfInjured && !currentGame.autoLineupEnabled) {
+            onHaltOnInjury(injuredStarters)
+            return
+        }
+
         viewModelScope.launch {
             _isSimulating.value = true
+            if (autoAdjustIfInjured || currentGame.autoLineupEnabled) {
+                optimizeUserLineup()
+            }
             _simulationProgressText.value = "Simulating Day ${currentGame.currentMatchday}..."
             val updated = repository.advanceMatchday(currentGame.id)
             _game.value = updated
@@ -232,16 +258,27 @@ class GameDashboardViewModel(
         }
     }
 
-    fun autoSimulateToMatchday(targetDay: Int) {
+    fun autoSimulateToMatchday(
+        targetDay: Int,
+        autoLineup: Boolean = false,
+        onFinished: (String) -> Unit = {}
+    ) {
         val currentGame = _game.value ?: return
         viewModelScope.launch {
             _isSimulating.value = true
+            if (autoLineup) {
+                toggleAutoLineup(true)
+                optimizeUserLineup()
+            }
+            var lastMsg = "Simulation Complete"
             val updated = repository.autoSimulateTo(currentGame.id, targetDay) { day, msg ->
                 _simulationProgressText.value = msg
+                lastMsg = msg
             }
             _game.value = updated
             refreshGameData(updated)
             _isSimulating.value = false
+            onFinished(lastMsg)
         }
     }
 

@@ -980,8 +980,21 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
     override suspend fun autoSimulateTo(gameId: Long, targetMatchday: Int, onProgress: (Int, String) -> Unit): GameSession = withContext(Dispatchers.IO) {
         var current = getGame(gameId) ?: throw IllegalStateException("Game not found")
         while (current.currentMatchday < targetMatchday && current.currentMatchday < 234) {
-            onProgress(current.currentMatchday, "Simulating Matchday ${current.currentMatchday}...")
+            val prevUserPlayers = getTeamPlayers(current.userTeamId).associateBy { it.id }
+            onProgress(current.currentMatchday, "Simulating Day ${current.currentMatchday}...")
             current = advanceMatchday(gameId)
+            
+            // Check if any user player suffered a new injury when auto-lineup is disabled
+            if (!current.autoLineupEnabled) {
+                val newUserPlayers = getTeamPlayers(current.userTeamId)
+                val newInjured = newUserPlayers.find { p ->
+                    p.stateInjury > 0 && (prevUserPlayers[p.id]?.stateInjury ?: 0) == 0
+                }
+                if (newInjured != null) {
+                    onProgress(current.currentMatchday, "PAUSED: ${newInjured.name} suffered an injury (${newInjured.stateInjury} days)")
+                    break
+                }
+            }
         }
         current
     }

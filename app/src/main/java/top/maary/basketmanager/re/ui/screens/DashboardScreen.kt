@@ -46,10 +46,13 @@ fun DashboardScreen(
     val scope = rememberCoroutineScope()
 
     var showAutoSimDialog by remember { mutableStateOf(false) }
+    var autoAdjustCheckbox by remember { mutableStateOf(false) }
     var targetMatchdayInput by remember { mutableStateOf("") }
     var selectedMatchForBoxScore by remember { mutableStateOf<Match?>(null) }
     var boxScoreResults by remember { mutableStateOf<List<MatchResult>>(emptyList()) }
     var selectedPlayerForDetail by remember { mutableStateOf<Player?>(null) }
+    var injuredStartersAlert by remember { mutableStateOf<List<Player>?>(null) }
+    var simulationHaltNotice by remember { mutableStateOf<String?>(null) }
 
     val teamMap = remember(allTeams) { allTeams.associateBy { it.id } }
     val playerMap = remember(allPlayers) { allPlayers.associateBy { it.id } }
@@ -213,7 +216,13 @@ fun DashboardScreen(
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Button(
-                            onClick = { viewModel.advanceDay() },
+                            onClick = {
+                                viewModel.advanceDay(
+                                    onHaltOnInjury = { injuredList ->
+                                        injuredStartersAlert = injuredList
+                                    }
+                                )
+                            },
                             enabled = !isSimulating,
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(10.dp)

@@ -44,6 +44,8 @@ fun ScheduleScreen(
     var boxScoreResults by remember { mutableStateOf<List<MatchResult>>(emptyList()) }
 
     var targetSimDayToConfirm by remember { mutableStateOf<Int?>(null) }
+    var autoAdjustCheckbox by remember { mutableStateOf(false) }
+    var simulationHaltNotice by remember { mutableStateOf<String?>(null) }
 
     val teamMap = remember(allTeams) { allTeams.associateBy { it.id } }
 
@@ -246,13 +248,29 @@ fun ScheduleScreen(
     targetSimDayToConfirm?.let { targetDay ->
         AlertDialog(
             onDismissRequest = { targetSimDayToConfirm = null },
-            title = { Text("Simulate to Matchday $targetDay") },
-            text = { Text("Do you want to fast forward simulation from Day ${game?.currentMatchday ?: 1} up to Day $targetDay?") },
+            title = { Text("Simulate to Day $targetDay") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Do you want to fast forward simulation from Day ${game?.currentMatchday ?: 1} up to Day $targetDay?")
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Checkbox(
+                            checked = autoAdjustCheckbox,
+                            onCheckedChange = { autoAdjustCheckbox = it }
+                        )
+                        Text("Auto-adjust lineup if players are injured", fontSize = 12.sp)
+                    }
+                }
+            },
             confirmButton = {
                 Button(
                     onClick = {
                         targetSimDayToConfirm = null
-                        viewModel.autoSimulateToMatchday(targetDay)
+                        viewModel.autoSimulateToMatchday(targetDay, autoLineup = autoAdjustCheckbox) { msg ->
+                            if (msg.startsWith("PAUSED:")) simulationHaltNotice = msg
+                        }
                     }
                 ) {
                     Text("Simulate")
@@ -261,6 +279,19 @@ fun ScheduleScreen(
             dismissButton = {
                 TextButton(onClick = { targetSimDayToConfirm = null }) {
                     Text("Cancel")
+                }
+            }
+        )
+    }
+
+    simulationHaltNotice?.let { notice ->
+        AlertDialog(
+            onDismissRequest = { simulationHaltNotice = null },
+            title = { Text("Simulation Paused") },
+            text = { Text(notice) },
+            confirmButton = {
+                Button(onClick = { simulationHaltNotice = null }) {
+                    Text("OK")
                 }
             }
         )
