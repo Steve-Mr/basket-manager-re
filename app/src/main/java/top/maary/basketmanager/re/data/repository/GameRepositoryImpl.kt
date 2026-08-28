@@ -825,19 +825,83 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
                     }
                 }
 
-                // Playoffs Progression: Matchdays 167..225
+                // Playoffs Progression: Matchdays 167..225 (Authentic BM15 15-Day Round Windows & 2-Day Match Interval)
                 currentDay in 167..225 -> {
                     val seriesList = getPlayoffSeries(gameId)
                     val teams = getTeams(gameId)
                     val teamMap = teams.associateBy { it.id }
 
-                    val activeSeries = seriesList.filter { it.winnerTeamId == null }
+                    // 1. Official Round Creation Milestones
+                    if (currentDay == 182) {
+                        val round1 = seriesList.filter { it.round == 1 }
+                        val round2Existing = seriesList.filter { it.round == 2 }
+                        if (round1.size == 8 && round1.all { it.winnerTeamId != null } && round2Existing.isEmpty()) {
+                            val semis = PlayoffsEngine.generateConferenceSemifinals(gameId, round1)
+                            semis.forEach { insertPlayoffSeriesDirect(db, it) }
+                            val news = NewsItem(
+                                gameId = gameId,
+                                matchday = currentDay,
+                                type = NewsType.PLAYOFFS,
+                                title = "Playoffs: Conference Semifinals Set!",
+                                body = "The First Round has concluded. 8 franchises advance to the Conference Semifinals."
+                            )
+                            insertNewsDirect(db, news.toEntity())
+                        }
+                    } else if (currentDay == 197) {
+                        val round2 = seriesList.filter { it.round == 2 }
+                        val round3Existing = seriesList.filter { it.round == 3 }
+                        if (round2.size == 4 && round2.all { it.winnerTeamId != null } && round3Existing.isEmpty()) {
+                            val confFinals = PlayoffsEngine.generateConferenceFinals(gameId, round2)
+                            confFinals.forEach { insertPlayoffSeriesDirect(db, it) }
+                            val news = NewsItem(
+                                gameId = gameId,
+                                matchday = currentDay,
+                                type = NewsType.PLAYOFFS,
+                                title = "Playoffs: Conference Finals Set!",
+                                body = "The Final Four contenders are set for the Eastern & Western Conference Finals."
+                            )
+                            insertNewsDirect(db, news.toEntity())
+                        }
+                    } else if (currentDay == 212) {
+                        val round3 = seriesList.filter { it.round == 3 }
+                        val finalsExisting = seriesList.find { it.round == 4 }
+                        if (round3.size == 2 && round3.all { it.winnerTeamId != null } && finalsExisting == null) {
+                            val nbaFinals = PlayoffsEngine.generateNbaFinals(gameId, round3)
+                            if (nbaFinals != null) {
+                                insertPlayoffSeriesDirect(db, nbaFinals)
+                                val t1 = teamMap[nbaFinals.team1Id]
+                                val t2 = teamMap[nbaFinals.team2Id]
+                                val news = NewsItem(
+                                    gameId = gameId,
+                                    matchday = currentDay,
+                                    type = NewsType.PLAYOFFS,
+                                    title = "World Finals Matchup: ${t1?.name} vs ${t2?.name}!",
+                                    body = "The battle for the World Championship trophy begins!"
+                                )
+                                insertNewsDirect(db, news.toEntity())
+                            }
+                        }
+                    }
 
-                    if (activeSeries.isNotEmpty()) {
-                        val currentRound = activeSeries.minOf { it.round }
-                        val currentRoundSeries = activeSeries.filter { it.round == currentRound }
+                    // 2. Official Matchdays per Round (Every 2 Days)
+                    val round1GameDays = setOf(168, 170, 172, 174, 176, 178, 180)
+                    val round2GameDays = setOf(183, 185, 187, 189, 191, 193, 195)
+                    val round3GameDays = setOf(198, 200, 202, 204, 206, 208, 210)
+                    val finalsGameDays = setOf(213, 215, 217, 219, 221, 223, 225)
 
-                        currentRoundSeries.forEach { series ->
+                    val targetRoundForToday = when (currentDay) {
+                        in round1GameDays -> 1
+                        in round2GameDays -> 2
+                        in round3GameDays -> 3
+                        in finalsGameDays -> 4
+                        else -> null // Rest / Off day between playoff games
+                    }
+
+                    if (targetRoundForToday != null) {
+                        val updatedSeriesList = getPlayoffSeries(gameId)
+                        val activeRoundSeries = updatedSeriesList.filter { it.round == targetRoundForToday && it.winnerTeamId == null }
+
+                        activeRoundSeries.forEach { series ->
                             val gamesPlayed = series.team1Wins + series.team2Wins
                             val (homeId, awayId) = PlayoffsEngine.determinePlayoffHomeTeam(series, gamesPlayed)
 
@@ -864,6 +928,12 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
                                 matchday = currentDay,
                                 teamLocalId = homeId,
                                 teamVisitorId = awayId,
+                                name = when (series.round) {
+                                    1 -> "Playoffs R1 G${gamesPlayed + 1}"
+                                    2 -> "Playoffs Semis G${gamesPlayed + 1}"
+                                    3 -> "Conf Finals G${gamesPlayed + 1}"
+                                    else -> "World Finals G${gamesPlayed + 1}"
+                                },
                                 isPlayed = false
                             )
 
@@ -893,85 +963,36 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
                             val winnerTeamId = if ((simResult.match.localScore ?: 0) > (simResult.match.visitorScore ?: 0)) homeId else awayId
                             val updatedSeries = PlayoffsEngine.updateSeriesAfterMatch(series, winnerTeamId)
                             db.update(DB.TABLE_PLAYOFF_SERIES, playoffSeriesToContentValues(updatedSeries), "id = ?", arrayOf(series.id.toString()))
+
+                            if (updatedSeries.round == 4 && updatedSeries.winnerTeamId != null) {
+                                val champTeam = teamMap[updatedSeries.winnerTeamId]
+                                val countCursor = db.rawQuery(
+                                    "SELECT COUNT(*) FROM " + DB.TABLE_NEWS + " WHERE gameId = ? AND title LIKE '%WORLD CHAMPIONS%'",
+                                    arrayOf(gameId.toString())
+                                )
+                                val alreadyAnnounced = countCursor.use { if (it.moveToFirst()) it.getInt(0) > 0 else false }
+                                if (!alreadyAnnounced) {
+                                    if (champTeam != null) {
+                                        db.execSQL("UPDATE ${DB.TABLE_CHALLENGE} SET completed = 1, completedSeason = ${game.currentSeason} WHERE teamName = ?", arrayOf(champTeam.name))
+                                    }
+                                    val champNews = NewsItem(
+                                        gameId = gameId,
+                                        matchday = currentDay,
+                                        type = NewsType.PLAYOFFS,
+                                        title = "🏆 WORLD CHAMPIONS: ${champTeam?.name}!",
+                                        body = "${champTeam?.name} has won the World Championship in Season ${game.currentSeason}!"
+                                    )
+                                    insertNewsDirect(db, champNews.toEntity())
+                                }
+                            }
                         }
                     } else {
-                        // Check if next playoff round needs to be created
-                        val allSeries = getPlayoffSeries(gameId)
-                        val maxRound = allSeries.maxOfOrNull { it.round } ?: 1
-
-                        when (maxRound) {
-                            1 -> {
-                                val round1 = allSeries.filter { it.round == 1 }
-                                if (round1.size == 8 && round1.all { it.winnerTeamId != null }) {
-                                    val semis = PlayoffsEngine.generateConferenceSemifinals(gameId, round1)
-                                    semis.forEach { insertPlayoffSeriesDirect(db, it) }
-                                    val news = NewsItem(
-                                        gameId = gameId,
-                                        matchday = currentDay,
-                                        type = NewsType.PLAYOFFS,
-                                        title = "Playoffs: Conference Semifinals Set!",
-                                        body = "The First Round has concluded. 8 franchises advance to the Conference Semifinals."
-                                    )
-                                    insertNewsDirect(db, news.toEntity())
-                                }
-                            }
-                            2 -> {
-                                val round2 = allSeries.filter { it.round == 2 }
-                                if (round2.size == 4 && round2.all { it.winnerTeamId != null }) {
-                                    val confFinals = PlayoffsEngine.generateConferenceFinals(gameId, round2)
-                                    confFinals.forEach { insertPlayoffSeriesDirect(db, it) }
-                                    val news = NewsItem(
-                                        gameId = gameId,
-                                        matchday = currentDay,
-                                        type = NewsType.PLAYOFFS,
-                                        title = "Playoffs: Conference Finals Set!",
-                                        body = "The Final Four contenders are set for the Eastern & Western Conference Finals."
-                                    )
-                                    insertNewsDirect(db, news.toEntity())
-                                }
-                            }
-                            3 -> {
-                                val round3 = allSeries.filter { it.round == 3 }
-                                if (round3.size == 2 && round3.all { it.winnerTeamId != null }) {
-                                    val nbaFinals = PlayoffsEngine.generateNbaFinals(gameId, round3)
-                                    if (nbaFinals != null) {
-                                        insertPlayoffSeriesDirect(db, nbaFinals)
-                                        val t1 = teamMap[nbaFinals.team1Id]
-                                        val t2 = teamMap[nbaFinals.team2Id]
-                                        val news = NewsItem(
-                                            gameId = gameId,
-                                            matchday = currentDay,
-                                            type = NewsType.PLAYOFFS,
-                                            title = "World Finals Matchup: ${t1?.name} vs ${t2?.name}!",
-                                            body = "The battle for the World Championship trophy begins!"
-                                        )
-                                        insertNewsDirect(db, news.toEntity())
-                                    }
-                                }
-                            }
-                            4 -> {
-                                val finals = allSeries.find { it.round == 4 }
-                                if (finals?.winnerTeamId != null) {
-                                    val champTeam = teamMap[finals.winnerTeamId]
-                                    val countCursor = db.rawQuery(
-                                        "SELECT COUNT(*) FROM " + DB.TABLE_NEWS + " WHERE gameId = ? AND title LIKE '%WORLD CHAMPIONS%'",
-                                        arrayOf(gameId.toString())
-                                    )
-                                    val alreadyAnnounced = countCursor.use { if (it.moveToFirst()) it.getInt(0) > 0 else false }
-                                    if (!alreadyAnnounced) {
-                                        if (champTeam != null) {
-                                            db.execSQL("UPDATE ${DB.TABLE_CHALLENGE} SET completed = 1, completedSeason = ${game.currentSeason} WHERE teamName = ?", arrayOf(champTeam.name))
-                                        }
-                                        val champNews = NewsItem(
-                                            gameId = gameId,
-                                            matchday = currentDay,
-                                            type = NewsType.PLAYOFFS,
-                                            title = "🏆 WORLD CHAMPIONS: ${champTeam?.name}!",
-                                            body = "${champTeam?.name} has won the World Championship in Season ${game.currentSeason}!"
-                                        )
-                                        insertNewsDirect(db, champNews.toEntity())
-                                    }
-                                }
+                        // Rest / Recovery Day: Restore player physique energy towards 99
+                        val allPlayers = getPlayers(gameId)
+                        allPlayers.forEach { p ->
+                            if (p.skillPhysique < 99) {
+                                val recoveredEnergy = (p.skillPhysique + 4).coerceAtMost(99)
+                                db.execSQL("UPDATE ${DB.TABLE_PLAYER} SET skillPhysique = ? WHERE id = ?", arrayOf(recoveredEnergy, p.id))
                             }
                         }
                     }

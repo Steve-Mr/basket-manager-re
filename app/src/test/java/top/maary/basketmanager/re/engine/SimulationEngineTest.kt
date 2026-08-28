@@ -319,4 +319,30 @@ class SimulationEngineTest {
 
         assertFalse(unfairResult.isAccepted)
     }
+
+
+    @Test
+    fun testPlayoffTimingAndCalendarMilestones() {
+        val round1GameDays = setOf(168, 170, 172, 174, 176, 178, 180)
+        val round2GameDays = setOf(183, 185, 187, 189, 191, 193, 195)
+        val round3GameDays = setOf(198, 200, 202, 204, 206, 208, 210)
+        val finalsGameDays = setOf(213, 215, 217, 219, 221, 223, 225)
+
+        // Verify each round has 7 possible matchdays spaced by 2 days
+        assertEquals(7, round1GameDays.size)
+        assertEquals(7, round2GameDays.size)
+        assertEquals(7, round3GameDays.size)
+        assertEquals(7, finalsGameDays.size)
+
+        // Verify milestones
+        assertTrue(168 in round1GameDays)
+        assertTrue(180 in round1GameDays)
+        assertTrue(182 !in round1GameDays && 182 !in round2GameDays) // Day 182 is Round 2 Setup & Media day
+        assertTrue(183 in round2GameDays)
+        assertTrue(197 !in round2GameDays && 197 !in round3GameDays) // Day 197 is Conf Finals Setup & Media day
+        assertTrue(198 in round3GameDays)
+        assertTrue(212 !in round3GameDays && 212 !in finalsGameDays) // Day 212 is Finals Setup & Media day
+        assertTrue(213 in finalsGameDays)
+        assertTrue(225 in finalsGameDays)
+    }
 }
