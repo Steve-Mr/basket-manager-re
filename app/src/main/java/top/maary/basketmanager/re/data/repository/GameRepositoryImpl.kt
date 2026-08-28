@@ -855,11 +855,11 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
                 }
             }
 
-            // 2. Player Development Tick
+            // 2. Player Development Tick (Authentic 10-Day Window)
             val devCandidates = allPlayers.filter { (it.id % 10) == (currentDay.toLong() % 10) }
             val statsMap = getAllPlayerStats(gameId)
             devCandidates.forEach { p ->
-                val recentBoxScores = statsMap[p.id]?.takeLast(10) ?: emptyList()
+                val recentBoxScores = statsMap[p.id]?.filter { it.matchday > currentDay - 10 } ?: emptyList()
                 val devReport = PlayerDevelopmentEngine.developPlayerAuthentic(p, recentBoxScores, currentDay, game.userTeamId)
                 db.update(DB.TABLE_PLAYER, playerToContentValues(devReport.updatedPlayer.toEntity()), "id = ?", arrayOf(p.id.toString()))
                 devReport.generatedNews.forEach { n -> insertNewsDirect(db, n.toEntity()) }
@@ -1137,12 +1137,12 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
                             }
                         }
                     } else {
-                        // Rest / Recovery Day: Restore player physique energy towards 99
+                        // Rest / Recovery Day: Restore player match energy towards 99
                         val allPlayers = getPlayers(gameId)
                         allPlayers.forEach { p ->
-                            if (p.skillPhysique < 99) {
-                                val recoveredEnergy = (p.skillPhysique + 4).coerceAtMost(99)
-                                db.execSQL("UPDATE ${DB.TABLE_PLAYER} SET skillPhysique = ? WHERE id = ?", arrayOf(recoveredEnergy, p.id))
+                            if (p.stateEnergy < 99) {
+                                val recoveredEnergy = (p.stateEnergy + 4).coerceAtMost(99)
+                                db.execSQL("UPDATE ${DB.TABLE_PLAYER} SET stateEnergy = ? WHERE id = ?", arrayOf(recoveredEnergy, p.id))
                             }
                         }
                     }

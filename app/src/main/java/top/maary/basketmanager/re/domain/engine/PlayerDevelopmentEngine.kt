@@ -24,18 +24,12 @@ object PlayerDevelopmentEngine {
         val perAvg = if (matchesPlayed == 0) 0.0 else recentResults.sumOf { it.per } / matchesPlayed
 
         var loops = when {
-            player.age < 30 -> {
-                when {
-                    player.potential <= 4 -> 0
-                    player.potential <= 6 -> 1
-                    player.potential <= 8 -> 2
-                    player.potential <= 9 -> 4
-                    else -> 5
-                }
-            }
-            player.age in 30..33 -> 1 // Gentle prime-to-veteran transition (no cliff drop)
-            player.age in 34..36 -> 2 // Gradual veteran decline
-            else -> 3 // Late career
+            player.potential <= 4 && player.age < 30 -> 0
+            player.potential <= 6 && player.age < 30 -> 1
+            player.potential <= 8 && player.age < 30 -> 2
+            player.potential <= 9 && player.age < 30 -> 4
+            player.potential <= 10 && player.age < 30 -> 5
+            else -> 3 // Age >= 30 defaults to 3 loops in BM15
         }
 
         if (player.overallRating > 90.0 && player.age < 30) loops--
@@ -43,33 +37,30 @@ object PlayerDevelopmentEngine {
 
         var curPlayer = player
 
-        // Load management bonus: 12-28 mins/game provides optimal veteran workload protection
-        val minutesFactor = when {
-            curPlayer.age >= 30 && minutesAvg in 12..28 -> 32
-            curPlayer.age >= 34 && minutesAvg > 32 -> (30 - (minutesAvg - 30)).coerceAtLeast(10) // Heavy workload fatigue
-            else -> minutesAvg
-        }
-
         for (i in 0 until loops) {
             val randomPot = Random.nextInt(1, 11)
-            if (curPlayer.age < 30 || (curPlayer.age in 30..32 && perAvg >= 18.0 && randomPot < curPlayer.potential - 3)) {
-                val devRoll = perAvg.toInt() + Random.nextInt(
-                    (curPlayer.potential * (30 - curPlayer.age).coerceAtLeast(1)) + minutesAvg,
-                    151
-                )
+            if (curPlayer.age < 30 || randomPot < curPlayer.potential - 4) {
+                val minVal = (curPlayer.potential * (30 - curPlayer.age)) + minutesAvg
+                val maxVal = 150
+                val randVal = if (minVal >= maxVal) {
+                    minVal
+                } else {
+                    Random.nextInt(minVal, maxVal + 1)
+                }
+
+                val devRoll = perAvg.toInt() + randVal
                 if (devRoll > 138 && (Random.nextInt(1, 11) >= 6 || curPlayer.overallRating < 76.0)) {
                     curPlayer = applySkillChange(curPlayer, isIncrement = true)
                 }
-            } else if (curPlayer.age >= 30) {
-                // Smooth age-tiered decline thresholds with high-skill superstar protection
-                val declineThreshold = when {
-                    curPlayer.age in 30..33 -> if (curPlayer.overallRating >= 80) 24 else 30
-                    curPlayer.age in 34..36 -> if (curPlayer.overallRating >= 80) 32 else 40
-                    else -> if (curPlayer.overallRating >= 80) 40 else 48
+            } else if (curPlayer.age > 30) {
+                val declineMin = curPlayer.potential + minutesAvg
+                val declineMax = 140
+                val declineRoll = if (declineMin >= declineMax) {
+                    declineMin
+                } else {
+                    Random.nextInt(declineMin, declineMax + 1)
                 }
-
-                val declineRoll = Random.nextInt(curPlayer.potential + minutesFactor, 141)
-                if (declineRoll < declineThreshold) {
+                if (declineRoll < 55) {
                     curPlayer = applySkillChange(curPlayer, isIncrement = false)
                 }
             }
@@ -81,8 +72,8 @@ object PlayerDevelopmentEngine {
             curPlayer = curPlayer.copy(potential = (curPlayer.potential + potChange).coerceIn(1, 10))
         }
 
-        // Heavy injury regression
-        if (curPlayer.stateInjury > 100 || Random.nextInt(1, curPlayer.skillPhysique + curPlayer.stateEnergy + 1) < 2) {
+        // Heavy injury & low energy regression
+        if (curPlayer.stateInjury > 100 || Random.nextInt(1, (curPlayer.skillPhysique + curPlayer.stateEnergy).coerceAtLeast(2)) < 2) {
             curPlayer = applySkillChange(curPlayer, isIncrement = false)
         }
 
@@ -132,22 +123,8 @@ object PlayerDevelopmentEngine {
 
     private fun applySkillChange(player: Player, isIncrement: Boolean): Player {
         val posId = player.positionFirst.id
-        val weights = if (isIncrement) {
-            // Growth favors position core skills
-            (1..8).map { skillType -> Player.getBaseOfPosition(posId, skillType) }
-        } else {
-            // Athleticism/Physique decays first; Shooting stroke and passing IQ are well preserved
-            listOf(
-                35, // 1: Physique (speed/stamina declines first)
-                28, // 2: Block
-                25, // 3: Steal
-                25, // 4: Rebound
-                15, // 5: Pass (vision & IQ preserved)
-                15, // 6: Shot Interior
-                12, // 7: Shot Exterior (shooting touch stays)
-                10  // 8: Free throw (muscle memory stays)
-            )
-        }
+        // In BM15: weights are getBaseOfPosition(posId, skillType) + 15
+        val weights = (1..8).map { skillType -> Player.getBaseOfPosition(posId, skillType) + 15 }
         val total = weights.sum()
         var roll = Random.nextInt(total) + 1
         var chosenSkill = 1
