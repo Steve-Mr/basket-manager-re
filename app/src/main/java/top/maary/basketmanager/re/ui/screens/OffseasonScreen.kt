@@ -213,7 +213,7 @@ fun OffseasonScreen(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = "🔴 到期球员 (0年合同 • 必须在此阶段续约)",
+                                        text = "🔴 Expiring Contracts (0 Years - Action Required)",
                                         fontWeight = FontWeight.Black,
                                         fontSize = 13.sp,
                                         color = MaterialTheme.colorScheme.error
@@ -223,7 +223,7 @@ fun OffseasonScreen(
                                     }
                                 }
                                 Text(
-                                    text = "⚠️ 若未在 Day 230 前完成续约，该球员将在 Day 231 自动进入自由球员市场！",
+                                    text = "⚠️ Players unrenewed before Day 230 will enter open Free Agency on Day 231!",
                                     fontSize = 11.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(vertical = 4.dp)
@@ -233,7 +233,7 @@ fun OffseasonScreen(
 
                                 if (expiringPlayers.isEmpty()) {
                                     Text(
-                                        text = "🎉 当前无到期球员，所有球员下赛季均有合同保障！",
+                                        text = "🎉 No expiring contracts. All players signed for next season.",
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         color = RatingGreen,
@@ -269,7 +269,7 @@ fun OffseasonScreen(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = "🟢 可提前续约球员 (1年合同 • 可选提前锁定)",
+                                        text = "🟢 Eligible for Extension (1 Year Remaining)",
                                         fontWeight = FontWeight.Black,
                                         fontSize = 13.sp,
                                         color = MaterialTheme.colorScheme.primary
@@ -279,7 +279,7 @@ fun OffseasonScreen(
                                     }
                                 }
                                 Text(
-                                    text = "✨ 可提前追加 1~4 年新合同（年限累加），锁定未来核心，避免下赛季休赛期进入自由市场。",
+                                    text = "✨ Add 1-4 years to lock in core players before their final contract year.",
                                     fontSize = 11.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(vertical = 4.dp)
@@ -289,7 +289,7 @@ fun OffseasonScreen(
 
                                 if (extensionEligible.isEmpty()) {
                                     Text(
-                                        text = "暂无可提前续约球员（无剩余 1 年合同的球员）。",
+                                        text = "No players currently eligible for early extension.",
                                         fontSize = 12.sp,
                                         color = MaterialTheme.colorScheme.outline,
                                         modifier = Modifier.padding(vertical = 8.dp)
@@ -487,7 +487,7 @@ fun OffseasonPlayerContractRow(
                 shape = RoundedCornerShape(8.dp),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
             ) {
-                Text(if (isExtension) "提前续约" else "续约谈判", fontSize = 12.sp)
+                Text(if (isExtension) "Extend" else "Renew", fontSize = 12.sp)
             }
         }
     }

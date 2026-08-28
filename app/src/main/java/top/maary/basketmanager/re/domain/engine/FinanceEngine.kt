@@ -74,40 +74,40 @@ object FinanceEngine {
             if (playoffTeamIds.contains(tId)) {
                 // Playoff Qualified (+ $2.0M)
                 diff += 2_000_000
-                reasons.add("季后赛资格 (+ $2.0M)")
+                reasons.add("Playoff Qualification (+ $2.0M)")
 
                 if (divRank == 1) {
                     diff += 1_000_000
-                    reasons.add("分赛区冠军 (+ $1.0M)")
+                    reasons.add("Division Champion (+ $1.0M)")
                 }
                 if (semisTeams.contains(tId)) {
                     diff += 1_000_000
-                    reasons.add("打进分区半决赛 (+ $1.0M)")
+                    reasons.add("Conference Semifinals (+ $1.0M)")
                 }
                 if (confFinalTeams.contains(tId)) {
                     diff += 1_000_000
-                    reasons.add("打进分区决赛 (+ $1.0M)")
+                    reasons.add("Conference Finals (+ $1.0M)")
                 }
                 if (finalsTeams.contains(tId)) {
                     diff += 1_000_000
-                    reasons.add("打进总决赛 (+ $1.0M)")
+                    reasons.add("NBA Finals Appearance (+ $1.0M)")
                 }
                 if (tId == championTeamId) {
                     diff += 1_000_000
-                    reasons.add("🏆 夺得总冠军 (+ $1.0M)")
+                    reasons.add("🏆 NBA Champion (+ $1.0M)")
                 }
             } else {
                 // Missed Playoffs (- $3.0M)
                 diff -= 3_000_000
-                reasons.add("无缘季后赛 (- $3.0M)")
+                reasons.add("Missed Playoffs (- $3.0M)")
 
                 if (divRank == 5) {
                     diff -= 1_000_000
-                    reasons.add("赛区垫底 (- $1.0M)")
+                    reasons.add("Division Bottom Place (- $1.0M)")
                 }
                 if (confRank == 15) {
                     diff -= 1_000_000
-                    reasons.add("分区联盟垫底 (- $1.0M)")
+                    reasons.add("Conference Last Place (- $1.0M)")
                 }
             }
 

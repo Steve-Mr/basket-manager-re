@@ -262,11 +262,11 @@ object MatchSimulationEngine {
             val mvpTeamName = if (mvpPlayer != null && localPlayers.any { it.id == mvpPlayer.id }) localTeam.name else visitorTeam.name
             val mvpLine = "⭐ MVP: ${mvpPlayer?.shortName ?: "N/A"} ($mvpTeamName) • PER ${String.format("%.1f", bestPerResult?.per ?: 0.0)} (${bestPerResult?.points ?: 0} PTS, ${bestPerResult?.rebounds ?: 0} REB, ${bestPerResult?.passesOk ?: 0} AST)"
 
-            val ptsLine = "🏀 得分: ${localTopPts?.playerName ?: "N/A"} (${localTeam.name}) ${localTopPts?.points ?: 0}  |  ${visitorTopPts?.playerName ?: "N/A"} (${visitorTeam.name}) ${visitorTopPts?.points ?: 0}"
-            val rebLine = "🛡️ 篮板: ${localTopReb?.playerName ?: "N/A"} (${localTeam.name}) ${localTopReb?.rebounds ?: 0}  |  ${visitorTopReb?.playerName ?: "N/A"} (${visitorTeam.name}) ${visitorTopReb?.rebounds ?: 0}"
-            val astLine = "🎯 助攻: ${localTopAst?.playerName ?: "N/A"} (${localTeam.name}) ${localTopAst?.passesOk ?: 0}  |  ${visitorTopAst?.playerName ?: "N/A"} (${visitorTeam.name}) ${visitorTopAst?.passesOk ?: 0}"
-            val stlLine = "⚡ 抢断: ${localTopStl?.playerName ?: "N/A"} (${localTeam.name}) ${localTopStl?.steals ?: 0}  |  ${visitorTopStl?.playerName ?: "N/A"} (${visitorTeam.name}) ${visitorTopStl?.steals ?: 0}"
-            val blkLine = "🚫 盖帽: ${localTopBlk?.playerName ?: "N/A"} (${localTeam.name}) ${localTopBlk?.blocks ?: 0}  |  ${visitorTopBlk?.playerName ?: "N/A"} (${visitorTeam.name}) ${visitorTopBlk?.blocks ?: 0}"
+            val ptsLine = "🏀 PTS: ${localTopPts?.playerName ?: "N/A"} (${localTeam.name}) ${localTopPts?.points ?: 0}  |  ${visitorTopPts?.playerName ?: "N/A"} (${visitorTeam.name}) ${visitorTopPts?.points ?: 0}"
+            val rebLine = "🛡️ REB: ${localTopReb?.playerName ?: "N/A"} (${localTeam.name}) ${localTopReb?.rebounds ?: 0}  |  ${visitorTopReb?.playerName ?: "N/A"} (${visitorTeam.name}) ${visitorTopReb?.rebounds ?: 0}"
+            val astLine = "🎯 AST: ${localTopAst?.playerName ?: "N/A"} (${localTeam.name}) ${localTopAst?.passesOk ?: 0}  |  ${visitorTopAst?.playerName ?: "N/A"} (${visitorTeam.name}) ${visitorTopAst?.passesOk ?: 0}"
+            val stlLine = "⚡ STL: ${localTopStl?.playerName ?: "N/A"} (${localTeam.name}) ${localTopStl?.steals ?: 0}  |  ${visitorTopStl?.playerName ?: "N/A"} (${visitorTeam.name}) ${visitorTopStl?.steals ?: 0}"
+            val blkLine = "🚫 BLK: ${localTopBlk?.playerName ?: "N/A"} (${localTeam.name}) ${localTopBlk?.blocks ?: 0}  |  ${visitorTopBlk?.playerName ?: "N/A"} (${visitorTeam.name}) ${visitorTopBlk?.blocks ?: 0}"
 
             val body = "$mvpLine\n$ptsLine\n$rebLine\n$astLine\n$stlLine\n$blkLine"
 

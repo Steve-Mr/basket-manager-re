@@ -161,7 +161,7 @@ fun LineupScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "🌟 STARTERS (首发)",
+                            text = "🌟 STARTERS",
                             fontWeight = FontWeight.Black,
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -187,7 +187,7 @@ fun LineupScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "🔄 RESERVES (替补)",
+                            text = "🔄 RESERVES",
                             fontWeight = FontWeight.Black,
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant

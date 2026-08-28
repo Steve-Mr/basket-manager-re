@@ -67,9 +67,9 @@ fun VerticalPlayoffBracketView(
         // =========================================================
         item {
             ConferenceHeaderCard(
-                conferenceName = "WESTERN CONFERENCE (西部赛区)",
+                conferenceName = "WESTERN CONFERENCE",
                 color = Color(0xFF1976D2),
-                directionText = "⬇ 向中心总决赛汇聚"
+                directionText = "⬇ Converging to Finals"
             )
         }
 
@@ -82,13 +82,13 @@ fun VerticalPlayoffBracketView(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "WEST FIRST ROUND (首轮 • 4组对决)",
+                        text = "WEST FIRST ROUND (4 Series)",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFF1976D2)
                     )
                     Text(
-                        text = "半区A (1v8, 4v5) | 半区B (2v7, 3v6)",
+                        text = "Bracket A (1v8, 4v5) | Bracket B (2v7, 3v6)",
                         fontSize = 9.sp,
                         color = MaterialTheme.colorScheme.outline
                     )
@@ -152,7 +152,7 @@ fun VerticalPlayoffBracketView(
         item {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    text = "WEST SEMIFINALS (半决赛 • 2组对决)",
+                    text = "WEST SEMIFINALS (2 Series)",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF1976D2)
@@ -182,7 +182,7 @@ fun VerticalPlayoffBracketView(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "WEST CONFERENCE FINALS (西部决赛)",
+                    text = "WEST CONFERENCE FINALS",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Black,
                     color = Color(0xFF1976D2)
@@ -236,7 +236,7 @@ fun VerticalPlayoffBracketView(
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "THE WORLD FINALS (NBA 总决赛)",
+                        text = "THE WORLD FINALS",
                         fontWeight = FontWeight.Black,
                         fontSize = 14.sp,
                         color = Color(0xFFFFB300)
@@ -301,7 +301,7 @@ fun VerticalPlayoffBracketView(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "EAST CONFERENCE FINALS (东部决赛)",
+                    text = "EAST CONFERENCE FINALS",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Black,
                     color = Color(0xFFD32F2F)
@@ -326,7 +326,7 @@ fun VerticalPlayoffBracketView(
         item {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    text = "EAST SEMIFINALS (半决赛 • 2组对决)",
+                    text = "EAST SEMIFINALS (2 Series)",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFFD32F2F)
@@ -365,13 +365,13 @@ fun VerticalPlayoffBracketView(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "EAST FIRST ROUND (首轮 • 4组对决)",
+                        text = "EAST FIRST ROUND (4 Series)",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFFD32F2F)
                     )
                     Text(
-                        text = "半区A (1v8, 4v5) | 半区B (2v7, 3v6)",
+                        text = "Bracket A (1v8, 4v5) | Bracket B (2v7, 3v6)",
                         fontSize = 9.sp,
                         color = MaterialTheme.colorScheme.outline
                     )
@@ -422,9 +422,9 @@ fun VerticalPlayoffBracketView(
         // East Footer
         item {
             ConferenceHeaderCard(
-                conferenceName = "EASTERN CONFERENCE (东部赛区)",
+                conferenceName = "EASTERN CONFERENCE",
                 color = Color(0xFFD32F2F),
-                directionText = "⬆ 向上中心总决赛汇聚"
+                directionText = "⬆ Converging to Finals"
             )
         }
     }

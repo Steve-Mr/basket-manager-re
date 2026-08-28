@@ -105,7 +105,7 @@ object TradeEvaluationEngine {
     }
 
     /**
-     * Feature 2: Shop My Assets (全联盟竞价 / 兜售资产)
+     * Feature 2: Shop My Assets (League-Wide Bids / Asset Shopping)
      * Finds competitive offers from CPU teams across the league.
      */
     fun findTradeOffersForAssets(
@@ -215,7 +215,7 @@ object TradeEvaluationEngine {
     }
 
     /**
-     * Feature 3: Target Asset Inquiry (索要目标球队报价)
+     * Feature 3: Target Asset Inquiry (Inquire Target Team Counter-Offer)
      * Ask what the target CPU team demands from user's roster & picks in exchange for requested assets.
      */
     fun generateCpuDemandForTargetAssets(

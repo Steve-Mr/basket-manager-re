@@ -170,7 +170,7 @@ fun RosterScreen(
                 // Card 1: 🌟 Starters Group
                 item {
                     RosterGroupCard(
-                        title = "🌟 STARTERS (首发五虎)",
+                        title = "🌟 STARTERS",
                         badgeText = "5 Players • Avg ${if (startersList.isNotEmpty()) startersList.map { it.overallRating }.average().toInt() else 0}",
                         headerColor = MaterialTheme.colorScheme.primaryContainer,
                         players = startersList,
@@ -182,7 +182,7 @@ fun RosterScreen(
                 // Card 2: 🔄 Reserves Group
                 item {
                     RosterGroupCard(
-                        title = "🔄 RESERVES (主要替补)",
+                        title = "🔄 RESERVES",
                         badgeText = "5 Players • Avg ${if (reservesList.isNotEmpty()) reservesList.map { it.overallRating }.average().toInt() else 0}",
                         headerColor = MaterialTheme.colorScheme.surfaceVariant,
                         players = reservesList,
@@ -195,7 +195,7 @@ fun RosterScreen(
                 if (benchList.isNotEmpty()) {
                     item {
                         RosterGroupCard(
-                            title = "🪑 BENCH DEPTH (板凳深度 / 未激活)",
+                            title = "🪑 BENCH DEPTH",
                             badgeText = "${benchList.size} Players",
                             headerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                             players = benchList,

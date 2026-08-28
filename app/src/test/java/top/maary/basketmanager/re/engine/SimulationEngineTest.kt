@@ -544,7 +544,7 @@ class SimulationEngineTest {
         val champAdj = adjustments[championTeamId]
         assertNotNull(champAdj)
         assertEquals(7_000_000, champAdj!!.deltaSalaryCap) // +2M playoff +1M div +1M semis +1M confFinals +1M finals +1M champ
-        assertTrue(champAdj.breakdownReasons.any { it.contains("总冠军") })
+        assertTrue(champAdj.breakdownReasons.any { it.contains("Champion") })
 
         val bottomTeamId = 15L // 15th in East, rank 5 in Division
         val botAdj = adjustments[bottomTeamId]

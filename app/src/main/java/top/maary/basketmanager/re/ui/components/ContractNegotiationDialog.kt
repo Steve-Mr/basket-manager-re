@@ -175,7 +175,7 @@ fun ContractNegotiationDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (isExtension) "提前续约 (Extension): ${player.name}" else "到期续约 (Renewal): ${player.name}",
+                        text = if (isExtension) "Contract Extension: ${player.name}" else "Contract Renewal: ${player.name}",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -316,8 +316,8 @@ fun ContractNegotiationDialog(
 
                 // Contract Duration
                 Text(
-                    text = if (isExtension) "追加续约年限 (+$selectedYears 年 • 签约后总合同: $totalContractYears 年):"
-                    else "签约年限 ($selectedYears 年):",
+                    text = if (isExtension) "Extension Duration (+$selectedYears yr • Total contract: $totalContractYears yr):"
+                    else "Contract Duration: $selectedYears Years",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -329,7 +329,7 @@ fun ContractNegotiationDialog(
                         FilterChip(
                             selected = selectedYears == y,
                             onClick = { selectedYears = y },
-                            label = { Text("+$y 年${if (isExtension) " (总${player.yearsContract + y}年)" else ""}", fontSize = 11.sp) },
+                            label = { Text("+$y Yrs${if (isExtension) " (Total ${player.yearsContract + y}y)" else ""}", fontSize = 11.sp) },
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -343,12 +343,12 @@ fun ContractNegotiationDialog(
                     onConfirmOffer(totalContractYears, currentOfferedSalaryInt, accepted, msg)
                 }
             ) {
-                Text(if (isExtension) "确认提前续约" else "提交续约报价")
+                Text(if (isExtension) "Confirm Extension" else "Submit Renewal Offer")
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("取消")
+                Text("Cancel")
             }
         }
     )

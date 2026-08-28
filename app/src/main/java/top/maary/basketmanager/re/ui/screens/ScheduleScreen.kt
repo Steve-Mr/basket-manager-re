@@ -202,10 +202,10 @@ fun ScheduleScreen(
                             ) {
                                 val dayDesc = when {
                                     selectedMatchday <= 166 -> "Regular Season • Week ${((selectedMatchday - 1) / 7) + 1}"
-                                    selectedMatchday <= 184 -> "Playoffs Round 1 (首轮系列赛)"
-                                    selectedMatchday <= 199 -> "Conference Semifinals (分区半决赛)"
-                                    selectedMatchday <= 214 -> "Conference Finals (分区决赛)"
-                                    else -> "The World Finals (NBA 总决赛)"
+                                    selectedMatchday <= 184 -> "Playoffs Round 1"
+                                    selectedMatchday <= 199 -> "Conference Semifinals"
+                                    selectedMatchday <= 214 -> "Conference Finals"
+                                    else -> "The World Finals"
                                 }
                                 val isToday = selectedMatchday == currentDay
 
@@ -396,14 +396,14 @@ fun ScheduleScreen(
                     Text("Quick Stage Shortcuts:", fontSize = 12.sp, fontWeight = FontWeight.Bold)
 
                     listOf(
-                        "Day 1: Season Opener (常规赛揭幕)" to 1,
-                        "Day 45: Early Season (常规赛第7周)" to 45,
-                        "Day 82: Midseason Mark (常规赛半程)" to 82,
-                        "Day 166: Regular Season Finale (收官战)" to 166,
-                        "Day 167: Playoffs Round 1 (季后赛首轮)" to 167,
-                        "Day 182: Conf Semifinals (分区半决赛)" to 182,
-                        "Day 197: Conf Finals (分区决赛)" to 197,
-                        "Day 212: The World Finals (NBA 总决赛)" to 212
+                        "Day 1: Season Opener" to 1,
+                        "Day 45: Early Season" to 45,
+                        "Day 82: Midseason Mark" to 82,
+                        "Day 166: Regular Season Finale" to 166,
+                        "Day 167: Playoffs Round 1" to 167,
+                        "Day 182: Conf Semifinals" to 182,
+                        "Day 197: Conf Finals" to 197,
+                        "Day 212: The World Finals" to 212
                     ).forEach { (label, day) ->
                         OutlinedButton(
                             onClick = {
