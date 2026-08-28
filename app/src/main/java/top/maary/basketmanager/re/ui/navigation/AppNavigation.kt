@@ -232,7 +232,7 @@ fun DashboardScaffold(
 
                 NavigationDrawerItem(
                     icon = { Icon(Icons.Default.CalendarMonth, contentDescription = null) },
-                    label = { Text("Schedule & Playoffs 🏆") },
+                    label = { Text("Schedule") },
                     selected = primaryTab == PrimaryTab.LEAGUE && leagueSubTab == 1,
                     onClick = {
                         primaryTab = PrimaryTab.LEAGUE
@@ -431,7 +431,7 @@ fun DashboardScaffold(
                         Column(modifier = Modifier.fillMaxSize()) {
                             TabRow(selectedTabIndex = leagueSubTab) {
                                 Tab(selected = leagueSubTab == 0, onClick = { leagueSubTab = 0 }, text = { Text("Standings") })
-                                Tab(selected = leagueSubTab == 1, onClick = { leagueSubTab = 1 }, text = { Text("Schedule & Playoffs 🏆") })
+                                Tab(selected = leagueSubTab == 1, onClick = { leagueSubTab = 1 }, text = { Text("Schedule") })
                                 Tab(selected = leagueSubTab == 2, onClick = { leagueSubTab = 2 }, text = { Text("Leaders") })
                             }
                             when (leagueSubTab) {

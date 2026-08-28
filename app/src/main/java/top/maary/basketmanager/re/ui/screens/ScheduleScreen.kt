@@ -15,14 +15,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import top.maary.basketmanager.re.domain.model.*
-import top.maary.basketmanager.re.ui.components.FullPlayoffBracketTreeView
 import top.maary.basketmanager.re.ui.components.MatchBoxScoreDialog
 import top.maary.basketmanager.re.ui.components.PlayoffSeriesHistoryDialog
+import top.maary.basketmanager.re.ui.components.VerticalPlayoffBracketView
 import top.maary.basketmanager.re.ui.theme.RatingGreen
 import top.maary.basketmanager.re.ui.viewmodel.GameDashboardViewModel
 
@@ -41,7 +40,7 @@ fun ScheduleScreen(
     val currentDay = game?.currentMatchday ?: 1
     val isPostseason = currentDay > 166
 
-    // Primary View Tabs: 0: Calendar Matches, 1: Playoff Bracket Tree, 2: Series Breakdown
+    // Primary View Tabs: 0: Calendar Matches, 1: Playoff Bracket Tree
     var selectedViewTab by remember(isPostseason) { mutableIntStateOf(if (isPostseason) 1 else 0) }
 
     var selectedFilterTeamId by remember { mutableStateOf<Long?>(userTeam?.id) }
@@ -86,12 +85,12 @@ fun ScheduleScreen(
         ) {
             Column {
                 Text(
-                    text = "Schedule & Playoffs Hub",
+                    text = "Schedule",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "Season ${game?.currentSeason ?: 1} • Day $currentDay / 234 (${if (isPostseason) "Playoffs" else "Regular Season"})",
+                    text = "Season ${game?.currentSeason ?: 1} • Day $currentDay / 234 (${if (isPostseason) "Playoffs Active 🏆" else "Regular Season"})",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -124,7 +123,7 @@ fun ScheduleScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Three Main View Tabs (Calendar, Playoff Bracket Tree, Series Overview)
+        // Two Clean View Tabs (Calendar, Vertical Playoff Bracket Tree)
         TabRow(
             selectedTabIndex = selectedViewTab,
             modifier = Modifier.fillMaxWidth()
@@ -132,17 +131,12 @@ fun ScheduleScreen(
             Tab(
                 selected = selectedViewTab == 0,
                 onClick = { selectedViewTab = 0 },
-                text = { Text("🗓️ Schedule Calendar", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+                text = { Text("🗓️ Match Calendar", fontSize = 13.sp, fontWeight = FontWeight.Bold) }
             )
             Tab(
                 selected = selectedViewTab == 1,
                 onClick = { selectedViewTab = 1 },
-                text = { Text("🌲 Playoff Bracket Tree", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
-            )
-            Tab(
-                selected = selectedViewTab == 2,
-                onClick = { selectedViewTab = 2 },
-                text = { Text("📋 Series Breakdown", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+                text = { Text("🌲 Playoff Bracket 🏆", fontSize = 13.sp, fontWeight = FontWeight.Bold) }
             )
         }
 
@@ -174,7 +168,7 @@ fun ScheduleScreen(
                             onClick = { selectedMatchday = currentDay.coerceIn(1, 225) },
                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
                         ) {
-                            Text("📍 Jump to Today (Day $currentDay)", fontSize = 11.sp)
+                            Text("📍 Jump to Today", fontSize = 11.sp)
                         }
                     }
                 }
@@ -379,8 +373,8 @@ fun ScheduleScreen(
             }
 
             1 -> {
-                // 🌲 PLAYOFF BRACKET TREE VIEW (Full Symmetrical NBA Layout)
-                FullPlayoffBracketTreeView(
+                // 🌲 VERTICAL PLAYOFF BRACKET VIEW (One-Page Vertical Flow)
+                VerticalPlayoffBracketView(
                     playoffSeries = playoffSeries,
                     standings = standings,
                     teamMap = teamMap,
@@ -388,73 +382,6 @@ fun ScheduleScreen(
                     isPlayoffsStarted = isPostseason,
                     onSeriesClick = { selectedSeriesForHistory = it }
                 )
-            }
-
-            2 -> {
-                // 📋 SERIES BREAKDOWN LIST VIEW
-                if (playoffSeries.isEmpty()) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                    ) {
-                        Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-                            Text(
-                                text = "Playoffs series will be generated once Regular Season concludes on Day 166.",
-                                textAlign = TextAlign.Center,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        items(playoffSeries) { series ->
-                            val t1 = teamMap[series.team1Id]
-                            val t2 = teamMap[series.team2Id]
-                            val isUser = series.team1Id == userTeam?.id || series.team2Id == userTeam?.id
-
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { selectedSeriesForHistory = series },
-                                shape = RoundedCornerShape(10.dp),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = if (isUser) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                                    else MaterialTheme.colorScheme.surfaceVariant
-                                )
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth().padding(12.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column {
-                                        val roundName = when (series.round) {
-                                            1 -> "${series.conference?.name ?: ""} First Round"
-                                            2 -> "${series.conference?.name ?: ""} Semifinals"
-                                            3 -> "${series.conference?.name ?: ""} Conference Finals"
-                                            else -> "The World Finals 🏆"
-                                        }
-                                        Text(roundName, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                                        Text("(${series.seed1}) ${t1?.name} vs (${series.seed2}) ${t2?.name}", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                    }
-
-                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        Text(
-                                            text = "${series.team1Wins} - ${series.team2Wins}",
-                                            fontWeight = FontWeight.Black,
-                                            fontSize = 16.sp,
-                                            color = if (series.winnerTeamId != null) RatingGreen else MaterialTheme.colorScheme.onSurface
-                                        )
-                                        Text("Details ➔", fontSize = 10.sp, color = MaterialTheme.colorScheme.outline)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
             }
         }
     }
@@ -474,9 +401,9 @@ fun ScheduleScreen(
                         "Day 82: Midseason Mark (常规赛半程)" to 82,
                         "Day 166: Regular Season Finale (收官战)" to 166,
                         "Day 167: Playoffs Round 1 (季后赛首轮)" to 167,
-                        "Day 185: Conf Semifinals (分区半决赛)" to 185,
-                        "Day 200: Conf Finals (分区决赛)" to 200,
-                        "Day 215: The World Finals (NBA 总决赛)" to 215
+                        "Day 182: Conf Semifinals (分区半决赛)" to 182,
+                        "Day 197: Conf Finals (分区决赛)" to 197,
+                        "Day 212: The World Finals (NBA 总决赛)" to 212
                     ).forEach { (label, day) ->
                         OutlinedButton(
                             onClick = {
