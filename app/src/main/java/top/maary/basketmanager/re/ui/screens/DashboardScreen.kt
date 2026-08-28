@@ -521,7 +521,7 @@ fun DashboardScreen(
                     accentColor = RatingRed,
                     badgeBgColor = RatingRed.copy(alpha = 0.14f),
                     iconVector = Icons.Default.SportsBasketball,
-                    categoryLabel = "MATCH RESULT"
+                    categoryLabel = "DEFEAT"
                 )
                 isInj -> NewsM3Theme(
                     borderColor = MaterialTheme.colorScheme.error.copy(alpha = 0.40f),
@@ -651,72 +651,81 @@ fun DashboardScreen(
                             )
                         }
 
-                        // Title
-                        Text(
-                            text = news.title,
-                            fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-
-                        // Body Lines
                         val rawLines = news.body.replace("\\n", "\n").lines().filter { it.isNotBlank() }
-                        rawLines.forEachIndexed { index, line ->
-                            val isMatchNews = news.type == NewsType.WON || news.type == NewsType.LOST || news.type == NewsType.PLAYOFFS
-                            if (index == 0 && isMatchNews && (line.contains(" @ ") || line.contains(" vs "))) {
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f),
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 3.dp)
-                                ) {
+                        val isMatchNews = (news.type == NewsType.WON || news.type == NewsType.LOST || news.type == NewsType.PLAYOFFS) &&
+                            (rawLines.any { it.contains(" @ ") || it.contains(" vs ") } || news.title.contains(" @ ") || news.title.contains(" vs "))
+
+                        if (isMatchNews) {
+                            // Extract match score line (e.g. "75 DEN @ 122 OKC") to serve directly as the primary headline
+                            val matchScore = rawLines.firstOrNull { it.contains(" @ ") || it.contains(" vs ") }
+                                ?: news.title.substringAfter(": ").ifBlank { news.title }
+
+                            Text(
+                                text = matchScore,
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontSize = 15.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+
+                            // Render MVP and leader stats cleanly without redundant score banners
+                            val remainingLines = rawLines.filter { it != matchScore }
+                            remainingLines.forEach { line ->
+                                if (line.startsWith("MVP:")) {
                                     Row(
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                        modifier = Modifier.padding(top = 1.dp, bottom = 1.dp)
                                     ) {
                                         Icon(
-                                            Icons.Default.SportsBasketball,
+                                            Icons.Default.Star,
                                             contentDescription = null,
-                                            tint = theme.accentColor,
-                                            modifier = Modifier.size(15.dp)
+                                            tint = Color(0xFFFFA000),
+                                            modifier = Modifier.size(13.dp)
                                         )
                                         Text(
                                             text = line,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 13.sp,
-                                            color = MaterialTheme.colorScheme.onSurface
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize = 12.sp,
+                                            color = MaterialTheme.colorScheme.primary
                                         )
                                     }
-                                }
-                            } else if (line.startsWith("MVP:") || line.startsWith("1.") || line.startsWith("2.") || line.startsWith("3.")) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                    modifier = Modifier.padding(vertical = 1.dp)
-                                ) {
-                                    Icon(
-                                        Icons.Default.Star,
-                                        contentDescription = null,
-                                        tint = Color(0xFFFFA000),
-                                        modifier = Modifier.size(13.dp)
+                                } else {
+                                    Text(
+                                        text = line,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontSize = 12.sp,
+                                        lineHeight = 16.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
+                                }
+                            }
+                        } else {
+                            // Non-match news: Standard Title & Body
+                            Text(
+                                text = news.title,
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+
+                            rawLines.forEach { line ->
+                                if (line.startsWith("1.") || line.startsWith("2.") || line.startsWith("3.")) {
                                     Text(
                                         text = line,
                                         fontWeight = FontWeight.SemiBold,
                                         fontSize = 12.sp,
                                         color = MaterialTheme.colorScheme.primary
                                     )
+                                } else {
+                                    Text(
+                                        text = line,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontSize = 12.sp,
+                                        lineHeight = 16.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 }
-                            } else {
-                                Text(
-                                    text = line,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontSize = 12.sp,
-                                    lineHeight = 16.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
                             }
                         }
                     }
