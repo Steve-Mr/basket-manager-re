@@ -491,7 +491,7 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
     override suspend fun getNews(gameId: Long): List<NewsItem> = withContext(Dispatchers.IO) {
         val list = mutableListOf<NewsItem>()
         val db = dbHelper.readableDatabase
-        val cursor = db.rawQuery("SELECT * FROM ${DB.TABLE_NEWS} WHERE gameId = ? ORDER BY matchday DESC, id DESC LIMIT 100", arrayOf(gameId.toString()))
+        val cursor = db.rawQuery("SELECT * FROM ${DB.TABLE_NEWS} WHERE gameId = ? ORDER BY matchday DESC, id DESC", arrayOf(gameId.toString()))
         cursor.use { c ->
             while (c.moveToNext()) {
                 list.add(cursorToNews(c).toDomain())
@@ -824,6 +824,18 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
                             body = "The regular season has concluded. The top 8 teams in each conference have secured their playoff berths."
                         )
                         insertNewsDirect(db, playoffNews.toEntity())
+
+                        // End-of-Regular-Season Official Awards: MVP & ROY
+                        val allPlayers = getPlayers(gameId)
+                        val teams = getTeams(gameId).associateBy { it.id }
+                        val regularStats = getAllPlayerRegularStats(gameId)
+
+                        AwardsEngine.calculateMvpPodium(allPlayers, teams, regularStats)?.let { mvpNews ->
+                            insertNewsDirect(db, mvpNews.toEntity())
+                        }
+                        AwardsEngine.calculateRoyPodium(allPlayers, teams, regularStats)?.let { royNews ->
+                            insertNewsDirect(db, royNews.toEntity())
+                        }
                     }
                 }
 

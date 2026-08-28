@@ -225,6 +225,8 @@ object MatchSimulationEngine {
         val mvpPlayer = allSimulatedPlayers.find { it.id == bestPerResult?.playerId }
 
         val newsItems = mutableListOf<NewsItem>()
+
+        // 1. Post-Match News for User Team / Playoffs (Full BM15 Category Alignment)
         if (localTeam.id == userTeamId || visitorTeam.id == userTeamId || isPlayoffs) {
             val isUserGame = (localTeam.id == userTeamId || visitorTeam.id == userTeamId)
             val userWon = (winnerTeamId == userTeamId)
@@ -238,14 +240,36 @@ object MatchSimulationEngine {
             } else {
                 if (userWon) "Victory: ${updatedMatch.name}" else "Defeat: ${updatedMatch.name}"
             }
-            val topScorer = finalBoxScores.maxByOrNull { it.points }
-            val topRebounder = finalBoxScores.maxByOrNull { it.rebounds }
-            val topPasser = finalBoxScores.maxByOrNull { it.passesOk }
-            val topBlocker = finalBoxScores.maxByOrNull { it.blocks }
-            val topStealer = finalBoxScores.maxByOrNull { it.steals }
-            val mvpSummary = "MVP: " + (mvpPlayer?.shortName ?: "N/A") + " (" + (bestPerResult?.points ?: 0) + " PTS, " + (bestPerResult?.rebounds ?: 0) + " REB, " + (bestPerResult?.passesOk ?: 0) + " AST)"
-            val leadersSummary = "Leaders: PTS: " + (topScorer?.playerName ?: "N/A") + " (" + (topScorer?.points ?: 0) + ") • REB: " + (topRebounder?.playerName ?: "N/A") + " (" + (topRebounder?.rebounds ?: 0) + ") • AST: " + (topPasser?.playerName ?: "N/A") + " (" + (topPasser?.passesOk ?: 0) + ")" + (if ((topBlocker?.blocks ?: 0) > 0) " • BLK: " + topBlocker?.playerName + " (" + topBlocker?.blocks + ")" else "") + (if ((topStealer?.steals ?: 0) > 0) " • STL: " + topStealer?.playerName + " (" + topStealer?.steals + ")" else "")
-            val body = "$mvpSummary\n$leadersSummary"
+
+            val localScores = finalBoxScores.filter { bs -> localPlayers.any { it.id == bs.playerId } }
+            val visitorScores = finalBoxScores.filter { bs -> visitorPlayers.any { it.id == bs.playerId } }
+
+            val localTopPts = localScores.maxByOrNull { it.points }
+            val visitorTopPts = visitorScores.maxByOrNull { it.points }
+
+            val localTopReb = localScores.maxByOrNull { it.rebounds }
+            val visitorTopReb = visitorScores.maxByOrNull { it.rebounds }
+
+            val localTopAst = localScores.maxByOrNull { it.passesOk }
+            val visitorTopAst = visitorScores.maxByOrNull { it.passesOk }
+
+            val localTopStl = localScores.maxByOrNull { it.steals }
+            val visitorTopStl = visitorScores.maxByOrNull { it.steals }
+
+            val localTopBlk = localScores.maxByOrNull { it.blocks }
+            val visitorTopBlk = visitorScores.maxByOrNull { it.blocks }
+
+            val mvpTeamName = if (mvpPlayer != null && localPlayers.any { it.id == mvpPlayer.id }) localTeam.name else visitorTeam.name
+            val mvpLine = "⭐ MVP: ${mvpPlayer?.shortName ?: "N/A"} ($mvpTeamName) • PER ${String.format("%.1f", bestPerResult?.per ?: 0.0)} (${bestPerResult?.points ?: 0} PTS, ${bestPerResult?.rebounds ?: 0} REB, ${bestPerResult?.passesOk ?: 0} AST)"
+
+            val ptsLine = "🏀 得分: ${localTopPts?.playerName ?: "N/A"} (${localTeam.name}) ${localTopPts?.points ?: 0}  |  ${visitorTopPts?.playerName ?: "N/A"} (${visitorTeam.name}) ${visitorTopPts?.points ?: 0}"
+            val rebLine = "🛡️ 篮板: ${localTopReb?.playerName ?: "N/A"} (${localTeam.name}) ${localTopReb?.rebounds ?: 0}  |  ${visitorTopReb?.playerName ?: "N/A"} (${visitorTeam.name}) ${visitorTopReb?.rebounds ?: 0}"
+            val astLine = "🎯 助攻: ${localTopAst?.playerName ?: "N/A"} (${localTeam.name}) ${localTopAst?.passesOk ?: 0}  |  ${visitorTopAst?.playerName ?: "N/A"} (${visitorTeam.name}) ${visitorTopAst?.passesOk ?: 0}"
+            val stlLine = "⚡ 抢断: ${localTopStl?.playerName ?: "N/A"} (${localTeam.name}) ${localTopStl?.steals ?: 0}  |  ${visitorTopStl?.playerName ?: "N/A"} (${visitorTeam.name}) ${visitorTopStl?.steals ?: 0}"
+            val blkLine = "🚫 盖帽: ${localTopBlk?.playerName ?: "N/A"} (${localTeam.name}) ${localTopBlk?.blocks ?: 0}  |  ${visitorTopBlk?.playerName ?: "N/A"} (${visitorTeam.name}) ${visitorTopBlk?.blocks ?: 0}"
+
+            val body = "$mvpLine\n$ptsLine\n$rebLine\n$astLine\n$stlLine\n$blkLine"
+
             newsItems.add(
                 NewsItem(
                     gameId = match.gameId,
@@ -258,6 +282,74 @@ object MatchSimulationEngine {
                     playerId = mvpPlayer?.id
                 )
             )
+        }
+
+        // 2. In-Season Outstanding Performance Milestones (League-Wide)
+        finalBoxScores.forEach { bs ->
+            val pObj = allSimulatedPlayers.find { it.id == bs.playerId } ?: return@forEach
+            val pTeam = if (localPlayers.any { it.id == pObj.id }) localTeam else visitorTeam
+
+            if (bs.points >= 10 && bs.rebounds >= 10 && bs.passesOk >= 10) {
+                newsItems.add(
+                    NewsItem(
+                        gameId = match.gameId,
+                        matchday = match.matchday,
+                        type = NewsType.INFO,
+                        title = "Triple Double! 🌟",
+                        body = "${pObj.name} (${pTeam.name}) recorded a Triple-Double with ${bs.points} PTS, ${bs.rebounds} REB, and ${bs.passesOk} AST in ${updatedMatch.name}.",
+                        team1Id = pTeam.id,
+                        playerId = pObj.id
+                    )
+                )
+            } else if (bs.points >= 50) {
+                newsItems.add(
+                    NewsItem(
+                        gameId = match.gameId,
+                        matchday = match.matchday,
+                        type = NewsType.INFO,
+                        title = "50+ Point Explosion! 🔥",
+                        body = "${pObj.name} (${pTeam.name}) scored ${bs.points} points in ${updatedMatch.name}.",
+                        team1Id = pTeam.id,
+                        playerId = pObj.id
+                    )
+                )
+            } else if (bs.per >= 48.0 && bs.minutesPlayed >= 22) {
+                newsItems.add(
+                    NewsItem(
+                        gameId = match.gameId,
+                        matchday = match.matchday,
+                        type = NewsType.INFO,
+                        title = "Awesome game! 🚀",
+                        body = "${pObj.name} (${pTeam.name}) had an awesome game with ${bs.points} PTS, ${bs.rebounds} REB, ${bs.passesOk} AST, ${bs.steals} STL, ${bs.blocks} BLK (PER ${String.format("%.1f", bs.per)}) in ${bs.minutesPlayed} mins in ${updatedMatch.name}.",
+                        team1Id = pTeam.id,
+                        playerId = pObj.id
+                    )
+                )
+            } else if (bs.rebounds >= 22) {
+                newsItems.add(
+                    NewsItem(
+                        gameId = match.gameId,
+                        matchday = match.matchday,
+                        type = NewsType.INFO,
+                        title = "Lot of rebounds! 🛡️",
+                        body = "${pObj.name} (${pTeam.name}) grabbed ${bs.rebounds} rebounds in ${updatedMatch.name}.",
+                        team1Id = pTeam.id,
+                        playerId = pObj.id
+                    )
+                )
+            } else if (bs.passesOk >= 18) {
+                newsItems.add(
+                    NewsItem(
+                        gameId = match.gameId,
+                        matchday = match.matchday,
+                        type = NewsType.INFO,
+                        title = "Lot of assists! 🎯",
+                        body = "${pObj.name} (${pTeam.name}) dished out ${bs.passesOk} assists in ${updatedMatch.name}.",
+                        team1Id = pTeam.id,
+                        playerId = pObj.id
+                    )
+                )
+            }
         }
 
         updatedPlayers.filter { it.teamId == userTeamId && it.stateInjury > 0 && (injuryMap[it.id] ?: 0) > 0 }.forEach { injP ->

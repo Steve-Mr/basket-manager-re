@@ -63,8 +63,18 @@ fun LeagueStatsScreen(
 
     val activeStatsList = if (selectedStatsScope == 0) regularStatsList else playoffStatsList
 
-    val statLeaders = remember(activeStatsList, selectedLeaderCategory) {
-        val qualified = activeStatsList.filter { it.gamesPlayed >= 1 }
+    val currentGame by viewModel.game.collectAsState()
+    val currentMatchday = currentGame?.currentMatchday ?: 1
+
+    val statLeaders = remember(activeStatsList, selectedLeaderCategory, selectedStatsScope, currentMatchday) {
+        val qualified = if (selectedStatsScope == 0) {
+            // Authentic BM15 Qualification: MPG >= 15.0 and gamesPlayed >= max(3, currentMatchday / 10)
+            val minGames = (currentMatchday / 10).coerceAtLeast(3)
+            activeStatsList.filter { it.gamesPlayed >= minGames && it.mpg >= 15.0 }
+        } else {
+            // Playoff Qualification: at least 1 playoff game
+            activeStatsList.filter { it.gamesPlayed >= 1 }
+        }
         when (selectedLeaderCategory) {
             "PTS" -> qualified.sortedByDescending { it.ppg }.take(50)
             "REB" -> qualified.sortedByDescending { it.rpg }.take(50)

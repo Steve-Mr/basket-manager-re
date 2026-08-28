@@ -551,4 +551,64 @@ class SimulationEngineTest {
         assertNotNull(botAdj)
         assertTrue(botAdj!!.deltaSalaryCap <= -3_000_000)
     }
+
+
+    @Test
+    fun testAwardsEngineMvpAndRoyPodium() {
+        val players = (1..30).map { i ->
+            Player(
+                id = i.toLong(),
+                gameId = 1,
+                teamId = ((i - 1) % 5 + 1).toLong(),
+                name = "Superstar $i",
+                age = 25,
+                potential = 8,
+                yearsContract = 2,
+                salary = 5000000,
+                yearsExperience = if (i % 2 == 0) 0 else 5, // Even are Rookies
+                positionFirst = Position.POINT_GUARD,
+                skillPhysique = 80,
+                skillBlock = 70,
+                skillSteal = 70,
+                skillRebound = 70,
+                skillPass = 70,
+                skillShotInterior = 70,
+                skillShotExterior = 70,
+                skillShotFree = 70
+            )
+        }
+
+        val teamMap = (1..5).associate { it.toLong() to Team(id = it.toLong(), name = "Team $it", conference = Conference.EAST, division = Division.E1_ATLANTIC, salaryCap = 70_000_000) }
+
+        val regularStats = players.associate { p ->
+            val matchResults = (1..20).map { m ->
+                MatchResult(
+                    id = m.toLong(),
+                    gameId = 1,
+                    matchday = m,
+                    playerId = p.id,
+                    playerName = p.name,
+                    minutesPlayed = 30,
+                    points = 20 + (p.id.toInt() % 10),
+                    rebounds = 5,
+                    passesOk = 5,
+                    shotsInteriorOk = 8 + (p.id.toInt() % 5),
+                    shotsInteriorKo = 4
+                )
+            }
+            p.id to matchResults
+        }
+
+        val mvpNews = AwardsEngine.calculateMvpPodium(players, teamMap, regularStats)
+        assertNotNull(mvpNews)
+        assertTrue(mvpNews!!.title.contains("Most Valuable Players"))
+        assertTrue(mvpNews.body.contains("1."))
+        assertTrue(mvpNews.body.contains("2."))
+        assertTrue(mvpNews.body.contains("3."))
+
+        val royNews = AwardsEngine.calculateRoyPodium(players, teamMap, regularStats)
+        assertNotNull(royNews)
+        assertTrue(royNews!!.title.contains("Rookies of the Year"))
+        assertTrue(royNews.body.contains("1."))
+    }
 }

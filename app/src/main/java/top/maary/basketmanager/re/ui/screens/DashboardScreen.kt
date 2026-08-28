@@ -321,18 +321,20 @@ fun DashboardScreen(
             }
         }
 
-        // News Feed with Visual Color Coding
-        items(newsList.take(30)) { news ->
+        // News Feed with Visual Color Coding (Full Season Retention & Beautiful Formatting)
+        items(newsList) { news ->
             val isWin = news.type == NewsType.WON || (news.type == NewsType.PLAYOFFS && news.title.contains("Victory"))
             val isLoss = news.type == NewsType.LOST || (news.type == NewsType.PLAYOFFS && news.title.contains("Defeat"))
             val isInj = news.type == NewsType.INJURED
             val isPlayoff = news.type == NewsType.PLAYOFFS && !news.title.contains("Victory") && !news.title.contains("Defeat")
+            val isAward = news.title.contains("MVP") || news.title.contains("ROY") || news.title.contains("Award") || news.title.contains("Triple Double") || news.title.contains("Explosion") || news.title.contains("Awesome")
 
             val borderColor = when {
                 isWin -> RatingGreen
                 isLoss -> RatingRed
                 isInj -> MaterialTheme.colorScheme.error
                 isPlayoff -> Color(0xFFFFD700)
+                isAward -> Color(0xFFFFA000)
                 else -> MaterialTheme.colorScheme.outlineVariant
             }
 
@@ -340,6 +342,7 @@ fun DashboardScreen(
                 isWin -> RatingGreen.copy(alpha = 0.08f)
                 isLoss -> RatingRed.copy(alpha = 0.08f)
                 isInj -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f)
+                isAward -> Color(0xFFFFA000).copy(alpha = 0.08f)
                 else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
             }
 
@@ -367,7 +370,8 @@ fun DashboardScreen(
                 Column(modifier = Modifier.padding(12.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
                             text = news.title,
@@ -376,6 +380,7 @@ fun DashboardScreen(
                             color = when {
                                 isWin -> RatingGreen
                                 isLoss -> RatingRed
+                                isAward -> Color(0xFFE65100)
                                 else -> MaterialTheme.colorScheme.onSurface
                             }
                         )
@@ -385,12 +390,35 @@ fun DashboardScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = news.body.replace("\\n", "\n"),
-                        style = MaterialTheme.typography.bodySmall,
-                        lineHeight = 16.sp
-                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    val rawLines = news.body.replace("\\n", "\n").lines()
+                    rawLines.forEach { line ->
+                        if (line.isNotBlank()) {
+                            if (line.startsWith("⭐ MVP:") || line.startsWith("1.") || line.startsWith("2.") || line.startsWith("3.")) {
+                                Text(
+                                    text = line,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(vertical = 1.dp)
+                                )
+                            } else if (line.contains("🏀") || line.contains("🛡️") || line.contains("🎯") || line.contains("⚡") || line.contains("🚫")) {
+                                Text(
+                                    text = line,
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.padding(vertical = 1.dp)
+                                )
+                            } else {
+                                Text(
+                                    text = line,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    lineHeight = 16.sp
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }

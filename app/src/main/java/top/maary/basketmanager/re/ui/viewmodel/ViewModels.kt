@@ -14,6 +14,7 @@ import java.io.InputStream
 data class PlayerSeasonStats(
     val player: Player,
     val gamesPlayed: Int,
+    val mpg: Double = 0.0,
     val ppg: Double,
     val rpg: Double,
     val apg: Double,
@@ -152,13 +153,14 @@ class GameDashboardViewModel(
         val regularList = players.map { p ->
             val pStats = regularMap[p.id] ?: emptyList()
             val gp = pStats.size
+            val mpg = if (gp > 0) pStats.sumOf { it.minutesPlayed }.toDouble() / gp else 0.0
             val ppg = if (gp > 0) pStats.sumOf { it.points }.toDouble() / gp else 0.0
             val rpg = if (gp > 0) pStats.sumOf { it.rebounds }.toDouble() / gp else 0.0
             val apg = if (gp > 0) pStats.sumOf { it.passesOk }.toDouble() / gp else 0.0
             val spg = if (gp > 0) pStats.sumOf { it.steals }.toDouble() / gp else 0.0
             val bpg = if (gp > 0) pStats.sumOf { it.blocks }.toDouble() / gp else 0.0
             val avgPer = if (gp > 0) pStats.sumOf { it.per }.toDouble() / gp else 0.0
-            PlayerSeasonStats(p, gp, ppg, rpg, apg, spg, bpg, avgPer, isPlayoffs = false)
+            PlayerSeasonStats(p, gp, mpg, ppg, rpg, apg, spg, bpg, avgPer, isPlayoffs = false)
         }
         _playerStatsList.value = regularList
 
@@ -167,13 +169,14 @@ class GameDashboardViewModel(
         val playoffList = players.map { p ->
             val pStats = playoffMap[p.id] ?: emptyList()
             val gp = pStats.size
+            val mpg = if (gp > 0) pStats.sumOf { it.minutesPlayed }.toDouble() / gp else 0.0
             val ppg = if (gp > 0) pStats.sumOf { it.points }.toDouble() / gp else 0.0
             val rpg = if (gp > 0) pStats.sumOf { it.rebounds }.toDouble() / gp else 0.0
             val apg = if (gp > 0) pStats.sumOf { it.passesOk }.toDouble() / gp else 0.0
             val spg = if (gp > 0) pStats.sumOf { it.steals }.toDouble() / gp else 0.0
             val bpg = if (gp > 0) pStats.sumOf { it.blocks }.toDouble() / gp else 0.0
             val avgPer = if (gp > 0) pStats.sumOf { it.per }.toDouble() / gp else 0.0
-            PlayerSeasonStats(p, gp, ppg, rpg, apg, spg, bpg, avgPer, isPlayoffs = true)
+            PlayerSeasonStats(p, gp, mpg, ppg, rpg, apg, spg, bpg, avgPer, isPlayoffs = true)
         }
         _playerPlayoffStatsList.value = playoffList
     }
