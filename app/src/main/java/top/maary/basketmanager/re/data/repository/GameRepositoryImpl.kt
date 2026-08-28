@@ -1575,4 +1575,76 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
         position = if (c.isNull(c.getColumnIndexOrThrow("position"))) null else c.getInt(c.getColumnIndexOrThrow("position")),
         marketValue = c.getDouble(c.getColumnIndexOrThrow("marketValue"))
     )
+
+    override suspend fun getTeamDraftPicks(teamId: Long): List<DraftPick> = withContext(Dispatchers.IO) {
+        val db = dbHelper.readableDatabase
+        val cursor = db.rawQuery("SELECT * FROM ${DB.TABLE_DRAFT_PICK} WHERE currentTeamId = ?", arrayOf(teamId.toString()))
+        val list = mutableListOf<DraftPick>()
+        while (cursor.moveToNext()) {
+            list.add(cursorToDraftPick(cursor).toDomain())
+        }
+        cursor.close()
+        list
+    }
+
+    override suspend fun findShopTradeOffers(
+        userTeamId: Long,
+        offeredPlayerIds: List<Long>,
+        offeredDraftPickIds: List<Long>
+    ): List<CpuTradeBid> = withContext(Dispatchers.IO) {
+        val userTeam = getTeam(userTeamId) ?: return@withContext emptyList()
+        val allPlayers = getPlayers(userTeam.gameId)
+        val allPicks = getDraftPicks(userTeam.gameId)
+        val allTeams = getTeams(userTeam.gameId)
+
+        val userRoster = allPlayers.filter { it.teamId == userTeamId }
+        val offeredPlayers = userRoster.filter { offeredPlayerIds.contains(it.id) }
+        val offeredPicks = allPicks.filter { offeredDraftPickIds.contains(it.id) }
+
+        val cpuTeams = allTeams.filter { it.id != userTeamId }
+        val cpuRosters = allPlayers.groupBy { it.teamId ?: 0L }
+        val cpuPicks = allPicks.groupBy { it.currentTeamId }
+
+        TradeEvaluationEngine.findTradeOffersForAssets(
+            userTeam = userTeam,
+            offeredPlayers = offeredPlayers,
+            offeredPicks = offeredPicks,
+            userRoster = userRoster,
+            cpuTeams = cpuTeams,
+            cpuRosters = cpuRosters,
+            cpuPicks = cpuPicks
+        )
+    }
+
+    override suspend fun askTargetTradeDemand(
+        userTeamId: Long,
+        targetTeamId: Long,
+        requestedPlayerIds: List<Long>,
+        requestedDraftPickIds: List<Long>
+    ): CpuTargetInquiryResult = withContext(Dispatchers.IO) {
+        val userTeam = getTeam(userTeamId) ?: return@withContext CpuTargetInquiryResult(false, Team(id = targetTeamId, name = "Target Team", conference = Conference.EAST, division = Division.E1_ATLANTIC, salaryCap = 70_000_000), emptyList(), emptyList(), "User team not found")
+        val targetTeam = getTeam(targetTeamId) ?: return@withContext CpuTargetInquiryResult(false, Team(id = targetTeamId, name = "Target Team", conference = Conference.EAST, division = Division.E1_ATLANTIC, salaryCap = 70_000_000), emptyList(), emptyList(), "Target team not found")
+
+        val allPlayers = getPlayers(userTeam.gameId)
+        val allPicks = getDraftPicks(userTeam.gameId)
+
+        val userRoster = allPlayers.filter { it.teamId == userTeamId }
+        val userPicks = allPicks.filter { it.currentTeamId == userTeamId }
+
+        val targetRoster = allPlayers.filter { it.teamId == targetTeamId }
+        val targetPicks = allPicks.filter { it.currentTeamId == targetTeamId }
+
+        val targetPlayers = targetRoster.filter { requestedPlayerIds.contains(it.id) }
+        val targetSelectedPicks = targetPicks.filter { requestedDraftPickIds.contains(it.id) }
+
+        TradeEvaluationEngine.generateCpuDemandForTargetAssets(
+            userTeam = userTeam,
+            userRoster = userRoster,
+            userPicks = userPicks,
+            targetTeam = targetTeam,
+            targetPlayers = targetPlayers,
+            targetPicks = targetSelectedPicks,
+            targetRoster = targetRoster
+        )
+    }
 }

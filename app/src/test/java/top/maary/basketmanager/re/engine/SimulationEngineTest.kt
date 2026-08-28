@@ -1,6 +1,7 @@
 package top.maary.basketmanager.re.engine
 
 import top.maary.basketmanager.re.domain.engine.ContractEngine
+import top.maary.basketmanager.re.domain.engine.TradeEvaluationEngine
 
 import org.junit.Assert.*
 import org.junit.Test
@@ -446,5 +447,68 @@ class SimulationEngineTest {
         if (acceptedExt) {
             assertTrue(msgExt.contains("4 years") || msgExt.contains("extension"))
         }
+    }
+
+    @Test
+    fun testMultiAssetMegaTradeWithPicks() {
+        val teamA = Team(id = 1, name = "Team A", conference = Conference.EAST, division = Division.E1_ATLANTIC, salaryCap = 120_000_000)
+        val teamB = Team(id = 2, name = "Team B", conference = Conference.WEST, division = Division.W3_PACIFIC, salaryCap = 120_000_000)
+
+        val playerA1 = Player(id = 1, gameId = 1, teamId = 1, name = "Star A1", age = 27, yearsContract = 3, positionFirst = Position.PG, salary = 20_000_000, potential = 9, skillPhysique = 88, skillBlock = 70, skillSteal = 85, skillRebound = 65, skillPass = 92, skillShotInterior = 86, skillShotExterior = 89, skillShotFree = 90)
+        val playerA2 = Player(id = 2, gameId = 1, teamId = 1, name = "Role A2", age = 26, yearsContract = 2, positionFirst = Position.SG, salary = 8_000_000, potential = 7, skillPhysique = 80, skillBlock = 65, skillSteal = 75, skillRebound = 60, skillPass = 78, skillShotInterior = 78, skillShotExterior = 82, skillShotFree = 80)
+        val playerA3 = Player(id = 3, gameId = 1, teamId = 1, name = "Bench A3", age = 24, yearsContract = 2, positionFirst = Position.SF, salary = 4_000_000, potential = 6, skillPhysique = 76, skillBlock = 60, skillSteal = 70, skillRebound = 65, skillPass = 70, skillShotInterior = 74, skillShotExterior = 75, skillShotFree = 75)
+
+        val playerB1 = Player(id = 4, gameId = 1, teamId = 2, name = "Star B1", age = 28, yearsContract = 3, positionFirst = Position.C, salary = 22_000_000, potential = 9, skillPhysique = 90, skillBlock = 92, skillSteal = 60, skillRebound = 95, skillPass = 65, skillShotInterior = 90, skillShotExterior = 50, skillShotFree = 75)
+        val playerB2 = Player(id = 5, gameId = 1, teamId = 2, name = "Role B2", age = 27, yearsContract = 2, positionFirst = Position.PF, salary = 7_000_000, potential = 7, skillPhysique = 80, skillBlock = 80, skillSteal = 65, skillRebound = 82, skillPass = 68, skillShotInterior = 80, skillShotExterior = 70, skillShotFree = 75)
+
+        val pickA = DraftPick(id = 1, gameId = 1, originalTeamId = 1, currentTeamId = 1, round = 1)
+        val pickB = DraftPick(id = 2, gameId = 1, originalTeamId = 2, currentTeamId = 2, round = 2)
+
+        val rosterA = listOf(playerA1, playerA2, playerA3) + (6..16).map { i ->
+            Player(id = i.toLong(), gameId = 1, teamId = 1, name = "RosterA $i", age = 25, yearsContract = 2, positionFirst = Position.PG, salary = 2_000_000, potential = 5, skillPhysique = 74, skillBlock = 60, skillSteal = 60, skillRebound = 60, skillPass = 70, skillShotInterior = 70, skillShotExterior = 70, skillShotFree = 70)
+        }
+        val rosterB = listOf(playerB1, playerB2) + (17..28).map { i ->
+            Player(id = i.toLong(), gameId = 1, teamId = 2, name = "RosterB $i", age = 25, yearsContract = 2, positionFirst = Position.SF, salary = 2_000_000, potential = 5, skillPhysique = 74, skillBlock = 60, skillSteal = 60, skillRebound = 60, skillPass = 70, skillShotInterior = 70, skillShotExterior = 70, skillShotFree = 70)
+        }
+
+        // Test Multi-Asset Trade (3 players + pick from A, 2 players + pick from B)
+        val result = TradeEvaluationEngine.evaluateTrade(
+            teamA = teamA,
+            teamB = teamB,
+            teamAPlayers = listOf(playerA1, playerA2, playerA3),
+            teamBPlayers = listOf(playerB1, playerB2),
+            teamADraftPicks = listOf(pickA),
+            teamBDraftPicks = listOf(pickB),
+            teamARoster = rosterA,
+            teamBRoster = rosterB
+        )
+
+        assertTrue(result.isAccepted)
+        assertTrue(result.valueTeamA > 0)
+        assertTrue(result.valueTeamB > 0)
+
+        // Test Feature 2: Shop My Assets
+        val shopBids = TradeEvaluationEngine.findTradeOffersForAssets(
+            userTeam = teamA,
+            offeredPlayers = listOf(playerA1),
+            offeredPicks = emptyList(),
+            userRoster = rosterA,
+            cpuTeams = listOf(teamB),
+            cpuRosters = mapOf(teamB.id to rosterB),
+            cpuPicks = mapOf(teamB.id to listOf(pickB))
+        )
+        assertNotNull(shopBids)
+
+        // Test Feature 3: Target Asset Inquiry
+        val targetInquiry = TradeEvaluationEngine.generateCpuDemandForTargetAssets(
+            userTeam = teamA,
+            userRoster = rosterA,
+            userPicks = listOf(pickA),
+            targetTeam = teamB,
+            targetPlayers = listOf(playerB1),
+            targetPicks = emptyList(),
+            targetRoster = rosterB
+        )
+        assertNotNull(targetInquiry)
     }
 }

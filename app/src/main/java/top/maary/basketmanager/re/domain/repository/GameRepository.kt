@@ -2,6 +2,8 @@ package top.maary.basketmanager.re.domain.repository
 
 import top.maary.basketmanager.re.domain.engine.TradeEvaluationResult
 import top.maary.basketmanager.re.domain.model.*
+import top.maary.basketmanager.re.domain.engine.CpuTradeBid
+import top.maary.basketmanager.re.domain.engine.CpuTargetInquiryResult
 import java.io.InputStream
 
 interface GameRepository {
@@ -61,4 +63,8 @@ interface GameRepository {
     // Simulation Loop
     suspend fun advanceMatchday(gameId: Long): GameSession
     suspend fun autoSimulateTo(gameId: Long, targetMatchday: Int, onProgress: (Int, String) -> Unit): GameSession
+
+    suspend fun getTeamDraftPicks(teamId: Long): List<DraftPick>
+    suspend fun findShopTradeOffers(userTeamId: Long, offeredPlayerIds: List<Long>, offeredDraftPickIds: List<Long>): List<CpuTradeBid>
+    suspend fun askTargetTradeDemand(userTeamId: Long, targetTeamId: Long, requestedPlayerIds: List<Long>, requestedDraftPickIds: List<Long>): CpuTargetInquiryResult
 }
