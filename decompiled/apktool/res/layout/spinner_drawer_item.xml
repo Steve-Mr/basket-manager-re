@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout android:layout_width="match_parent" android:layout_height="match_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <TextView android:id="@id/spinnerDrawerItemTextViewId" android:paddingBottom="@dimen/padding_default" android:visibility="invisible" android:text="@string/value_example" android:layout_alignParentLeft="true" android:layout_centerVertical="true" style="@style/textViewDefault" />
+    <ImageView android:id="@id/spinnerDrawerItemImageViewIcon" android:padding="@dimen/padding_double" android:src="@drawable/star1" android:layout_alignParentLeft="true" android:layout_centerVertical="true" android:contentDescription="@string/blank" style="@style/imageDefault" />
+    <TextView android:textStyle="normal" android:textColor="@color/base_gray_very_light" android:id="@id/spinnerDrawerItemTextViewTitle" android:text="@string/hello_world" android:layout_toRightOf="@id/spinnerDrawerItemImageViewIcon" android:layout_centerVertical="true" style="@style/textViewDefault" />
+    <TextView android:textSize="@dimen/text_small" android:textStyle="normal" android:textColor="@color/base_gray_very_light" android:id="@id/spinnerDrawerItemTextViewText" android:paddingRight="@dimen/padding_triple" android:text="@string/hello_world" android:layout_alignParentRight="true" android:layout_centerVertical="true" style="@style/textViewDefault" />
+</RelativeLayout>

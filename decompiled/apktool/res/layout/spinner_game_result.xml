@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:gravity="center" android:orientation="horizontal" android:background="@color/holo_blue_light" android:layout_width="match_parent" android:layout_height="match_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <TextView android:textSize="@dimen/text_very_small" android:gravity="center_vertical" android:id="@id/spinnerGameResultTextViewTeamName" android:layout_width="@dimen/padding_none" android:text="@string/name" android:layout_weight="3.0" style="@style/textViewDefault" />
+    <TextView android:textSize="@dimen/text_very_small" android:gravity="center" android:id="@id/spinnerGameResultTextViewQuarterOne" android:layout_width="@dimen/padding_none" android:text="@string/value_example" android:layout_weight="1.0" style="@style/textViewDefault" />
+    <TextView android:textSize="@dimen/text_very_small" android:gravity="center" android:id="@id/spinnerGameResultTextViewQuarterTwo" android:layout_width="@dimen/padding_none" android:text="@string/value_example" android:layout_weight="1.0" style="@style/textViewDefault" />
+    <TextView android:textSize="@dimen/text_very_small" android:gravity="center" android:id="@id/spinnerGameResultTextViewQuarterThree" android:layout_width="@dimen/padding_none" android:text="@string/value_example" android:layout_weight="1.0" style="@style/textViewDefault" />
+    <TextView android:textSize="@dimen/text_very_small" android:gravity="center" android:id="@id/spinnerGameResultTextViewQuarterFour" android:layout_width="@dimen/padding_none" android:text="@string/value_example" android:layout_weight="1.0" style="@style/textViewDefault" />
+    <TextView android:textSize="@dimen/text_very_small" android:gravity="center" android:id="@id/spinnerGameResultTextViewExtension" android:layout_width="@dimen/padding_none" android:text="@string/value_example" android:layout_weight="1.0" style="@style/textViewDefault" />
+    <TextView android:textSize="@dimen/text_very_small" android:gravity="center" android:id="@id/spinnerGameResultTextViewTotal" android:layout_width="@dimen/padding_none" android:text="@string/value_example" android:layout_weight="1.0" style="@style/textViewDefault" />
+</LinearLayout>

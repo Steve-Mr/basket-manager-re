@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:ads="http://schemas.android.com/apk/res-auto" style="@style/layoutDefault">
+    <ListView
+        android:id="@+id/fragmentCalendarListViewCalendar"
+        android:layout_width="80dp"
+        android:layout_height="wrap_content"
+        android:divider="@color/base_gray_light"
+        android:dividerHeight="1dp"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentBottom="true"/>
+    <ListView
+        android:id="@+id/fragmentCalendarListViewMatch"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="@dimen/padding_default"
+        android:divider="@color/base_gray_very_light"
+        android:dividerHeight="1dp"
+        android:layout_toRightOf="@+id/fragmentCalendarListViewCalendar"
+        android:layout_above="@+id/fragmentCalendarButtonPlay"
+        android:layout_alignParentTop="true"/>
+    <Button
+        android:id="@+id/fragmentCalendarButtonPlay"
+        android:layout_height="@dimen/button_height_small"
+        android:layout_margin="@dimen/padding_default"
+        android:text="@string/calendar_play"
+        android:layout_toRightOf="@+id/fragmentCalendarListViewCalendar"
+        android:layout_alignParentRight="true"
+        android:layout_alignParentBottom="true"
+        style="@style/buttonDefault"/>
+</RelativeLayout>

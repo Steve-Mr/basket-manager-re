@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:gravity="center" android:orientation="horizontal" android:background="@color/holo_blue_light" android:layout_width="match_parent" android:layout_height="match_parent"
+  xmlns:android="http://schemas.android.com/apk/res/android">
+    <TextView android:textSize="@dimen/text_very_small" android:gravity="center_vertical" android:id="@id/spinnerFinanceTextViewPlayerName" android:layout_width="@dimen/padding_none" android:text="@string/name" android:layout_weight="1.0" style="@style/textViewDefault" />
+    <TextView android:textSize="@dimen/text_very_small" android:gravity="center" android:id="@id/spinnerFinanceTextViewYear1" android:layout_width="@dimen/padding_none" android:text="@string/spinner_finance_year1" android:layout_weight="1.0" style="@style/textViewDefault" />
+    <TextView android:textSize="@dimen/text_very_small" android:gravity="center" android:id="@id/spinnerFinanceTextViewYear2" android:layout_width="@dimen/padding_none" android:text="@string/spinner_finance_year2" android:layout_weight="1.0" style="@style/textViewDefault" />
+    <TextView android:textSize="@dimen/text_very_small" android:gravity="center" android:id="@id/spinnerFinanceTextViewYear3" android:layout_width="@dimen/padding_none" android:text="@string/spinner_finance_year3" android:layout_weight="1.0" style="@style/textViewDefault" />
+    <TextView android:textSize="@dimen/text_very_small" android:gravity="center" android:id="@id/spinnerFinanceTextViewYear4" android:layout_width="@dimen/padding_none" android:text="@string/spinner_finance_year4" android:layout_weight="1.0" style="@style/textViewDefault" />
+    <TextView android:textSize="@dimen/text_very_small" android:gravity="center" android:id="@id/spinnerFinanceTextViewYear5" android:visibility="gone" android:layout_width="@dimen/padding_none" android:text="@string/spinner_finance_year5" android:layout_weight="1.0" style="@style/textViewDefault" />
+</LinearLayout>
