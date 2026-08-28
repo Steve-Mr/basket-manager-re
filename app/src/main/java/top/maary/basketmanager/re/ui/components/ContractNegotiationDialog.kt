@@ -25,6 +25,7 @@ import kotlin.math.roundToInt
 fun ContractNegotiationDialog(
     player: Player,
     isHomeTeamRenewal: Boolean = true,
+    capAvailable: Int? = null,
     onDismiss: () -> Unit,
     onConfirmOffer: (years: Int, salary: Int, accepted: Boolean, feedbackMessage: String) -> Unit
 ) {
@@ -72,6 +73,7 @@ fun ContractNegotiationDialog(
     fun formatMoney(a: Int) = if (a >= 1_000_000) "$${String.format("%.2f", a / 1_000_000.0)}M" else "$${a / 1_000}K"
 
     val isMinContract = currentOfferedSalaryInt < 1_000_000
+    val isAffordable = capAvailable == null || currentOfferedSalaryInt <= capAvailable || isMinContract
 
     val loyaltyQuote = if (isHomeTeamRenewal) {
         when (player.loyalty) {
@@ -173,8 +175,42 @@ fun ContractNegotiationDialog(
                     }
                 }
 
-                // Minimum Contract Exception Tag
-                if (isMinContract) {
+                // Cap Space and Minimum Contract Exception Status
+                if (capAvailable != null) {
+                    if (!isAffordable) {
+                        Surface(shape = RoundedCornerShape(6.dp), color = RatingRed.copy(alpha = 0.15f)) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text("⚠️", fontSize = 12.sp)
+                                Text(
+                                    text = "Exceeds Cap Space: ${formatMoney(capAvailable)} available. (Must be < $1.0M for Minimum Exception)",
+                                    color = RatingRed,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    } else if (isMinContract) {
+                        Surface(shape = RoundedCornerShape(4.dp), color = RatingGreen.copy(alpha = 0.15f)) {
+                            Text(
+                                text = "⚡ Minimum Contract Exception (< $1.0M): Allowed under salary cap rules",
+                                color = RatingGreen,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    } else {
+                        Text(
+                            text = "Team Cap Space: ${formatMoney(capAvailable)} available",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                } else if (isMinContract) {
                     Surface(shape = RoundedCornerShape(4.dp), color = RatingGreen.copy(alpha = 0.15f)) {
                         Text(
                             text = "⚡ Minimum Contract Exception (< $1.0M): Allowed even if over cap",
@@ -278,10 +314,12 @@ fun ContractNegotiationDialog(
                 onClick = {
                     val (accepted, msg) = ContractEngine.evaluateContractOffer(player, currentOfferedSalaryInt, selectedYears, isHomeTeamRenewal)
                     onConfirmOffer(totalContractYears, currentOfferedSalaryInt, accepted, msg)
-                }
+                },
+                enabled = isAffordable
             ) {
                 Text(
-                    when {
+                    if (!isAffordable) "Insufficient Cap Space"
+                    else when {
                         isExtension -> "Confirm Extension"
                         isHomeTeamRenewal -> "Submit Renewal Offer"
                         else -> "Submit FA Offer"

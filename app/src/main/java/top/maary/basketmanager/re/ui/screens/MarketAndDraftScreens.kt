@@ -170,6 +170,7 @@ fun FreeAgencyScreen(
         ContractNegotiationDialog(
             player = player,
             isHomeTeamRenewal = false,
+            capAvailable = capRemaining,
             onDismiss = { negotiatingPlayer = null },
             onConfirmOffer = { years: Int, salary: Int, accepted: Boolean, feedbackMsg: String ->
                 negotiatingPlayer = null

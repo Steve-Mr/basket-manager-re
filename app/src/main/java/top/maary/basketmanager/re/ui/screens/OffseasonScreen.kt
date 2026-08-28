@@ -642,6 +642,7 @@ fun OffseasonScreen(
         ContractNegotiationDialog(
             player = player,
             isHomeTeamRenewal = true,
+            capAvailable = capSpace,
             onDismiss = { negotiatingPlayer = null },
             onConfirmOffer = { years: Int, salary: Int, accepted: Boolean, feedbackMsg: String ->
                 if (accepted) {
