@@ -95,19 +95,19 @@ fun PotentialTierBadge(
     potential: Int,
     modifier: Modifier = Modifier
 ) {
-    val (bgColor, labelColor, starDrawableId) = when {
-        potential >= 9 -> Triple(Color(0xFFFFF8E1), Color(0xFFB45309), R.drawable.star6)
-        potential >= 7 -> Triple(Color(0xFFFFF3E0), Color(0xFFC2410C), R.drawable.star5)
-        potential >= 5 -> Triple(Color(0xFFE0F2F1), Color(0xFF0F766E), R.drawable.star4)
-        potential >= 3 -> Triple(Color(0xFFE3F2FD), Color(0xFF1D4ED8), R.drawable.star3)
-        potential >= 1 -> Triple(Color(0xFFF3E8FF), Color(0xFF6D28D9), R.drawable.star2)
-        else -> Triple(Color(0xFFECEFF1), Color(0xFF475569), R.drawable.star1)
+    val (containerColor, onContainerColor, starDrawableId) = when {
+        potential >= 9 -> Triple(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer, R.drawable.star6)
+        potential >= 7 -> Triple(MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.onSecondaryContainer, R.drawable.star5)
+        potential >= 5 -> Triple(MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer, R.drawable.star4)
+        potential >= 3 -> Triple(MaterialTheme.colorScheme.surfaceContainerHigh, MaterialTheme.colorScheme.onSurface, R.drawable.star3)
+        potential >= 1 -> Triple(MaterialTheme.colorScheme.surfaceContainer, MaterialTheme.colorScheme.onSurfaceVariant, R.drawable.star2)
+        else -> Triple(MaterialTheme.colorScheme.surfaceContainerLow, MaterialTheme.colorScheme.onSurfaceVariant, R.drawable.star1)
     }
 
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(10.dp),
-        color = bgColor
+        color = containerColor
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 7.dp, vertical = 6.dp),
@@ -124,7 +124,7 @@ fun PotentialTierBadge(
                 text = "$potential",
                 fontWeight = FontWeight.Black,
                 fontSize = 12.sp,
-                color = labelColor
+                color = onContainerColor
             )
         }
     }
@@ -160,9 +160,9 @@ fun ReadinessPill(
     } else {
         val readiness = ((form + energy) / 2).coerceIn(0, 99)
         val (tintBg, tintText) = when {
-            readiness >= 80 -> Pair(RatingGreen.copy(alpha = 0.15f), RatingGreen)
-            readiness >= 50 -> Pair(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.onSurfaceVariant)
-            else -> Pair(RatingOrange.copy(alpha = 0.15f), RatingOrange)
+            readiness >= 80 -> Pair(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.onPrimaryContainer)
+            readiness >= 50 -> Pair(MaterialTheme.colorScheme.surfaceContainer, MaterialTheme.colorScheme.onSurfaceVariant)
+            else -> Pair(MaterialTheme.colorScheme.tertiaryContainer, MaterialTheme.colorScheme.onTertiaryContainer)
         }
 
         Surface(
@@ -205,7 +205,7 @@ fun M3PlayerCard(
             .fillMaxWidth()
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest),
         border = null,
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
@@ -250,13 +250,13 @@ fun M3PlayerCard(
                         // Prominent Age Pill
                         Surface(
                             shape = RoundedCornerShape(4.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                            color = MaterialTheme.colorScheme.surfaceContainer
                         ) {
                             Text(
                                 text = "${player.age} yrs",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
                             )
                         }

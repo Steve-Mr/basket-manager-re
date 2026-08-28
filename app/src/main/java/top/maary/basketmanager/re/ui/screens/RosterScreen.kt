@@ -173,6 +173,7 @@ fun RosterScreen(
                         title = "Starters",
                         badgeText = "5 Players • Avg ${if (startersList.isNotEmpty()) startersList.map { it.overallRating }.average().toInt() else 0}",
                         headerColor = MaterialTheme.colorScheme.primaryContainer,
+                        headerTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
                         players = startersList,
                         onPlayerClick = { selectedPlayerForDetail = it }
                     )
@@ -183,7 +184,8 @@ fun RosterScreen(
                     RosterGroupCard(
                         title = "Reserves",
                         badgeText = "5 Players • Avg ${if (reservesList.isNotEmpty()) reservesList.map { it.overallRating }.average().toInt() else 0}",
-                        headerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        headerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        headerTextColor = MaterialTheme.colorScheme.onSecondaryContainer,
                         players = reservesList,
                         onPlayerClick = { selectedPlayerForDetail = it }
                     )
@@ -195,7 +197,8 @@ fun RosterScreen(
                         RosterGroupCard(
                             title = "Bench Depth",
                             badgeText = "${benchList.size} Players",
-                            headerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            headerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                            headerTextColor = MaterialTheme.colorScheme.onTertiaryContainer,
                             players = benchList,
                             onPlayerClick = { selectedPlayerForDetail = it }
                         )
@@ -236,13 +239,14 @@ fun RosterGroupCard(
     title: String,
     badgeText: String,
     headerColor: Color,
+    headerTextColor: Color,
     players: List<Player>,
     onPlayerClick: (Player) -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         border = null
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(10.dp)) {
@@ -266,6 +270,7 @@ fun RosterGroupCard(
                         text = badgeText,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
+                        color = headerTextColor,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                     )
                 }

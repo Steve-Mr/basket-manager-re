@@ -162,7 +162,7 @@ fun LineupScreen(
                 // Left Header: Starters
                 Surface(
                     shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                    color = MaterialTheme.colorScheme.primaryContainer,
                     modifier = Modifier.weight(1f)
                 ) {
                     Row(
@@ -188,7 +188,7 @@ fun LineupScreen(
                 // Right Header: Reserves
                 Surface(
                     shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    color = MaterialTheme.colorScheme.secondaryContainer,
                     modifier = Modifier.weight(1f)
                 ) {
                     Row(
@@ -200,13 +200,13 @@ fun LineupScreen(
                             text = "Reserves",
                             fontWeight = FontWeight.Black,
                             fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
                         Text(
                             text = "Avg $reserveAvgOvr",
                             fontWeight = FontWeight.Bold,
                             fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.outline
+                            color = MaterialTheme.colorScheme.secondary
                         )
                     }
                 }
@@ -443,15 +443,11 @@ fun CompactLineupSlotCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
-            .clickable(onClick = onClick)
-            .then(
-                if (isStarter) Modifier.border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
-                else Modifier.border(0.5.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(10.dp))
-            ),
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(10.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isStarter) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
-            else MaterialTheme.colorScheme.surfaceVariant
+            containerColor = if (isStarter) MaterialTheme.colorScheme.surfaceContainerHighest
+            else MaterialTheme.colorScheme.surfaceContainerLow
         )
     ) {
         Row(

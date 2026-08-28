@@ -133,7 +133,7 @@ fun TeamStatsScreen(
                 .fillMaxWidth()
                 .weight(1f),
             shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 // Table Container (Horizontally Scrollable)
@@ -146,7 +146,7 @@ fun TeamStatsScreen(
                     Column(modifier = Modifier.width(620.dp)) {
                         // 1. Table Header Row (Clickable Sort Headers)
                         Surface(
-                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                            color = MaterialTheme.colorScheme.surfaceContainerHighest,
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(
@@ -267,21 +267,22 @@ fun TeamStatsScreen(
                                 .weight(1f)
                         ) {
                             itemsIndexed(sortedPlayerStats) { index, pStat ->
-                                val rowBg = if (index % 2 == 1) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f) else Color.Transparent
+                                val rowBg = if (index % 2 == 1) MaterialTheme.colorScheme.surfaceContainer else Color.Transparent
                                 TablePlayerRow(
                                     stat = pStat,
                                     bgColor = rowBg,
                                     onClick = { selectedPlayerForDetail = pStat.player }
                                 )
-                                HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                                HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
                             }
                         }
 
                         // 3. Highlighted Bottom Sticky Summary Row: Team Total
                         Surface(
-                            color = RatingGreen.copy(alpha = 0.2f),
+                            color = MaterialTheme.colorScheme.primaryContainer,
                             modifier = Modifier.fillMaxWidth()
                         ) {
+                            val summaryColor = MaterialTheme.colorScheme.onPrimaryContainer
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -292,17 +293,17 @@ fun TeamStatsScreen(
                                     text = "Team Total",
                                     fontWeight = FontWeight.Black,
                                     fontSize = 12.sp,
-                                    color = Color(0xFF1B5E20),
+                                    color = summaryColor,
                                     modifier = Modifier.width(130.dp)
                                 )
-                                TableCell(text = "$totalGames", width = 50.dp, isBold = true, color = Color(0xFF1B5E20))
-                                TableCell(text = "-", width = 55.dp, isBold = true, color = Color(0xFF1B5E20))
-                                TableCell(text = String.format(java.util.Locale.US, "%.1f", teamPpg), width = 55.dp, isBold = true, color = Color(0xFF1B5E20))
-                                TableCell(text = String.format(java.util.Locale.US, "%.1f", teamRpg), width = 55.dp, isBold = true, color = Color(0xFF1B5E20))
-                                TableCell(text = String.format(java.util.Locale.US, "%.1f", teamApg), width = 55.dp, isBold = true, color = Color(0xFF1B5E20))
-                                TableCell(text = String.format(java.util.Locale.US, "%.1f", teamBpg), width = 55.dp, isBold = true, color = Color(0xFF1B5E20))
-                                TableCell(text = String.format(java.util.Locale.US, "%.1f", teamSpg), width = 55.dp, isBold = true, color = Color(0xFF1B5E20))
-                                TableCell(text = String.format(java.util.Locale.US, "%.2f", teamAvgPer), width = 60.dp, isBold = true, color = Color(0xFF1B5E20))
+                                TableCell(text = "$totalGames", width = 50.dp, isBold = true, color = summaryColor)
+                                TableCell(text = "-", width = 55.dp, isBold = true, color = summaryColor)
+                                TableCell(text = String.format(java.util.Locale.US, "%.1f", teamPpg), width = 55.dp, isBold = true, color = summaryColor)
+                                TableCell(text = String.format(java.util.Locale.US, "%.1f", teamRpg), width = 55.dp, isBold = true, color = summaryColor)
+                                TableCell(text = String.format(java.util.Locale.US, "%.1f", teamApg), width = 55.dp, isBold = true, color = summaryColor)
+                                TableCell(text = String.format(java.util.Locale.US, "%.1f", teamBpg), width = 55.dp, isBold = true, color = summaryColor)
+                                TableCell(text = String.format(java.util.Locale.US, "%.1f", teamSpg), width = 55.dp, isBold = true, color = summaryColor)
+                                TableCell(text = String.format(java.util.Locale.US, "%.2f", teamAvgPer), width = 60.dp, isBold = true, color = summaryColor)
                             }
                         }
                     }
