@@ -24,28 +24,44 @@ android {
         }
     }
 
+    val keystorePropertiesFile = rootProject.file("keystore.properties")
+    val keystoreFile = rootProject.file("keystore.jks")
+
     signingConfigs {
-        create("release") {
-            val keystorePropertiesFile = rootProject.file("keystore.properties")
-            val keystoreFile = rootProject.file("keystore.jks")
-            if (keystorePropertiesFile.exists() && keystoreFile.exists()) {
+        if (keystorePropertiesFile.exists() && keystoreFile.exists()) {
+            create("release") {
                 val keystoreProperties = Properties().apply {
                     load(FileInputStream(keystorePropertiesFile))
                 }
-                storeFile = keystoreFile
-                storePassword = keystoreProperties.getProperty("storePassword")
-                keyAlias = keystoreProperties.getProperty("keyAlias")
-                keyPassword = keystoreProperties.getProperty("keyPassword")
+                val sPassword = keystoreProperties.getProperty("storePassword")
+                    ?: keystoreProperties.getProperty("SIGNING_STORE_PASSWORD")
+                    ?: System.getenv("SIGNING_STORE_PASSWORD")
+                val kAlias = keystoreProperties.getProperty("keyAlias")
+                    ?: keystoreProperties.getProperty("SIGNING_KEY_ALIAS")
+                    ?: System.getenv("SIGNING_KEY_ALIAS")
+                val kPassword = keystoreProperties.getProperty("keyPassword")
+                    ?: keystoreProperties.getProperty("SIGNING_KEY_PASSWORD")
+                    ?: System.getenv("SIGNING_KEY_PASSWORD")
+
+                if (!sPassword.isNullOrBlank() && !kAlias.isNullOrBlank() && !kPassword.isNullOrBlank()) {
+                    storeFile = keystoreFile
+                    storePassword = sPassword
+                    keyAlias = kAlias
+                    keyPassword = kPassword
+                }
             }
         }
     }
 
+    val releaseSigning = signingConfigs.findByName("release")
+    val hasValidReleaseSigning = releaseSigning?.storeFile != null && !releaseSigning.storePassword.isNullOrBlank()
+
     buildTypes {
         release {
-            val keystorePropertiesFile = rootProject.file("keystore.properties")
-            val keystoreFile = rootProject.file("keystore.jks")
-            if (keystorePropertiesFile.exists() && keystoreFile.exists()) {
-                signingConfig = signingConfigs.getByName("release")
+            signingConfig = if (hasValidReleaseSigning) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
             }
             isMinifyEnabled = false
             proguardFiles(
@@ -54,9 +70,7 @@ android {
             )
         }
         debug {
-            val keystorePropertiesFile = rootProject.file("keystore.properties")
-            val keystoreFile = rootProject.file("keystore.jks")
-            if (keystorePropertiesFile.exists() && keystoreFile.exists()) {
+            if (hasValidReleaseSigning) {
                 signingConfig = signingConfigs.getByName("release")
             }
             isMinifyEnabled = false

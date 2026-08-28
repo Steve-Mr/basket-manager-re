@@ -1105,7 +1105,7 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
                                         gameId = gameId,
                                         matchday = currentDay,
                                         type = NewsType.PLAYOFFS,
-                                        title = "Playoffs: ${winnerTeam?.name} Advances! 👑",
+                                        title = "Playoffs: ${winnerTeam?.name} Advances!",
                                         body = "${winnerTeam?.name} eliminates ${loserTeam?.name} ($winCount-$lossCount) in the $roundName and advances to the $nextStage.",
                                         team1Id = winnerTeam?.id,
                                         team2Id = loserTeam?.id
@@ -1126,7 +1126,7 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
                                             gameId = gameId,
                                             matchday = currentDay,
                                             type = NewsType.TROPHY,
-                                            title = "🏆 WORLD CHAMPIONS: ${champTeam?.name}!",
+                                            title = "World Champions: ${champTeam?.name}!",
                                             body = "${champTeam?.name} defeats ${loserTeam?.name} ($winCount-$lossCount) to capture the World Championship in Season ${game.currentSeason}!",
                                             team1Id = champTeam?.id,
                                             team2Id = loserTeam?.id

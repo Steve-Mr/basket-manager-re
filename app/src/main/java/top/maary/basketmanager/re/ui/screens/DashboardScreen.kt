@@ -13,14 +13,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
-import top.maary.basketmanager.re.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -33,7 +32,14 @@ import top.maary.basketmanager.re.ui.theme.RatingGreen
 import top.maary.basketmanager.re.ui.theme.RatingRed
 import top.maary.basketmanager.re.ui.viewmodel.GameDashboardViewModel
 
-private data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
+private data class NewsM3Theme(
+    val borderColor: Color,
+    val containerColor: Color,
+    val accentColor: Color,
+    val badgeBgColor: Color,
+    val iconVector: androidx.compose.ui.graphics.vector.ImageVector,
+    val categoryLabel: String
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -472,7 +478,7 @@ fun DashboardScreen(
             }
         }
 
-        // News Feed with Visual Color Coding, Authentic Icons & Beautiful Formatting
+        // News Feed with Material Design 3 Expressive Tonal Cards & Modern Vector Icons
         items(newsList) { news ->
             val isWin = news.type == NewsType.WON || (news.type == NewsType.PLAYOFFS && news.title.contains("Victory"))
             val isLoss = news.type == NewsType.LOST || (news.type == NewsType.PLAYOFFS && news.title.contains("Defeat"))
@@ -484,70 +490,90 @@ fun DashboardScreen(
             val isAward = news.type == NewsType.TROPHY || news.type == NewsType.MVP || news.title.contains("MVP") || news.title.contains("ROY") || news.title.contains("Award") || news.title.contains("Triple Double") || news.title.contains("Explosion") || news.title.contains("Awesome")
             val isTrade = news.type == NewsType.TRADE
 
-            val (borderColor, bgColor, titleColor, iconRes) = when {
-                isImprove -> Quadruple(
-                    Color(0xFF00C853),
-                    Color(0xFF00C853).copy(alpha = 0.12f),
-                    Color(0xFF007E33),
-                    R.drawable.news_improve
+            val theme = when {
+                isImprove -> NewsM3Theme(
+                    borderColor = Color(0xFF00C853).copy(alpha = 0.35f),
+                    containerColor = Color(0xFF00C853).copy(alpha = 0.05f),
+                    accentColor = Color(0xFF00C853),
+                    badgeBgColor = Color(0xFF00C853).copy(alpha = 0.16f),
+                    iconVector = Icons.AutoMirrored.Filled.TrendingUp,
+                    categoryLabel = "PROGRESSION"
                 )
-                isDecline -> Quadruple(
-                    Color(0xFFE53935),
-                    Color(0xFFE53935).copy(alpha = 0.10f),
-                    Color(0xFFCC0000),
-                    R.drawable.news_decline
+                isDecline -> NewsM3Theme(
+                    borderColor = Color(0xFFE53935).copy(alpha = 0.30f),
+                    containerColor = Color(0xFFE53935).copy(alpha = 0.04f),
+                    accentColor = Color(0xFFE53935),
+                    badgeBgColor = Color(0xFFE53935).copy(alpha = 0.14f),
+                    iconVector = Icons.AutoMirrored.Filled.TrendingDown,
+                    categoryLabel = "REGRESSION"
                 )
-                isWin -> Quadruple(
-                    RatingGreen,
-                    RatingGreen.copy(alpha = 0.10f),
-                    RatingGreen,
-                    R.drawable.news_won
+                isWin -> NewsM3Theme(
+                    borderColor = RatingGreen.copy(alpha = 0.35f),
+                    containerColor = RatingGreen.copy(alpha = 0.05f),
+                    accentColor = RatingGreen,
+                    badgeBgColor = RatingGreen.copy(alpha = 0.16f),
+                    iconVector = Icons.Default.SportsBasketball,
+                    categoryLabel = "VICTORY"
                 )
-                isLoss -> Quadruple(
-                    RatingRed,
-                    RatingRed.copy(alpha = 0.08f),
-                    RatingRed,
-                    R.drawable.news_lost
+                isLoss -> NewsM3Theme(
+                    borderColor = RatingRed.copy(alpha = 0.30f),
+                    containerColor = RatingRed.copy(alpha = 0.04f),
+                    accentColor = RatingRed,
+                    badgeBgColor = RatingRed.copy(alpha = 0.14f),
+                    iconVector = Icons.Default.SportsBasketball,
+                    categoryLabel = "DEFEAT"
                 )
-                isInj -> Quadruple(
-                    MaterialTheme.colorScheme.error,
-                    MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f),
-                    MaterialTheme.colorScheme.error,
-                    R.drawable.news_injured
+                isInj -> NewsM3Theme(
+                    borderColor = MaterialTheme.colorScheme.error.copy(alpha = 0.40f),
+                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.16f),
+                    accentColor = MaterialTheme.colorScheme.error,
+                    badgeBgColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.50f),
+                    iconVector = Icons.Default.MedicalServices,
+                    categoryLabel = "INJURY REPORT"
                 )
-                isRecovery -> Quadruple(
-                    Color(0xFF00B0FF),
-                    Color(0xFF00B0FF).copy(alpha = 0.10f),
-                    Color(0xFF0091EA),
-                    R.drawable.news_recovery
+                isRecovery -> NewsM3Theme(
+                    borderColor = Color(0xFF00B0FF).copy(alpha = 0.35f),
+                    containerColor = Color(0xFF00B0FF).copy(alpha = 0.05f),
+                    accentColor = Color(0xFF00B0FF),
+                    badgeBgColor = Color(0xFF00B0FF).copy(alpha = 0.16f),
+                    iconVector = Icons.Default.Healing,
+                    categoryLabel = "MEDICAL CLEARANCE"
                 )
-                isAward -> Quadruple(
-                    Color(0xFFFFA000),
-                    Color(0xFFFFA000).copy(alpha = 0.12f),
-                    Color(0xFFE65100),
-                    R.drawable.news_trophy
+                isAward -> NewsM3Theme(
+                    borderColor = Color(0xFFFFA000).copy(alpha = 0.40f),
+                    containerColor = Color(0xFFFFA000).copy(alpha = 0.05f),
+                    accentColor = Color(0xFFFFA000),
+                    badgeBgColor = Color(0xFFFFA000).copy(alpha = 0.18f),
+                    iconVector = Icons.Default.WorkspacePremium,
+                    categoryLabel = "LEAGUE MILESTONE"
                 )
-                isPlayoff -> Quadruple(
-                    Color(0xFFFFD700),
-                    Color(0xFFFFD700).copy(alpha = 0.10f),
-                    Color(0xFFB78103),
-                    R.drawable.news_playoffs
+                isPlayoff -> NewsM3Theme(
+                    borderColor = Color(0xFFFFD700).copy(alpha = 0.45f),
+                    containerColor = Color(0xFFFFD700).copy(alpha = 0.06f),
+                    accentColor = Color(0xFFFFD700),
+                    badgeBgColor = Color(0xFFFFD700).copy(alpha = 0.20f),
+                    iconVector = Icons.Default.MilitaryTech,
+                    categoryLabel = "POSTSEASON"
                 )
-                isTrade -> Quadruple(
-                    Color(0xFF7C4DFF),
-                    Color(0xFF7C4DFF).copy(alpha = 0.08f),
-                    Color(0xFF651FFF),
-                    R.drawable.news_trade
+                isTrade -> NewsM3Theme(
+                    borderColor = Color(0xFF7C4DFF).copy(alpha = 0.35f),
+                    containerColor = Color(0xFF7C4DFF).copy(alpha = 0.05f),
+                    accentColor = Color(0xFF7C4DFF),
+                    badgeBgColor = Color(0xFF7C4DFF).copy(alpha = 0.16f),
+                    iconVector = Icons.Default.SwapHoriz,
+                    categoryLabel = "TRANSACTION"
                 )
-                else -> Quadruple(
-                    MaterialTheme.colorScheme.outlineVariant,
-                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    MaterialTheme.colorScheme.onSurface,
-                    R.drawable.news_info
+                else -> NewsM3Theme(
+                    borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f),
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.30f),
+                    accentColor = MaterialTheme.colorScheme.primary,
+                    badgeBgColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.40f),
+                    iconVector = Icons.Default.Campaign,
+                    categoryLabel = "LEAGUE UPDATE"
                 )
             }
 
-            Card(
+            OutlinedCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable {
@@ -564,77 +590,142 @@ fun DashboardScreen(
                             selectedPlayerForDetail = playerMap[news.playerId]
                         }
                     },
-                shape = RoundedCornerShape(10.dp),
-                border = BorderStroke(1.dp, borderColor),
-                colors = CardDefaults.cardColors(containerColor = bgColor)
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, theme.borderColor),
+                colors = CardDefaults.outlinedCardColors(containerColor = theme.containerColor)
             ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    // M3 Expressive Vector Icon Badge (Left Column)
+                    Box(
+                        modifier = Modifier
+                            .size(46.dp)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(theme.badgeBgColor)
+                            .border(1.dp, theme.accentColor.copy(alpha = 0.25f), RoundedCornerShape(14.dp)),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clip(CircleShape)
-                                .background(bgColor)
-                                .border(1.dp, borderColor.copy(alpha = 0.5f), CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Image(
-                                painter = painterResource(id = iconRes),
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
+                        Icon(
+                            imageVector = theme.iconVector,
+                            contentDescription = null,
+                            tint = theme.accentColor,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
 
-                        Spacer(modifier = Modifier.width(10.dp))
-
+                    // Content (Right Column)
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        // Header Row: Category Pill Chip & Matchday
                         Row(
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = news.title,
-                                fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = titleColor,
-                                modifier = Modifier.weight(1f, fill = false)
-                            )
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = theme.badgeBgColor
+                            ) {
+                                Text(
+                                    text = theme.categoryLabel,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 10.sp,
+                                    color = theme.accentColor,
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+                                    letterSpacing = 0.5.sp
+                                )
+                            }
                             Text(
                                 text = "Day ${news.matchday}",
                                 style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                    }
-                    Spacer(modifier = Modifier.height(6.dp))
 
-                    val rawLines = news.body.replace("\\n", "\n").lines()
-                    rawLines.forEach { line ->
-                        if (line.isNotBlank()) {
-                            if (line.startsWith("⭐ MVP:") || line.startsWith("1.") || line.startsWith("2.") || line.startsWith("3.")) {
-                                Text(
-                                    text = line,
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 12.sp,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.padding(vertical = 1.dp)
-                                )
-                            } else if (line.contains("🏀") || line.contains("🛡️") || line.contains("🎯") || line.contains("⚡") || line.contains("🚫")) {
-                                Text(
-                                    text = line,
-                                    fontSize = 12.sp,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.padding(vertical = 1.dp)
-                                )
-                            } else {
-                                Text(
-                                    text = line,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    lineHeight = 16.sp
-                                )
+                        val rawLines = news.body.replace("\\n", "\n").lines().filter { it.isNotBlank() }
+                        val isMatchNews = (news.type == NewsType.WON || news.type == NewsType.LOST || news.type == NewsType.PLAYOFFS) &&
+                            (rawLines.any { it.contains(" @ ") || it.contains(" vs ") } || news.title.contains(" @ ") || news.title.contains(" vs "))
+
+                        if (isMatchNews) {
+                            // Extract match score line (e.g. "75 DEN @ 122 OKC") to serve directly as the primary headline
+                            val matchScore = rawLines.firstOrNull { it.contains(" @ ") || it.contains(" vs ") }
+                                ?: news.title.substringAfter(": ").ifBlank { news.title }
+
+                            Text(
+                                text = matchScore,
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontSize = 15.sp,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+
+                            // Render MVP and leader stats cleanly without redundant score banners
+                            val remainingLines = rawLines.filter { it != matchScore }
+                            remainingLines.forEach { line ->
+                                if (line.startsWith("MVP:")) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                        modifier = Modifier.padding(top = 1.dp, bottom = 1.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Star,
+                                            contentDescription = null,
+                                            tint = Color(0xFFFFA000),
+                                            modifier = Modifier.size(13.dp)
+                                        )
+                                        Text(
+                                            text = line,
+                                            fontWeight = FontWeight.SemiBold,
+                                            fontSize = 12.sp,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                } else {
+                                    Text(
+                                        text = line,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontSize = 12.sp,
+                                        lineHeight = 16.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        } else {
+                            // Non-match news: Standard Title & Body
+                            Text(
+                                text = news.title,
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+
+                            rawLines.forEach { line ->
+                                if (line.startsWith("1.") || line.startsWith("2.") || line.startsWith("3.")) {
+                                    Text(
+                                        text = line,
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                } else {
+                                    Text(
+                                        text = line,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontSize = 12.sp,
+                                        lineHeight = 16.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
                     }
