@@ -1,5 +1,7 @@
 package top.maary.basketmanager.re.data.repository
 
+import top.maary.basketmanager.re.domain.engine.ContractEngine
+
 import android.content.ContentValues
 import android.content.Context
 import android.database.Cursor
@@ -1028,6 +1030,61 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
                     botTeams.forEach { tId ->
                         db.execSQL("UPDATE ${DB.TABLE_TEAM} SET salaryCap = MAX(50000000, salaryCap - 2000000) WHERE id = ?", arrayOf(tId))
                     }
+
+                    // CPU Renewals (0-year expiring) and Extensions (1-year remaining core stars)
+                    val allPlayers = getPlayers(gameId)
+                    val cpuTeams = getTeams(gameId).filter { it.id != game.userTeamId }
+
+                    cpuTeams.forEach { team ->
+                        val teamPlayers = allPlayers.filter { it.teamId == team.id }
+
+                        // 1. CPU Expiring Contracts (yearsContract == 0)
+                        val expiring = teamPlayers.filter { it.yearsContract == 0 }
+                        expiring.forEach { p ->
+                            val shouldRenew = p.overallRating >= 76 || (p.age < 25 && p.potential >= 7) || (p.age > 33 && p.overallRating >= 80)
+                            if (shouldRenew) {
+                                val roll = kotlin.random.Random.nextInt(0, 10)
+                                val renewSuccess = roll < (p.loyalty + 3).coerceIn(1, 9)
+                                if (renewSuccess) {
+                                    val years = when {
+                                        p.age <= 25 -> kotlin.random.Random.nextInt(2, 5)
+                                        p.age <= 30 -> kotlin.random.Random.nextInt(1, 5)
+                                        else -> kotlin.random.Random.nextInt(1, 3)
+                                    }
+                                    val (marketBase, _) = ContractEngine.calculateMarketDemandSalary(p, isHomeTeamRenewal = true)
+                                    db.execSQL("UPDATE ${DB.TABLE_PLAYER} SET yearsContract = ?, salary = ? WHERE id = ?", arrayOf(years, marketBase, p.id))
+                                }
+                            }
+                        }
+
+                        // 2. CPU Contract Extensions (yearsContract == 1 for franchise core players)
+                        val extensionCandidates = teamPlayers.filter { it.yearsContract == 1 }
+                        extensionCandidates.forEach { p ->
+                            val isFranchiseCore = p.overallRating >= 84 || (p.age <= 25 && p.potential >= 8 && p.overallRating >= 78)
+                            if (isFranchiseCore && p.loyalty >= 3) {
+                                val roll = kotlin.random.Random.nextInt(0, 10)
+                                if (roll < p.loyalty + 3) {
+                                    val additionalYears = if (p.age >= 32) 2 else kotlin.random.Random.nextInt(2, 4)
+                                    val newTotalYears = p.yearsContract + additionalYears
+                                    val (marketBase, _) = ContractEngine.calculateMarketDemandSalary(p, isHomeTeamRenewal = true)
+                                    db.execSQL("UPDATE ${DB.TABLE_PLAYER} SET yearsContract = ?, salary = ? WHERE id = ?", arrayOf(newTotalYears, marketBase, p.id))
+
+                                    if (p.overallRating >= 84) {
+                                        val extNews = NewsItem(
+                                            gameId = gameId,
+                                            matchday = currentDay,
+                                            type = NewsType.INFO,
+                                            title = "Contract Extension: ${p.shortName}",
+                                            body = "${team.name} has signed ${p.name} to a $additionalYears-year contract extension through Season ${game.currentSeason + newTotalYears}!",
+                                            team1Id = team.id,
+                                            playerId = p.id
+                                        )
+                                        insertNewsDirect(db, extNews.toEntity())
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
 
                 // Trade Day & Draft Prospect Generation (Matchday 230)
@@ -1059,6 +1116,55 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
                         body = "The draft order is set. 90 top rookie prospects are on the board across 2 rounds of selection."
                     )
                     insertNewsDirect(db, news.toEntity())
+                }
+
+                // Day 231: Free Agency Opens & Finish Renewals (Release all unrenewed 0-year players to Free Agency)
+                currentDay == 231 -> {
+                    val unrenewedPlayers = getPlayers(gameId).filter { it.yearsContract == 0 && it.teamId != null }
+                    if (unrenewedPlayers.isNotEmpty()) {
+                        unrenewedPlayers.forEach { p ->
+                            db.execSQL("UPDATE ${DB.TABLE_PLAYER} SET teamId = NULL, salary = 0 WHERE id = ?", arrayOf(p.id))
+                        }
+
+                        // Clean up tactic slots referencing released players
+                        val releasedIds = unrenewedPlayers.map { it.id }.toSet()
+                        val tacticCursor = db.rawQuery("SELECT * FROM ${DB.TABLE_TACTIC} WHERE gameId = ?", arrayOf(gameId.toString()))
+                        val tacticsToUpdate = mutableListOf<Tactic>()
+                        while (tacticCursor.moveToNext()) {
+                            val t = cursorToTactic(tacticCursor).toDomain()
+                            var updated = t
+                            if (t.starterPgId in releasedIds) updated = updated.copy(starterPgId = null)
+                            if (t.starterSgId in releasedIds) updated = updated.copy(starterSgId = null)
+                            if (t.starterSfId in releasedIds) updated = updated.copy(starterSfId = null)
+                            if (t.starterPfId in releasedIds) updated = updated.copy(starterPfId = null)
+                            if (t.starterCId in releasedIds) updated = updated.copy(starterCId = null)
+                            if (t.reservePgId in releasedIds) updated = updated.copy(reservePgId = null)
+                            if (t.reserveSgId in releasedIds) updated = updated.copy(reserveSgId = null)
+                            if (t.reserveSfId in releasedIds) updated = updated.copy(reserveSfId = null)
+                            if (t.reservePfId in releasedIds) updated = updated.copy(reservePfId = null)
+                            if (t.reserveCId in releasedIds) updated = updated.copy(reserveCId = null)
+                            if (t.starOnePlayerId in releasedIds) updated = updated.copy(starOnePlayerId = null)
+                            if (t.starTwoPlayerId in releasedIds) updated = updated.copy(starTwoPlayerId = null)
+                            if (t.starThreePlayerId in releasedIds) updated = updated.copy(starThreePlayerId = null)
+                            if (updated != t) {
+                                tacticsToUpdate.add(updated)
+                            }
+                        }
+                        tacticCursor.close()
+
+                        tacticsToUpdate.forEach { t ->
+                            db.update(DB.TABLE_TACTIC, tacticToContentValues(t.toEntity()), "id = ?", arrayOf(t.id.toString()))
+                        }
+
+                        val faNews = NewsItem(
+                            gameId = gameId,
+                            matchday = currentDay,
+                            type = NewsType.TRADE,
+                            title = "Free Agency Market Officially Opens!",
+                            body = "${unrenewedPlayers.size} unrenewed players across the league have entered the open Free Agency pool. Teams may now submit contract offers."
+                        )
+                        insertNewsDirect(db, faNews.toEntity())
+                    }
                 }
 
                 // CPU Free Agency Validation & New Season Reset (Matchday 234)

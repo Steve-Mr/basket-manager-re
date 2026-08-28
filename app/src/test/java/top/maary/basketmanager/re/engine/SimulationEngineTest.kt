@@ -1,5 +1,7 @@
 package top.maary.basketmanager.re.engine
 
+import top.maary.basketmanager.re.domain.engine.ContractEngine
+
 import org.junit.Assert.*
 import org.junit.Test
 import top.maary.basketmanager.re.domain.engine.*
@@ -404,5 +406,45 @@ class SimulationEngineTest {
         val clearedStar = swappedStars.assignStar(3, null)
         assertNull(clearedStar.starThreePlayerId)
         assertEquals(2, clearedStar.starIds.size)
+    }
+
+
+    @Test
+    fun testContractExtensionAndExpiringRenewal() {
+        val expiringPlayer = Player(
+            id = 101L,
+            gameId = 1L,
+            teamId = 1L,
+            name = "Expiring Star",
+            age = 27,
+            potential = 9,
+            loyalty = 4,
+            yearsContract = 0,
+            salary = 15_000_000,
+            positionFirst = Position.PG,
+            skillPhysique = 85,
+            skillBlock = 70,
+            skillSteal = 80,
+            skillRebound = 65,
+            skillPass = 90,
+            skillShotInterior = 85,
+            skillShotExterior = 88,
+            skillShotFree = 90
+        )
+
+        val (baseSalary, openMarket) = ContractEngine.calculateMarketDemandSalary(expiringPlayer, isHomeTeamRenewal = true)
+        assertTrue(baseSalary > 0)
+        assertTrue(baseSalary <= openMarket) // Hometown discount holds
+
+        // Test Expiring Renewal Evaluation
+        val (acceptedExp, msgExp) = ContractEngine.evaluateContractOffer(expiringPlayer, baseSalary, 3, isHomeTeamRenewal = true)
+        assertTrue(msgExp.contains("ACCEPTED") || msgExp.contains("REJECTED"))
+
+        // Test Extension Player (1 Year remaining)
+        val extensionPlayer = expiringPlayer.copy(yearsContract = 1)
+        val (acceptedExt, msgExt) = ContractEngine.evaluateContractOffer(extensionPlayer, (baseSalary * 1.1).toInt(), 3, isHomeTeamRenewal = true)
+        if (acceptedExt) {
+            assertTrue(msgExt.contains("4 years") || msgExt.contains("extension"))
+        }
     }
 }

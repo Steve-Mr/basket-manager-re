@@ -1,5 +1,7 @@
 package top.maary.basketmanager.re.ui.screens
 
+import top.maary.basketmanager.re.domain.engine.ContractEngine
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -175,112 +177,146 @@ fun OffseasonScreen(
             }
 
             1 -> {
-                // Tab 1: Contract Renewals
+                // Tab 1: Contract Renewals & Extensions (Two Groups: Expiring 0-yr vs Extension-eligible 1-yr)
+                val extensionEligible = remember(roster) { roster.filter { it.yearsContract == 1 } }
+
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(bottom = 16.dp)
                 ) {
                     item {
                         Text(
-                            text = "Contract Negotiations & Extensions",
+                            text = "Contract Renewals & Extensions",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
                         )
                         Text(
-                            text = "Negotiate new contract lengths and salaries with your players before they hit Free Agency.",
+                            text = "Expiring (0-yr) players will enter Free Agency on Day 231 if not renewed. 1-yr players can be extended early.",
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
                     }
 
-                    if (expiringPlayers.isEmpty()) {
-                        item {
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(10.dp),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                            ) {
-                                Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("All roster players are under multi-year contracts! 🎉", fontWeight = FontWeight.Bold)
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Button(onClick = { selectedTab = 2 }) {
-                                        Text("Proceed to Rookie Draft >")
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        items(expiringPlayers) { player ->
-                            val loyaltyDesc = when (player.loyalty) {
-                                1 -> "★1: Not interested in staying"
-                                2 -> "★2: Wants to test free agency"
-                                3 -> "★3: Undecided about renewal"
-                                4 -> "★4: Willing to stay on good terms"
-                                else -> "★5: Highly loyal to franchise"
-                            }
-
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { selectedPlayerForDetail = player },
-                                shape = RoundedCornerShape(10.dp),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                            ) {
+                    // Section 1: Expiring Contracts (0 Years Left - Critical)
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f))
+                        ) {
+                            Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
                                 Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(12.dp),
+                                    modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                    ) {
-                                        RatingBadge(rating = player.overallRating)
-                                        Column {
-                                            Text(player.name, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                                PositionBadge(position = player.positionFirst)
-                                                Text(
-                                                    text = "Age: ${player.age} • ${formatMoney(player.salary)}/yr",
-                                                    fontSize = 11.sp,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                )
-                                            }
-                                            Text(
-                                                text = loyaltyDesc,
-                                                fontSize = 10.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = if (player.loyalty >= 4) RatingGreen else if (player.loyalty <= 2) RatingRed else MaterialTheme.colorScheme.primary
+                                    Text(
+                                        text = "🔴 到期球员 (0年合同 • 必须在此阶段续约)",
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 13.sp,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                    Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.errorContainer) {
+                                        Text("${expiringPlayers.size} Players", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                                    }
+                                }
+                                Text(
+                                    text = "⚠️ 若未在 Day 230 前完成续约，该球员将在 Day 231 自动进入自由球员市场！",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(vertical = 4.dp)
+                                )
+
+                                Spacer(modifier = Modifier.height(4.dp))
+
+                                if (expiringPlayers.isEmpty()) {
+                                    Text(
+                                        text = "🎉 当前无到期球员，所有球员下赛季均有合同保障！",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = RatingGreen,
+                                        modifier = Modifier.padding(vertical = 8.dp)
+                                    )
+                                } else {
+                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        expiringPlayers.forEach { player ->
+                                            OffseasonPlayerContractRow(
+                                                player = player,
+                                                isExtension = false,
+                                                onNegotiate = { negotiatingPlayer = player },
+                                                onDetail = { selectedPlayerForDetail = player }
                                             )
                                         }
-                                    }
-
-                                    Button(
-                                        onClick = {
-                                            negotiatingPlayer = player
-                                            offerYears = 2
-                                            offerSalarySlider = (player.salary / 1_000_000f).coerceIn(1f, 35f)
-                                        },
-                                        shape = RoundedCornerShape(8.dp)
-                                    ) {
-                                        Text("Negotiate")
                                     }
                                 }
                             }
                         }
+                    }
 
-                        item {
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Button(
-                                onClick = { selectedTab = 2 },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("Finalize Renewals & Proceed to Draft >")
+                    // Section 2: Extension Eligible (1 Year Left - Optional Lock-in)
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f))
+                        ) {
+                            Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "🟢 可提前续约球员 (1年合同 • 可选提前锁定)",
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 13.sp,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.primaryContainer) {
+                                        Text("${extensionEligible.size} Players", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                                    }
+                                }
+                                Text(
+                                    text = "✨ 可提前追加 1~4 年新合同（年限累加），锁定未来核心，避免下赛季休赛期进入自由市场。",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(vertical = 4.dp)
+                                )
+
+                                Spacer(modifier = Modifier.height(4.dp))
+
+                                if (extensionEligible.isEmpty()) {
+                                    Text(
+                                        text = "暂无可提前续约球员（无剩余 1 年合同的球员）。",
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.outline,
+                                        modifier = Modifier.padding(vertical = 8.dp)
+                                    )
+                                } else {
+                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        extensionEligible.forEach { player ->
+                                            OffseasonPlayerContractRow(
+                                                player = player,
+                                                isExtension = true,
+                                                onNegotiate = { negotiatingPlayer = player },
+                                                onDetail = { selectedPlayerForDetail = player }
+                                            )
+                                        }
+                                    }
+                                }
                             }
+                        }
+                    }
+
+                    item {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Button(
+                            onClick = { selectedTab = 2 },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Finalize Contract Phase & Proceed to Draft >")
                         }
                     }
                 }
@@ -387,5 +423,72 @@ fun OffseasonScreen(
             playoffStats = viewModel.getPlayerPlayoffStats(player.id),
             onDismiss = { selectedPlayerForDetail = null }
         )
+    }
+}
+
+
+@Composable
+fun OffseasonPlayerContractRow(
+    player: Player,
+    isExtension: Boolean,
+    onNegotiate: () -> Unit,
+    onDetail: () -> Unit
+) {
+    val loyaltyDesc = when (player.loyalty) {
+        1 -> "★1: Not interested in staying"
+        2 -> "★2: Wants to test free agency"
+        3 -> "★3: Undecided about renewal"
+        4 -> "★4: Willing to stay on good terms"
+        else -> "★5: Highly loyal to franchise"
+    }
+
+    fun formatSalaryText(a: Int) = if (a >= 1_000_000) "$${String.format("%.2f", a / 1_000_000.0)}M" else "$${a / 1_000}K"
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onDetail),
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                RatingBadge(rating = player.overallRating, size = 30)
+                Column {
+                    Text(player.name, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        PositionBadge(position = player.positionFirst)
+                        Text(
+                            text = "Age: ${player.age} • ${if (isExtension) "1 Yr Left" else "0 Yrs (Expired)"} • ${formatSalaryText(player.salary)}/yr",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Text(
+                        text = loyaltyDesc,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (player.loyalty >= 4) RatingGreen else if (player.loyalty <= 2) RatingRed else MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            Button(
+                onClick = onNegotiate,
+                shape = RoundedCornerShape(8.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Text(if (isExtension) "提前续约" else "续约谈判", fontSize = 12.sp)
+            }
+        }
     }
 }

@@ -1,5 +1,7 @@
 package top.maary.basketmanager.re.ui.components
 
+import top.maary.basketmanager.re.domain.engine.ContractEngine
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -38,7 +40,7 @@ object ContractEngine {
         val openMarketValue = ((rawSalary / 100_000) * 100_000).coerceIn(1_000_000, 42_000_000)
 
         val negotiationBase = if (isHomeTeamRenewal) {
-            // Authentic BM15 Hometown 80% Discount factor + Loyalty loyalty bonus
+            // Authentic BM15 Hometown 80% Discount factor + Loyalty bonus
             val discountFactor = when (player.loyalty) {
                 5 -> 0.72 // Super loyal franchise icon
                 4 -> 0.76
@@ -63,6 +65,7 @@ object ContractEngine {
     ): Pair<Boolean, String> {
         val (marketBase, openMarket) = calculateMarketDemandSalary(player, isHomeTeamRenewal)
         val ratio = offeredSalary.toDouble() / marketBase.toDouble()
+        val isExtension = player.yearsContract > 0
 
         val tier = when {
             ratio >= 1.20 -> 4
@@ -73,21 +76,28 @@ object ContractEngine {
         }
 
         val roll = Random.nextInt(0, 10)
-        val threshold = (player.loyalty + tier).coerceIn(1, 9)
+        val loyaltyPenalty = if (isExtension && player.loyalty <= 2) 1 else 0
+        val threshold = (player.loyalty + tier - loyaltyPenalty).coerceIn(1, 9)
         val accepted = roll < threshold
 
         fun formatMoney(a: Int) = if (a >= 1_000_000) "$${String.format("%.2f", a / 1_000_000.0)}M" else "$${a / 1_000}K"
 
         val msg = if (accepted) {
             val discountNote = if (isHomeTeamRenewal && offeredSalary < openMarket) {
-                " (Includes a team-friendly hometown discount from his open market身价 of ${formatMoney(openMarket)}/yr)"
+                " (Includes a team-friendly hometown discount from open market value of ${formatMoney(openMarket)}/yr)"
             } else ""
-            "${player.name} has ACCEPTED your contract extension offer of ${formatMoney(offeredSalary)}/yr for $offeredYears year(s)!$discountNote"
+            if (isExtension) {
+                val totalYears = player.yearsContract + offeredYears
+                "${player.name} has ACCEPTED your contract extension offer of ${formatMoney(offeredSalary)}/yr for an extra $offeredYears year(s) (Total contract: $totalYears years)!$discountNote"
+            } else {
+                "${player.name} has ACCEPTED your contract renewal offer of ${formatMoney(offeredSalary)}/yr for $offeredYears year(s)!$discountNote"
+            }
         } else {
-            val demandTip = when (tier) {
-                0, 1 -> "He feels this offer is below his expectations and requests at least ${formatMoney(marketBase)}/yr."
-                2 -> "He is leaning towards testing Free Agency (open market worth ~${formatMoney(openMarket)}/yr) unless offered a slight raise."
-                else -> "Negotiations stalled. Consider adjusting the contract term length or adding compensation."
+            val demandTip = when {
+                isExtension && player.loyalty <= 2 -> "He prefers to play out his remaining contract year and explore Free Agency."
+                tier <= 1 -> "He feels this offer is below his expectations and requests at least ${formatMoney(marketBase)}/yr."
+                tier == 2 -> "He is leaning towards testing Free Agency (market value ~${formatMoney(openMarket)}/yr) unless offered a slight raise."
+                else -> "Negotiations stalled. Consider adjusting the contract term length or salary."
             }
             "${player.name} has REJECTED your contract offer.\n\n$demandTip"
         }
@@ -104,10 +114,13 @@ fun ContractNegotiationDialog(
     onDismiss: () -> Unit,
     onConfirmOffer: (years: Int, salary: Int, accepted: Boolean, feedbackMessage: String) -> Unit
 ) {
+    val isExtension = player.yearsContract > 0
     val (marketSalary, openMarketSalary) = remember(player, isHomeTeamRenewal) {
         ContractEngine.calculateMarketDemandSalary(player, isHomeTeamRenewal)
     }
     var selectedYears by remember { mutableIntStateOf(if (player.age >= 34) 2 else 3) }
+
+    val totalContractYears = if (isExtension) player.yearsContract + selectedYears else selectedYears
 
     val marketM = marketSalary / 1_000_000f
     val sliderMin = (marketM * 0.6f).coerceAtLeast(0.8f)
@@ -127,7 +140,7 @@ fun ContractNegotiationDialog(
         else -> 0
     }
 
-    val estChance = ((player.loyalty + currentTier) * 10).coerceIn(10, 95)
+    val estChance = ((player.loyalty + currentTier - (if (isExtension && player.loyalty <= 2) 1 else 0)) * 10).coerceIn(10, 95)
 
     val sentimentColor = when {
         estChance >= 75 -> RatingGreen
@@ -145,11 +158,11 @@ fun ContractNegotiationDialog(
     fun formatMoney(a: Int) = if (a >= 1_000_000) "$${String.format("%.2f", a / 1_000_000.0)}M" else "$${a / 1_000}K"
 
     val loyaltyQuote = when (player.loyalty) {
-        5 -> "★5 Franchise Icon: \"I love this team! Willing to take a friendly hometown deal.\""
-        4 -> "★4 High Loyalty: \"I want to stay with the franchise if given a fair contract.\""
-        3 -> "★3 Balanced: \"Weighing my options between staying and testing Free Agency.\""
-        2 -> "★2 Exploring: \"Interested in exploring outside offers unless given a great deal.\""
-        else -> "★1 Low Loyalty: \"Ready to test my full open-market value in Free Agency.\""
+        5 -> "★5 Franchise Icon: Loves the franchise and welcomes a hometown deal."
+        4 -> "★4 High Loyalty: Wants to stay with the franchise on a fair contract."
+        3 -> "★3 Balanced: Weighing options between staying and testing Free Agency."
+        2 -> "★2 Exploring: Interested in exploring outside offers unless given a great deal."
+        else -> "★1 Low Loyalty: Ready to test full open-market value in Free Agency."
     }
 
     AlertDialog(
@@ -162,7 +175,7 @@ fun ContractNegotiationDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Negotiate: ${player.name}",
+                        text = if (isExtension) "提前续约 (Extension): ${player.name}" else "到期续约 (Renewal): ${player.name}",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -301,17 +314,22 @@ fun ContractNegotiationDialog(
                     steps = sliderSteps
                 )
 
-                // Contract Duration (1 to 5 Years)
-                Text("Contract Length ($selectedYears Year${if (selectedYears > 1) "s" else ""}):", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                // Contract Duration
+                Text(
+                    text = if (isExtension) "追加续约年限 (+$selectedYears 年 • 签约后总合同: $totalContractYears 年):"
+                    else "签约年限 ($selectedYears 年):",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    (1..5).forEach { y ->
+                    (1..4).forEach { y ->
                         FilterChip(
                             selected = selectedYears == y,
                             onClick = { selectedYears = y },
-                            label = { Text("$y Yr${if (y > 1) "s" else ""}", fontSize = 12.sp) },
+                            label = { Text("+$y 年${if (isExtension) " (总${player.yearsContract + y}年)" else ""}", fontSize = 11.sp) },
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -322,15 +340,15 @@ fun ContractNegotiationDialog(
             Button(
                 onClick = {
                     val (accepted, msg) = ContractEngine.evaluateContractOffer(player, currentOfferedSalaryInt, selectedYears, isHomeTeamRenewal)
-                    onConfirmOffer(selectedYears, currentOfferedSalaryInt, accepted, msg)
+                    onConfirmOffer(totalContractYears, currentOfferedSalaryInt, accepted, msg)
                 }
             ) {
-                Text("Submit Offer")
+                Text(if (isExtension) "确认提前续约" else "提交续约报价")
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text("取消")
             }
         }
     )
