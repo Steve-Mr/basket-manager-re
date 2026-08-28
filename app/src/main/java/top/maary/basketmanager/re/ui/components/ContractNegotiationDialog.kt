@@ -5,6 +5,8 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -186,7 +188,7 @@ fun ContractNegotiationDialog(
                     if (capAvailable != null && currentOfferedSalaryInt > capAvailable) {
                         Surface(shape = RoundedCornerShape(4.dp), color = RatingGreen.copy(alpha = 0.15f)) {
                             Text(
-                                text = "⚡ Bird Rights (Hometown Exception): Allowed to re-sign own players over salary cap",
+                                text = "Bird Rights (Hometown Exception): Allowed to re-sign own players over salary cap",
                                 color = RatingGreen,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
@@ -210,7 +212,12 @@ fun ContractNegotiationDialog(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
-                                    Text("⚠️", fontSize = 12.sp)
+                                    Icon(
+                                        Icons.Default.Warning,
+                                        contentDescription = null,
+                                        tint = RatingRed,
+                                        modifier = Modifier.size(14.dp)
+                                    )
                                     Text(
                                         text = "Exceeds Cap Space: ${formatMoney(capAvailable)} available. (Must be < $1.0M for Minimum Exception)",
                                         color = RatingRed,
@@ -222,7 +229,7 @@ fun ContractNegotiationDialog(
                         } else if (isMinContract) {
                             Surface(shape = RoundedCornerShape(4.dp), color = RatingGreen.copy(alpha = 0.15f)) {
                                 Text(
-                                    text = "⚡ Minimum Contract Exception (< $1.0M): Allowed under salary cap rules",
+                                    text = "Minimum Contract Exception (< $1.0M): Allowed under salary cap rules",
                                     color = RatingGreen,
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
@@ -239,7 +246,7 @@ fun ContractNegotiationDialog(
                     } else if (isMinContract) {
                         Surface(shape = RoundedCornerShape(4.dp), color = RatingGreen.copy(alpha = 0.15f)) {
                             Text(
-                                text = "⚡ Minimum Contract Exception (< $1.0M): Allowed even if over cap",
+                                text = "Minimum Contract Exception (< $1.0M): Allowed even if over cap",
                                 color = RatingGreen,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,

@@ -189,8 +189,8 @@ fun DashboardScaffold(
                 )
 
                 NavigationDrawerItem(
-                    icon = { Icon(Icons.Default.Tune, contentDescription = null) },
-                    label = { Text("Game Tactics") },
+                    icon = { Icon(Icons.Default.QueryStats, contentDescription = null) },
+                    label = { Text("Team Statistics") },
                     selected = primaryTab == PrimaryTab.SQUAD && squadSubTab == 2,
                     onClick = {
                         primaryTab = PrimaryTab.SQUAD
@@ -306,7 +306,7 @@ fun DashboardScaffold(
                 if ((game?.currentMatchday ?: 1) in 226..234) {
                     NavigationDrawerItem(
                         icon = { Icon(Icons.Default.Celebration, contentDescription = null) },
-                        label = { Text("Offseason Hub 🏆") },
+                        label = { Text("Offseason Hub") },
                         selected = primaryTab == PrimaryTab.HOME,
                         onClick = {
                             primaryTab = PrimaryTab.HOME
@@ -420,16 +420,14 @@ fun DashboardScaffold(
                             TabRow(selectedTabIndex = squadSubTab) {
                                 Tab(selected = squadSubTab == 0, onClick = { squadSubTab = 0 }, text = { Text("Roster") })
                                 Tab(selected = squadSubTab == 1, onClick = { squadSubTab = 1 }, text = { Text("Lineup") })
-                                Tab(selected = squadSubTab == 2, onClick = { squadSubTab = 2 }, text = { Text("Tactics") })
+                                Tab(selected = squadSubTab == 2, onClick = { squadSubTab = 2 }, text = { Text("Stats") })
                                 Tab(selected = squadSubTab == 3, onClick = { squadSubTab = 3 }, text = { Text("Finances") })
-                                Tab(selected = squadSubTab == 4, onClick = { squadSubTab = 4 }, text = { Text("Stats") })
                             }
                             when (squadSubTab) {
                                 0 -> RosterScreen(viewModel = viewModel)
                                 1 -> LineupScreen(viewModel = viewModel)
-                                2 -> TacticsScreen(viewModel = viewModel)
+                                2 -> TeamStatsScreen(viewModel = viewModel)
                                 3 -> FinancesScreen(viewModel = viewModel)
-                                4 -> TeamStatsScreen(viewModel = viewModel)
                             }
                         }
                     }

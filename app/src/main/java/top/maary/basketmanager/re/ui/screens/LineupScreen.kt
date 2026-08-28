@@ -9,15 +9,19 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import top.maary.basketmanager.re.R
 import top.maary.basketmanager.re.domain.model.LineupSlot
 import top.maary.basketmanager.re.domain.model.Player
 import top.maary.basketmanager.re.domain.model.Position
@@ -36,6 +40,7 @@ fun LineupScreen(
     val roster by viewModel.userRoster.collectAsState()
     val tactic by viewModel.userTactic.collectAsState()
 
+    var showTacticsSheet by remember { mutableStateOf(false) }
     var selectedSlotForEdit by remember { mutableStateOf<LineupSlot?>(null) }
     var selectedPlayerForDetail by remember { mutableStateOf<Player?>(null) }
 
@@ -100,14 +105,26 @@ fun LineupScreen(
                     )
                 }
 
-                Button(
-                    onClick = { viewModel.optimizeUserLineup() },
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
-                ) {
-                    Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Auto Optimize", fontSize = 12.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = { showTacticsSheet = true },
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(stringResource(R.string.team_tab_tactic), fontSize = 12.sp)
+                    }
+
+                    Button(
+                        onClick = { viewModel.optimizeUserLineup() },
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Auto Optimize", fontSize = 12.sp)
+                    }
                 }
             }
         }
@@ -125,7 +142,12 @@ fun LineupScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Text("⚠️", fontSize = 20.sp)
+                        Icon(
+                            Icons.Default.Warning,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.size(22.dp)
+                        )
                         Column {
                             Text(
                                 text = "Rotation Injury Alert",
@@ -161,7 +183,7 @@ fun LineupScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "🌟 STARTERS",
+                            text = stringResource(R.string.team_titular),
                             fontWeight = FontWeight.Black,
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -187,7 +209,7 @@ fun LineupScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "🔄 RESERVES",
+                            text = stringResource(R.string.team_reserve),
                             fontWeight = FontWeight.Black,
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -367,13 +389,22 @@ fun LineupScreen(
         }
     }
 
-    // Player Detail Modal
+    // Player Detail Modal with position swap support
     selectedPlayerForDetail?.let { player ->
         PlayerDetailBottomSheet(
             player = player,
             stats = viewModel.getPlayerSeasonStats(player.id),
             playoffStats = viewModel.getPlayerPlayoffStats(player.id),
+            onSwapPosition = { viewModel.swapPlayerPositions(it) },
             onDismiss = { selectedPlayerForDetail = null }
+        )
+    }
+
+    // Tactics Bottom Sheet
+    if (showTacticsSheet) {
+        TacticsBottomSheet(
+            viewModel = viewModel,
+            onDismiss = { showTacticsSheet = false }
         )
     }
 }
