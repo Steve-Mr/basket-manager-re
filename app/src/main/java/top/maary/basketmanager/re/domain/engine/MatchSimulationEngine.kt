@@ -431,14 +431,13 @@ object MatchSimulationEngine {
             }
         }
 
-        // 4. Assist check (34% chance)
+        // 4. Assist / Playmaking check (34% chance, authentic BM15 formula)
         var assistanceModifier = 0
-        var assistPlayer: Player? = null
         if (skillAttempt(34)) {
             val passer = rulete.getRulete(5, attackTeam.id)
             if (passer != null && accomplishedAction(passer.skillPass + (attackMods[passer.id] ?: 0), 1.0f)) {
-                assistanceModifier = 6
-                assistPlayer = passer
+                assistanceModifier = 5
+                boxScores[passer.id]?.passesOk = (boxScores[passer.id]?.passesOk ?: 0) + 1
             }
         }
 
@@ -498,9 +497,7 @@ object MatchSimulationEngine {
                 2 -> boxScores[shooter.id]?.shotsExteriorDoubleOk = (boxScores[shooter.id]?.shotsExteriorDoubleOk ?: 0) + 1
                 else -> boxScores[shooter.id]?.shotsExteriorTripleOk = (boxScores[shooter.id]?.shotsExteriorTripleOk ?: 0) + 1
             }
-            if (assistPlayer != null && assistPlayer.id != shooter.id) {
-                boxScores[assistPlayer.id]?.passesOk = (boxScores[assistPlayer.id]?.passesOk ?: 0) + 1
-            }
+
             if (isFoul) {
                 shotsFree = 1
             }
