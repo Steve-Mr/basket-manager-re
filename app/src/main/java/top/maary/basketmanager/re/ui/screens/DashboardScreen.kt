@@ -826,6 +826,7 @@ fun DashboardScreen(
             player = player,
             stats = viewModel.getPlayerSeasonStats(player.id),
             playoffStats = viewModel.getPlayerPlayoffStats(player.id),
+            onSwapPosition = if (player.teamId == userTeam?.id) { { viewModel.swapPlayerPositions(it) } } else null,
             onDismiss = { selectedPlayerForDetail = null }
         )
     }

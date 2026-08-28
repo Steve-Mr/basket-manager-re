@@ -8,18 +8,21 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import top.maary.basketmanager.re.R
 import top.maary.basketmanager.re.domain.model.Match
 import top.maary.basketmanager.re.domain.model.MatchResult
 import top.maary.basketmanager.re.domain.model.Player
@@ -87,24 +90,219 @@ fun PositionBadge(
     }
 }
 
+@Composable
+fun PotentialTierBadge(
+    potential: Int,
+    modifier: Modifier = Modifier
+) {
+    val (bgColor, starColor, labelColor) = when {
+        potential >= 9 -> Triple(Color(0xFFFFF8E1), Color(0xFFFFB300), Color(0xFFB45309)) // Superstar Gold Tier
+        potential >= 7 -> Triple(Color(0xFFFFF3E0), Color(0xFFFB8C00), Color(0xFFC2410C)) // High Potential Amber
+        potential >= 5 -> Triple(Color(0xFFE0F2F1), Color(0xFF00897B), Color(0xFF0F766E)) // Solid Contender Teal
+        else -> Triple(Color(0xFFECEFF1), Color(0xFF78909C), Color(0xFF475569))          // Role Player Slate
+    }
+
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(10.dp),
+        color = bgColor
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 7.dp, vertical = 6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                Icons.Default.Star,
+                contentDescription = null,
+                tint = starColor,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = "$potential",
+                fontWeight = FontWeight.Black,
+                fontSize = 12.sp,
+                color = labelColor
+            )
+        }
+    }
+}
+
+@Composable
+fun ReadinessPill(
+    form: Int,
+    energy: Int,
+    injuryDays: Int,
+    modifier: Modifier = Modifier
+) {
+    if (injuryDays > 0) {
+        Surface(
+            shape = RoundedCornerShape(6.dp),
+            color = MaterialTheme.colorScheme.errorContainer,
+            modifier = modifier
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Icon(Icons.Default.MedicalServices, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer, modifier = Modifier.size(12.dp))
+                Text(
+                    text = "INJ (${injuryDays}d)",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+            }
+        }
+    } else {
+        val readiness = ((form + energy) / 2).coerceIn(0, 99)
+        val (tintBg, tintText) = when {
+            readiness >= 80 -> Pair(RatingGreen.copy(alpha = 0.15f), RatingGreen)
+            readiness >= 50 -> Pair(MaterialTheme.colorScheme.surfaceVariant, MaterialTheme.colorScheme.onSurfaceVariant)
+            else -> Pair(RatingOrange.copy(alpha = 0.15f), RatingOrange)
+        }
+
+        Surface(
+            shape = RoundedCornerShape(6.dp),
+            color = tintBg,
+            modifier = modifier
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Icon(
+                    imageVector = if (readiness >= 80) Icons.Default.Bolt else Icons.Default.BatteryChargingFull,
+                    contentDescription = null,
+                    tint = tintText,
+                    modifier = Modifier.size(12.dp)
+                )
+                Text(
+                    text = "$readiness% Ready",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = tintText
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun M3PlayerCard(
+    player: Player,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit = {},
+    showReadiness: Boolean = true,
+    customBadge: (@Composable () -> Unit)? = null
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(10.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Left: Tiered Potential Star Container + Player Info
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                // 1. Potential Star Badge
+                PotentialTierBadge(potential = player.potential)
+
+                // 2. Name, Positions & Age Pill
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text(
+                        text = player.name,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        maxLines = 1
+                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        PositionBadge(position = player.positionFirst)
+                        if (player.positionSecond != Position.NONE) {
+                            Text(
+                                text = "· ${player.positionSecond.shortName}",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+
+                        // Prominent Age Pill
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                        ) {
+                            Text(
+                                text = "${player.age} yrs",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Right: Readiness / Custom Badge + Rating Badge
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (customBadge != null) {
+                    customBadge()
+                } else if (showReadiness) {
+                    ReadinessPill(
+                        form = player.stateForm,
+                        energy = player.stateEnergy,
+                        injuryDays = player.stateInjury
+                    )
+                }
+
+                RatingBadge(rating = player.overallRating, size = 32)
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlayerDetailBottomSheet(
     player: Player?,
     stats: PlayerSeasonStats? = null,
     playoffStats: PlayerSeasonStats? = null,
+    onSwapPosition: ((Player) -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
     if (player == null) return
 
-    var selectedMainTab by remember { mutableStateOf(0) } // 0: Stats & Splits, 1: Attributes & Scouting
+    var currentPlayer by remember(player) { mutableStateOf(player) }
+    var selectedMainTab by remember { mutableStateOf(0) } // 0: Attributes & Scouting (First Tab), 1: Stats & Splits (Second Tab)
     var statsScopeTab by remember { mutableStateOf(0) } // 0: Regular Season, 1: Playoffs
     val activeStats = if (statsScopeTab == 0) stats else playoffStats
 
-    val formattedSalary = if (player.salary >= 1_000_000) {
-        "$${String.format(java.util.Locale.US, "%.2f", player.salary / 1_000_000.0)}M"
+    val p = currentPlayer
+    val formattedSalary = if (p.salary >= 1_000_000) {
+        "$${String.format(java.util.Locale.US, "%.2f", p.salary / 1_000_000.0)}M"
     } else {
-        "$${player.salary / 1_000}K"
+        "$${p.salary / 1_000}K"
     }
 
     ModalBottomSheet(
@@ -127,10 +325,10 @@ fun PlayerDetailBottomSheet(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    RatingBadge(rating = player.overallRating, size = 46)
+                    RatingBadge(rating = p.overallRating, size = 46)
                     Column {
                         Text(
-                            text = player.name,
+                            text = p.name,
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.ExtraBold
                         )
@@ -138,12 +336,12 @@ fun PlayerDetailBottomSheet(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            PositionBadge(position = player.positionFirst)
-                            if (player.positionSecond != Position.NONE) {
-                                PositionBadge(position = player.positionSecond)
+                            PositionBadge(position = p.positionFirst)
+                            if (p.positionSecond != Position.NONE) {
+                                PositionBadge(position = p.positionSecond)
                             }
                             Text(
-                                text = "Age ${player.age} • Pot ★${player.potential}",
+                                text = "${stringResource(R.string.spinner_player_age)}: ${p.age} • ${stringResource(R.string.spinner_player_potential)}: ${p.potential}",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -159,7 +357,7 @@ fun PlayerDetailBottomSheet(
                         color = MaterialTheme.colorScheme.primary
                     )
                     Text(
-                        text = "${player.yearsContract} yrs left • Loyalty ★${player.loyalty}",
+                        text = "${p.yearsContract} ${stringResource(R.string.free_agent_years_contract)}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -168,7 +366,7 @@ fun PlayerDetailBottomSheet(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // 2. MAIN TWO TABS: STATS VS ATTRIBUTES
+            // 2. MAIN TWO TABS: ATTRIBUTES (0) VS STATS (1)
             TabRow(
                 selectedTabIndex = selectedMainTab,
                 modifier = Modifier
@@ -178,12 +376,28 @@ fun PlayerDetailBottomSheet(
                 Tab(
                     selected = selectedMainTab == 0,
                     onClick = { selectedMainTab = 0 },
-                    text = { Text("📊 Stats & Shooting Splits", fontWeight = FontWeight.Bold, fontSize = 13.sp) }
+                    text = {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Text(stringResource(R.string.player_tab_skills), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
+                    }
                 )
                 Tab(
                     selected = selectedMainTab == 1,
                     onClick = { selectedMainTab = 1 },
-                    text = { Text("⚡ Attributes & Scouting", fontWeight = FontWeight.Bold, fontSize = 13.sp) }
+                    text = {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(Icons.Default.QueryStats, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Text(stringResource(R.string.player_tab_statistic), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
+                    }
                 )
             }
 
@@ -191,7 +405,126 @@ fun PlayerDetailBottomSheet(
 
             // 3. TAB CONTENT
             if (selectedMainTab == 0) {
-                // TAB 0: STATS & SHOOTING SPLITS
+                // TAB 0: ATTRIBUTES & SCOUTING REPORT (FIRST TAB)
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Position Swapping Control (if secondary position exists and callback provided)
+                    if (p.positionSecond != Position.NONE && onSwapPosition != null) {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = stringResource(R.string.player_skills_exchange_positions),
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text(
+                                        text = "${p.positionFirst.shortName} (${stringResource(R.string.team_position_first)}) ↔ ${p.positionSecond.shortName} (${stringResource(R.string.team_position_second)})",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Button(
+                                    onClick = {
+                                        val swapped = p.copy(
+                                            positionFirst = p.positionSecond,
+                                            positionSecond = p.positionFirst
+                                        )
+                                        currentPlayer = swapped
+                                        onSwapPosition(p)
+                                    },
+                                    shape = RoundedCornerShape(8.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                ) {
+                                    Icon(Icons.Default.SwapHoriz, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(stringResource(R.string.player_skills_exchange_positions), fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    }
+
+                    // Physical & Condition Card
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(Icons.Default.FitnessCenter, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                                Text(stringResource(R.string.player_skills_physique), fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+                            }
+                            SkillProgressBar(label = stringResource(R.string.player_skills_physique), value = p.skillPhysique)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("${stringResource(R.string.spinner_player_energy)}: ${p.stateEnergy}%", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("${stringResource(R.string.spinner_player_form)}: ${p.stateForm}%", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+
+                    // Offensive Skills Card
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(Icons.Default.SportsBasketball, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                                Text(stringResource(R.string.player_skills_attack), fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+                            }
+                            SkillProgressBar(label = stringResource(R.string.player_skills_shot_int), value = p.skillShotInterior)
+                            SkillProgressBar(label = stringResource(R.string.player_skills_shot_ext), value = p.skillShotExterior)
+                            SkillProgressBar(label = stringResource(R.string.player_skills_shot_fre), value = p.skillShotFree)
+                            SkillProgressBar(label = stringResource(R.string.player_skills_pass), value = p.skillPass)
+                        }
+                    }
+
+                    // Defensive Skills Card
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(Icons.Default.Shield, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                                Text(stringResource(R.string.player_skills_defense), fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+                            }
+                            SkillProgressBar(label = stringResource(R.string.player_skills_steal), value = p.skillSteal)
+                            SkillProgressBar(label = stringResource(R.string.player_skills_block), value = p.skillBlock)
+                            SkillProgressBar(label = stringResource(R.string.player_skills_rebound), value = p.skillRebound)
+                        }
+                    }
+                }
+            } else {
+                // TAB 1: STATS & SHOOTING SPLITS (SECOND TAB)
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -236,32 +569,38 @@ fun PlayerDetailBottomSheet(
                             ModernMetricCard(label = "TOPG", value = String.format(java.util.Locale.US, "%.1f", activeStats.topg), modifier = Modifier.weight(1f), isTurnover = true)
                         }
 
-                        // Shooting Efficiency Splits Card
+                        // Shooting Efficiency Splits Card (NBA Calibrated Benchmarks)
                         Card(
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text("🎯 Shooting Efficiency & Percentages", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+                                Text("Shooting Efficiency & Percentages", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
 
                                 ShootingSplitRow(
                                     label = "Field Goal (FG%)",
                                     percentage = activeStats.fgPercentage,
                                     made = activeStats.fgMadePerGame,
-                                    attempted = activeStats.fgAttPerGame
+                                    attempted = activeStats.fgAttPerGame,
+                                    highThreshold = 48.0,
+                                    lowThreshold = 42.0
                                 )
                                 ShootingSplitRow(
                                     label = "3-Point (3P%)",
                                     percentage = activeStats.threePtPercentage,
                                     made = activeStats.threePtMadePerGame,
-                                    attempted = activeStats.threePtAttPerGame
+                                    attempted = activeStats.threePtAttPerGame,
+                                    highThreshold = 37.5,
+                                    lowThreshold = 33.0
                                 )
                                 ShootingSplitRow(
                                     label = "Free Throw (FT%)",
                                     percentage = activeStats.ftPercentage,
                                     made = activeStats.ftMadePerGame,
-                                    attempted = activeStats.ftAttPerGame
+                                    attempted = activeStats.ftAttPerGame,
+                                    highThreshold = 80.0,
+                                    lowThreshold = 70.0
                                 )
                             }
                         }
@@ -303,57 +642,6 @@ fun PlayerDetailBottomSheet(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                        }
-                    }
-                }
-            } else {
-                // TAB 1: ATTRIBUTES & SCOUTING REPORT
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text("⚡ Athleticism & Physical Condition", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
-                            SkillProgressBar(label = "Physique & Conditioning", value = player.skillPhysique)
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text("Current Energy: ${player.stateEnergy}%", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text("Match Form: ${player.stateForm}%", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                    }
-
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text("🏀 Offensive Skills", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
-                            SkillProgressBar(label = "Interior Scoring (2PT Paint & Mid)", value = player.skillShotInterior)
-                            SkillProgressBar(label = "Exterior Shooting (2PT/3PT Range)", value = player.skillShotExterior)
-                            SkillProgressBar(label = "Free Throw Accuracy", value = player.skillShotFree)
-                            SkillProgressBar(label = "Playmaking & Court Vision", value = player.skillPass)
-                        }
-                    }
-
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                        shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text("🛡️ Defensive Skills", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
-                            SkillProgressBar(label = "Stealing & Perimeter Defense", value = player.skillSteal)
-                            SkillProgressBar(label = "Shot Blocking & Rim Protection", value = player.skillBlock)
-                            SkillProgressBar(label = "Rebounding Dominance", value = player.skillRebound)
                         }
                     }
                 }
@@ -414,11 +702,13 @@ fun ShootingSplitRow(
     label: String,
     percentage: Double,
     made: Double,
-    attempted: Double
+    attempted: Double,
+    highThreshold: Double = 48.0,
+    lowThreshold: Double = 42.0
 ) {
     val pctColor = when {
-        percentage >= 50.0 -> RatingGreen
-        percentage >= 40.0 -> Color(0xFFD97706)
+        percentage >= highThreshold -> RatingGreen
+        percentage >= lowThreshold -> Color(0xFFD97706)
         else -> RatingRed
     }
 
