@@ -27,6 +27,7 @@ import top.maary.basketmanager.re.domain.model.Position
 import top.maary.basketmanager.re.ui.components.PlayerDetailBottomSheet
 import top.maary.basketmanager.re.ui.components.PositionBadge
 import top.maary.basketmanager.re.ui.components.RatingBadge
+import top.maary.basketmanager.re.ui.theme.RatingGreen
 import top.maary.basketmanager.re.ui.viewmodel.GameDashboardViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -49,7 +50,7 @@ fun FreeAgencyScreen(
         else freeAgents.filter { it.positionFirst == positionFilter || it.positionSecond == positionFilter }
     }
 
-    val totalSalary = remember(roster) { roster.sumOf { it.salary } }
+    val totalSalary = remember(roster) { roster.filter { it.yearsContract > 0 }.sumOf { it.salary } }
     val capRemaining = (userTeam?.salaryCap ?: 70_000_000) - totalSalary
 
     fun formatMoney(amount: Int): String {
@@ -162,8 +163,24 @@ fun FreeAgencyScreen(
             title = { Text("Sign Free Agent: ${player.name}") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    val isMinContract = player.salary < 1_000_000
                     Text("Demanded Salary: ${formatMoney(player.salary)} / year", fontWeight = FontWeight.Bold)
-                    Text("Cap Room Available: ${formatMoney(capRemaining)}", color = if (capRemaining >= player.salary) Color.Unspecified else MaterialTheme.colorScheme.error)
+                    if (isMinContract) {
+                        Surface(shape = RoundedCornerShape(4.dp), color = RatingGreen.copy(alpha = 0.15f)) {
+                            Text(
+                                text = "⚡ Minimum Contract Exception (< $1.0M): Allowed even if over cap",
+                                color = RatingGreen,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                            )
+                        }
+                    }
+                    Text(
+                        text = "Cap Room Available: ${formatMoney(capRemaining)}",
+                        fontSize = 12.sp,
+                        color = if (capRemaining >= player.salary || isMinContract) Color.Unspecified else MaterialTheme.colorScheme.error
+                    )
 
                     Text("Contract Length:", fontSize = 12.sp)
                     Row(
@@ -185,8 +202,9 @@ fun FreeAgencyScreen(
                     onClick = {
                         val p = player
                         playerToSign = null
-                        if (capRemaining < p.salary) {
-                            signFeedbackMsg = "Cannot sign ${p.name}: exceeds salary cap limit!"
+                        val isMinContract = p.salary < 1_000_000
+                        if (capRemaining < p.salary && !isMinContract) {
+                            signFeedbackMsg = "Cannot sign ${p.name}: exceeds salary cap limit (and does not qualify for Minimum Contract Exception)!"
                         } else {
                             viewModel.signFreeAgent(p.id, p.salary, contractYears) { success ->
                                 signFeedbackMsg = if (success) "Successfully signed ${p.name}!" else "Failed to sign ${p.name}."

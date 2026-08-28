@@ -63,7 +63,7 @@ fun OffseasonScreen(
         roster.filter { it.yearsContract == 0 }
     }
 
-    val totalPayroll = remember(roster) { roster.sumOf { it.salary } }
+    val totalPayroll = remember(roster) { roster.filter { it.yearsContract > 0 }.sumOf { it.salary } }
     val capSpace = (userTeam?.salaryCap ?: 70_000_000) - totalPayroll
 
     fun formatMoney(amount: Int): String {

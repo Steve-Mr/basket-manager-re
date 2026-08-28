@@ -19,7 +19,8 @@ object FreeAgencyEngine {
             rating >= 80 -> 7_000_000 + ((rating - 80) * 1_000_000).toInt()
             rating >= 75 -> 4_000_000 + ((rating - 75) * 600_000).toInt()
             rating >= 70 -> 2_000_000 + ((rating - 70) * 400_000).toInt()
-            else -> 1_000_000
+            rating >= 65 -> 1_000_000 + ((rating - 65) * 150_000).toInt()
+            else -> 500_000
         }
 
         val ageFactor = if (age > 32) (1.0 - (age - 32) * 0.1).coerceAtLeast(0.4) else 1.0
@@ -27,7 +28,7 @@ object FreeAgencyEngine {
 
         val estimated = (baseSalary * ageFactor * potFactor).roundToInt()
         // Round to nearest 50,000
-        return ((estimated / 50_000) * 50_000).coerceAtLeast(800_000)
+        return ((estimated / 50_000) * 50_000).coerceIn(500_000, 35_000_000)
     }
 
     fun evaluateCpuSignings(
@@ -43,9 +44,10 @@ object FreeAgencyEngine {
             val roster = teamPlayersMap[team.id] ?: emptyList()
             if (roster.size >= 15) continue
 
-            val currentPayroll = roster.sumOf { it.salary }
+            val currentPayroll = roster.filter { it.yearsContract > 0 }.sumOf { it.salary }
             val capSpace = team.salaryCap - currentPayroll
-            if (capSpace <= 1_000_000) continue
+            // Allow minimum salary signings (< $1.0M) even if over cap when roster < 12
+            if (capSpace <= 1_000_000 && roster.size >= 12) continue
 
             // Find weakest position
             val positionCounts = Position.entries.filter { it != Position.NONE }.associateWith { pos ->

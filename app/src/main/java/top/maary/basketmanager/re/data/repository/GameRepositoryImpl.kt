@@ -647,9 +647,20 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
         val player = getPlayer(playerId) ?: return@withContext false
         val team = getTeam(teamId) ?: return@withContext false
         val roster = getTeamPlayers(teamId)
-        val payroll = roster.sumOf { it.salary }
+        val game = getGame(team.gameId)
+        val currentDay = game?.currentMatchday ?: 1
 
-        if (roster.size >= 20 || (payroll + salary) > team.salaryCap) {
+        // Expired contracts (yearsContract == 0) in offseason don't count towards active payroll
+        val activePayroll = roster.filter { it.yearsContract > 0 }.sumOf { it.salary }
+        val capAvailable = team.salaryCap - activePayroll
+
+        if (roster.size >= 20) {
+            return@withContext false
+        }
+
+        // Minimum Contract Exception: Contracts under $1,000,000 can be signed even when over the cap (BM15 standard)
+        val isMinContract = salary < 1_000_000
+        if (!isMinContract && salary > capAvailable) {
             return@withContext false
         }
 
