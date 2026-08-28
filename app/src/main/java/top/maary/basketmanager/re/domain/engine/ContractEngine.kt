@@ -19,7 +19,7 @@ object ContractEngine {
         var baseVal = (120.0 * ((subAvg.pow(4) / 400.0) * ((40 - age) + (potential * 2) + 75))) / 100.0
         baseVal *= pos2Bonus
         val rawSalary = (baseVal * 10.0).toInt()
-        val openMarketValue = ((rawSalary / 100_000) * 100_000).coerceIn(1_000_000, 42_000_000)
+        val openMarketValue = ((rawSalary / 50_000) * 50_000).coerceIn(500_000, 42_000_000)
 
         val negotiationBase = if (isHomeTeamRenewal) {
             // Authentic BM15 Hometown 80% Discount factor + Loyalty bonus
@@ -31,7 +31,7 @@ object ContractEngine {
                 else -> 0.90
             }
             val discounted = (openMarketValue * discountFactor).toInt()
-            ((discounted / 100_000) * 100_000).coerceIn(1_000_000, 36_000_000)
+            ((discounted / 50_000) * 50_000).coerceIn(500_000, 36_000_000)
         } else {
             openMarketValue
         }
@@ -71,8 +71,10 @@ object ContractEngine {
             if (isExtension) {
                 val totalYears = player.yearsContract + offeredYears
                 "${player.name} has ACCEPTED your contract extension offer of ${formatMoney(offeredSalary)}/yr for an extra $offeredYears year(s) (Total contract: $totalYears years)!$discountNote"
-            } else {
+            } else if (isHomeTeamRenewal) {
                 "${player.name} has ACCEPTED your contract renewal offer of ${formatMoney(offeredSalary)}/yr for $offeredYears year(s)!$discountNote"
+            } else {
+                "${player.name} has ACCEPTED your Free Agency contract offer of ${formatMoney(offeredSalary)}/yr for $offeredYears year(s)!"
             }
         } else {
             val demandTip = when {

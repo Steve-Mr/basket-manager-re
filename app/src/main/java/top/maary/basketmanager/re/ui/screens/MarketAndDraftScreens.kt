@@ -5,12 +5,9 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.HowToVote
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -20,10 +17,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import top.maary.basketmanager.re.domain.engine.DraftEngine
-import top.maary.basketmanager.re.domain.model.DraftPick
+import top.maary.basketmanager.re.domain.engine.ContractEngine
 import top.maary.basketmanager.re.domain.model.Player
 import top.maary.basketmanager.re.domain.model.Position
+import top.maary.basketmanager.re.ui.components.ContractNegotiationDialog
 import top.maary.basketmanager.re.ui.components.PlayerDetailBottomSheet
 import top.maary.basketmanager.re.ui.components.PositionBadge
 import top.maary.basketmanager.re.ui.components.RatingBadge
@@ -41,9 +38,8 @@ fun FreeAgencyScreen(
 
     var positionFilter by remember { mutableStateOf<Position?>(null) }
     var selectedPlayerForDetail by remember { mutableStateOf<Player?>(null) }
-    var playerToSign by remember { mutableStateOf<Player?>(null) }
-    var contractYears by remember { mutableIntStateOf(1) }
-    var signFeedbackMsg by remember { mutableStateOf<String?>(null) }
+    var negotiatingPlayer by remember { mutableStateOf<Player?>(null) }
+    var negotiationFeedback by remember { mutableStateOf<Pair<Boolean, String>?>(null) }
 
     val filteredList = remember(freeAgents, positionFilter) {
         if (positionFilter == null) freeAgents
@@ -54,7 +50,7 @@ fun FreeAgencyScreen(
     val capRemaining = (userTeam?.salaryCap ?: 70_000_000) - totalSalary
 
     fun formatMoney(amount: Int): String {
-        return if (amount >= 1_000_000) "$${amount / 1_000_000}M" else "$${amount / 1_000}K"
+        return if (amount >= 1_000_000) "$${String.format("%.2f", amount / 1_000_000.0)}M" else "$${amount / 1_000}K"
     }
 
     Column(
@@ -68,7 +64,7 @@ fun FreeAgencyScreen(
             fontWeight = FontWeight.Bold
         )
         Text(
-            text = "Sign available free agents to complete your roster. Cap Room: ${formatMoney(capRemaining)}",
+            text = "Sign available free agents to complete your roster. Cap Room: ${formatMoney(capRemaining)} (Min Exception: < $1.0M)",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -98,57 +94,70 @@ fun FreeAgencyScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(filteredList) { player ->
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { selectedPlayerForDetail = player },
-                    shape = RoundedCornerShape(10.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                ) {
-                    Row(
+        if (filteredList.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(
+                    text = "No free agents available.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(bottom = 16.dp)
+            ) {
+                items(filteredList) { player ->
+                    val (_, marketDemand) = remember(player.id) {
+                        ContractEngine.calculateMarketDemandSalary(player, isHomeTeamRenewal = false)
+                    }
+
+                    Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                            .clickable { selectedPlayerForDetail = player },
+                        shape = RoundedCornerShape(10.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                     ) {
                         Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            RatingBadge(rating = player.overallRating)
-                            Column {
-                                Text(text = player.name, fontWeight = FontWeight.Bold)
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    PositionBadge(position = player.positionFirst)
-                                    Text(
-                                        text = "Age: ${player.age} • Pot: ★${player.potential} • Demands: ${formatMoney(player.salary)}/yr",
-                                        fontSize = 11.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                RatingBadge(rating = player.overallRating)
+                                Column {
+                                    Text(text = player.name, fontWeight = FontWeight.Bold)
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        PositionBadge(position = player.positionFirst)
+                                        Text(
+                                            text = "Age: ${player.age} • Demands: ${formatMoney(marketDemand)}/yr",
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
                                 }
                             }
-                        }
 
-                        Button(
-                            onClick = {
-                                playerToSign = player
-                                contractYears = 1
-                            },
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
-                        ) {
-                            Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Sign", fontSize = 12.sp)
+                            Button(
+                                onClick = { negotiatingPlayer = player },
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Sign", fontSize = 12.sp)
+                            }
                         }
                     }
                 }
@@ -156,80 +165,51 @@ fun FreeAgencyScreen(
         }
     }
 
-    // Signing Modal Dialog
-    playerToSign?.let { player ->
-        AlertDialog(
-            onDismissRequest = { playerToSign = null },
-            title = { Text("Sign Free Agent: ${player.name}") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    val isMinContract = player.salary < 1_000_000
-                    Text("Demanded Salary: ${formatMoney(player.salary)} / year", fontWeight = FontWeight.Bold)
-                    if (isMinContract) {
-                        Surface(shape = RoundedCornerShape(4.dp), color = RatingGreen.copy(alpha = 0.15f)) {
-                            Text(
-                                text = "⚡ Minimum Contract Exception (< $1.0M): Allowed even if over cap",
-                                color = RatingGreen,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
-                            )
-                        }
-                    }
-                    Text(
-                        text = "Cap Room Available: ${formatMoney(capRemaining)}",
-                        fontSize = 12.sp,
-                        color = if (capRemaining >= player.salary || isMinContract) Color.Unspecified else MaterialTheme.colorScheme.error
-                    )
-
-                    Text("Contract Length:", fontSize = 12.sp)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        (1..3).forEach { y ->
-                            FilterChip(
-                                selected = contractYears == y,
-                                onClick = { contractYears = y },
-                                label = { Text("$y Years") }
-                            )
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        val p = player
-                        playerToSign = null
-                        val isMinContract = p.salary < 1_000_000
-                        if (capRemaining < p.salary && !isMinContract) {
-                            signFeedbackMsg = "Cannot sign ${p.name}: exceeds salary cap limit (and does not qualify for Minimum Contract Exception)!"
-                        } else {
-                            viewModel.signFreeAgent(p.id, p.salary, contractYears) { success ->
-                                signFeedbackMsg = if (success) "Successfully signed ${p.name}!" else "Failed to sign ${p.name}."
+    // Dynamic Negotiation Modal Dialog (Interactive Offer Tiers & Slider)
+    negotiatingPlayer?.let { player ->
+        ContractNegotiationDialog(
+            player = player,
+            isHomeTeamRenewal = false,
+            onDismiss = { negotiatingPlayer = null },
+            onConfirmOffer = { years: Int, salary: Int, accepted: Boolean, feedbackMsg: String ->
+                negotiatingPlayer = null
+                if (accepted) {
+                    val isMinContract = salary < 1_000_000
+                    if (salary > capRemaining && !isMinContract) {
+                        negotiationFeedback = Pair(
+                            false,
+                            "${player.name} accepted your offer, but the contract could not be finalized because your team is over the salary cap (${formatMoney(capRemaining)} available) and the salary exceeds the $1.0M Minimum Contract Exception."
+                        )
+                    } else {
+                        viewModel.signFreeAgent(player.id, salary, years) { success ->
+                            if (success) {
+                                negotiationFeedback = Pair(
+                                    true,
+                                    "Successfully signed Free Agent ${player.name} to a $years-year, ${formatMoney(salary)}/yr contract!"
+                                )
+                            } else {
+                                negotiationFeedback = Pair(
+                                    false,
+                                    "Signing failed: Roster size exceeds maximum limit of 20 players."
+                                )
                             }
                         }
                     }
-                ) {
-                    Text("Confirm Signing")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { playerToSign = null }) {
-                    Text("Cancel")
+                } else {
+                    negotiationFeedback = Pair(false, feedbackMsg)
                 }
             }
         )
     }
 
-    signFeedbackMsg?.let { msg ->
+    // Feedback Notice Dialog
+    negotiationFeedback?.let { (accepted, msg) ->
         AlertDialog(
-            onDismissRequest = { signFeedbackMsg = null },
-            title = { Text("Free Agency Notice") },
+            onDismissRequest = { negotiationFeedback = null },
+            title = { Text(if (accepted) "Signing Successful! ✅" else "Negotiation Failed ❌") },
             text = { Text(msg) },
             confirmButton = {
-                Button(onClick = { signFeedbackMsg = null }) {
+                Button(onClick = { negotiationFeedback = null }) {
                     Text("OK")
                 }
             }
