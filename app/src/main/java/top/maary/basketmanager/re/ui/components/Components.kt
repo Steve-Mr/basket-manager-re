@@ -95,17 +95,17 @@ fun PotentialTierBadge(
     potential: Int,
     modifier: Modifier = Modifier
 ) {
-    val (bgColor, starColor, labelColor) = when {
-        potential >= 9 -> Triple(Color(0xFFFFF8E1), Color(0xFFFFB300), Color(0xFFB45309)) // Superstar Gold Tier
-        potential >= 7 -> Triple(Color(0xFFFFF3E0), Color(0xFFFB8C00), Color(0xFFC2410C)) // High Potential Amber
-        potential >= 5 -> Triple(Color(0xFFE0F2F1), Color(0xFF00897B), Color(0xFF0F766E)) // Solid Contender Teal
-        else -> Triple(Color(0xFFECEFF1), Color(0xFF78909C), Color(0xFF475569))          // Role Player Slate
+    val (bgColor, starColor, labelColor, starIcon) = when {
+        potential >= 9 -> listOf(Color(0xFFFFF8E1), Color(0xFFFFB300), Color(0xFFB45309), Icons.Default.Star) // 9-10: Full 5-point star (Superstar Gold)
+        potential >= 7 -> listOf(Color(0xFFFFF3E0), Color(0xFFFB8C00), Color(0xFFC2410C), Icons.AutoMirrored.Filled.StarHalf) // 7-8: Half-corner Star (Amber)
+        potential >= 5 -> listOf(Color(0xFFE0F2F1), Color(0xFF00897B), Color(0xFF0F766E), Icons.Default.StarOutline) // 5-6: Star Outline (Teal)
+        else -> listOf(Color(0xFFECEFF1), Color(0xFF78909C), Color(0xFF475569), Icons.Default.StarBorder) // 1-4: Star Border (Slate)
     }
 
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(10.dp),
-        color = bgColor
+        color = bgColor as Color
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 7.dp, vertical = 6.dp),
@@ -113,9 +113,9 @@ fun PotentialTierBadge(
             verticalArrangement = Arrangement.Center
         ) {
             Icon(
-                Icons.Default.Star,
+                imageVector = starIcon as androidx.compose.ui.graphics.vector.ImageVector,
                 contentDescription = null,
-                tint = starColor,
+                tint = starColor as Color,
                 modifier = Modifier.size(20.dp)
             )
             Spacer(modifier = Modifier.height(2.dp))
@@ -123,7 +123,7 @@ fun PotentialTierBadge(
                 text = "$potential",
                 fontWeight = FontWeight.Black,
                 fontSize = 12.sp,
-                color = labelColor
+                color = labelColor as Color
             )
         }
     }
@@ -204,7 +204,9 @@ fun M3PlayerCard(
             .fillMaxWidth()
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Row(
             modifier = Modifier
@@ -341,7 +343,7 @@ fun PlayerDetailBottomSheet(
                                 PositionBadge(position = p.positionSecond)
                             }
                             Text(
-                                text = "${stringResource(R.string.spinner_player_age)}: ${p.age} • ${stringResource(R.string.spinner_player_potential)}: ${p.potential}",
+                                text = "Age ${p.age} • Potential ${p.potential}",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -357,7 +359,7 @@ fun PlayerDetailBottomSheet(
                         color = MaterialTheme.colorScheme.primary
                     )
                     Text(
-                        text = "${p.yearsContract} ${stringResource(R.string.free_agent_years_contract)}",
+                        text = "${p.yearsContract} yrs left",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -382,7 +384,7 @@ fun PlayerDetailBottomSheet(
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Text(stringResource(R.string.player_tab_skills), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text("Attributes", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         }
                     }
                 )
@@ -395,7 +397,7 @@ fun PlayerDetailBottomSheet(
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Icon(Icons.Default.QueryStats, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Text(stringResource(R.string.player_tab_statistic), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text("Statistics", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         }
                     }
                 )
@@ -426,13 +428,13 @@ fun PlayerDetailBottomSheet(
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = stringResource(R.string.player_skills_exchange_positions),
+                                        text = "Primary Position Swap",
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 13.sp,
                                         color = MaterialTheme.colorScheme.primary
                                     )
                                     Text(
-                                        text = "${p.positionFirst.shortName} (${stringResource(R.string.team_position_first)}) ↔ ${p.positionSecond.shortName} (${stringResource(R.string.team_position_second)})",
+                                        text = "${p.positionFirst.shortName} (Primary) ↔ ${p.positionSecond.shortName} (Secondary)",
                                         fontSize = 11.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -451,7 +453,7 @@ fun PlayerDetailBottomSheet(
                                 ) {
                                     Icon(Icons.Default.SwapHoriz, contentDescription = null, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text(stringResource(R.string.player_skills_exchange_positions), fontSize = 11.sp)
+                                    Text("Swap", fontSize = 11.sp)
                                 }
                             }
                         }
@@ -469,15 +471,15 @@ fun PlayerDetailBottomSheet(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Icon(Icons.Default.FitnessCenter, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
-                                Text(stringResource(R.string.player_skills_physique), fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+                                Text("Athleticism & Fitness", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
                             }
-                            SkillProgressBar(label = stringResource(R.string.player_skills_physique), value = p.skillPhysique)
+                            SkillProgressBar(label = "Physique & Speed", value = p.skillPhysique)
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text("${stringResource(R.string.spinner_player_energy)}: ${p.stateEnergy}%", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text("${stringResource(R.string.spinner_player_form)}: ${p.stateForm}%", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("Energy: ${p.stateEnergy}%", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("Form: ${p.stateForm}%", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
@@ -494,12 +496,12 @@ fun PlayerDetailBottomSheet(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Icon(Icons.Default.SportsBasketball, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
-                                Text(stringResource(R.string.player_skills_attack), fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+                                Text("Offensive Skills", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
                             }
-                            SkillProgressBar(label = stringResource(R.string.player_skills_shot_int), value = p.skillShotInterior)
-                            SkillProgressBar(label = stringResource(R.string.player_skills_shot_ext), value = p.skillShotExterior)
-                            SkillProgressBar(label = stringResource(R.string.player_skills_shot_fre), value = p.skillShotFree)
-                            SkillProgressBar(label = stringResource(R.string.player_skills_pass), value = p.skillPass)
+                            SkillProgressBar(label = "Inside Scoring", value = p.skillShotInterior)
+                            SkillProgressBar(label = "Outside Shooting", value = p.skillShotExterior)
+                            SkillProgressBar(label = "Free Throw", value = p.skillShotFree)
+                            SkillProgressBar(label = "Passing & Vision", value = p.skillPass)
                         }
                     }
 
@@ -515,11 +517,11 @@ fun PlayerDetailBottomSheet(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Icon(Icons.Default.Shield, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
-                                Text(stringResource(R.string.player_skills_defense), fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+                                Text("Defensive Skills", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
                             }
-                            SkillProgressBar(label = stringResource(R.string.player_skills_steal), value = p.skillSteal)
-                            SkillProgressBar(label = stringResource(R.string.player_skills_block), value = p.skillBlock)
-                            SkillProgressBar(label = stringResource(R.string.player_skills_rebound), value = p.skillRebound)
+                            SkillProgressBar(label = "Steal & Defense", value = p.skillSteal)
+                            SkillProgressBar(label = "Rim Protection", value = p.skillBlock)
+                            SkillProgressBar(label = "Rebounding", value = p.skillRebound)
                         }
                     }
                 }

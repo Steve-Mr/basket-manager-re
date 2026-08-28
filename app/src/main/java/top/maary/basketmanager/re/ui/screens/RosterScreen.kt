@@ -164,13 +164,13 @@ fun RosterScreen(
             // ALL POS: Grouped by Lineup (Starters, Reserves, Bench Depth)
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(bottom = 16.dp)
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+                contentPadding = PaddingValues(bottom = 20.dp)
             ) {
                 // Card 1: Starters Group
                 item {
                     RosterGroupCard(
-                        title = stringResource(R.string.team_titular),
+                        title = "Starters",
                         badgeText = "5 Players • Avg ${if (startersList.isNotEmpty()) startersList.map { it.overallRating }.average().toInt() else 0}",
                         headerColor = MaterialTheme.colorScheme.primaryContainer,
                         players = startersList,
@@ -181,7 +181,7 @@ fun RosterScreen(
                 // Card 2: Reserves Group
                 item {
                     RosterGroupCard(
-                        title = stringResource(R.string.team_reserve),
+                        title = "Reserves",
                         badgeText = "5 Players • Avg ${if (reservesList.isNotEmpty()) reservesList.map { it.overallRating }.average().toInt() else 0}",
                         headerColor = MaterialTheme.colorScheme.surfaceVariant,
                         players = reservesList,
@@ -193,7 +193,7 @@ fun RosterScreen(
                 if (benchList.isNotEmpty()) {
                     item {
                         RosterGroupCard(
-                            title = stringResource(R.string.team_remain),
+                            title = "Bench Depth",
                             badgeText = "${benchList.size} Players",
                             headerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                             players = benchList,
@@ -241,8 +241,9 @@ fun RosterGroupCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(10.dp)) {
             // Section Header

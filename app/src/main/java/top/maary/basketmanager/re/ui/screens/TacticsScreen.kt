@@ -49,12 +49,12 @@ fun TacticsBottomSheet(
             ) {
                 Column {
                     Text(
-                        text = stringResource(R.string.team_tab_tactic),
+                        text = "Tactics & Strategy",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.ExtraBold
                     )
                     Text(
-                        text = "Configure offensive hierarchy, game pace, and shot distribution",
+                        text = "Offensive priority, game pace, and shot distribution",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -81,12 +81,12 @@ fun TacticsScreen(
             .padding(horizontal = 16.dp, vertical = 10.dp)
     ) {
         Text(
-            text = "Team Tactics & Strategy",
+            text = "Tactics & Strategy",
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold
         )
         Text(
-            text = "Configure offensive hierarchy, game pace, and shot distribution",
+            text = "Offensive priority, game pace, and shot distribution",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

@@ -105,26 +105,14 @@ fun LineupScreen(
                     )
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(
-                        onClick = { showTacticsSheet = true },
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
-                    ) {
-                        Icon(Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(stringResource(R.string.team_tab_tactic), fontSize = 12.sp)
-                    }
-
-                    Button(
-                        onClick = { viewModel.optimizeUserLineup() },
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
-                    ) {
-                        Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Auto Optimize", fontSize = 12.sp)
-                    }
+                Button(
+                    onClick = { viewModel.optimizeUserLineup() },
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Auto Optimize", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -183,7 +171,7 @@ fun LineupScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = stringResource(R.string.team_titular),
+                            text = "Starters",
                             fontWeight = FontWeight.Black,
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -209,7 +197,7 @@ fun LineupScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = stringResource(R.string.team_reserve),
+                            text = "Reserves",
                             fontWeight = FontWeight.Black,
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -258,6 +246,36 @@ fun LineupScreen(
                         onDetail = { if (reserveP != null) selectedPlayerForDetail = reserveP }
                     )
                 }
+            }
+        }
+
+        // Dedicated Bottom Full-Width Tactics & Strategy Button
+        item {
+            Spacer(modifier = Modifier.height(4.dp))
+            OutlinedButton(
+                onClick = { showTacticsSheet = true },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                ),
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
+            ) {
+                Icon(
+                    Icons.Default.Tune,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Tactics & Strategy",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
         }
     }

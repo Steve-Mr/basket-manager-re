@@ -100,7 +100,7 @@ fun TeamStatsScreen(
         ) {
             Column {
                 Text(
-                    text = "${effectiveTeam?.name ?: stringResource(R.string.team)} ${stringResource(R.string.player_tab_statistic)}",
+                    text = "${effectiveTeam?.name ?: "Team"} Stats",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.ExtraBold
                 )
@@ -156,7 +156,7 @@ fun TeamStatsScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 TableHeaderCell(
-                                    title = stringResource(R.string.name),
+                                    title = "Name",
                                     field = StatSortField.NAME,
                                     activeField = sortField,
                                     isAscending = sortAscending,
@@ -168,7 +168,7 @@ fun TeamStatsScreen(
                                     }
                                 )
                                 TableHeaderCell(
-                                    title = stringResource(R.string.spinner_match_result_matches),
+                                    title = "GP",
                                     field = StatSortField.GP,
                                     activeField = sortField,
                                     isAscending = sortAscending,
@@ -179,7 +179,7 @@ fun TeamStatsScreen(
                                     }
                                 )
                                 TableHeaderCell(
-                                    title = stringResource(R.string.spinner_match_result_minutes),
+                                    title = "MIN",
                                     field = StatSortField.MIN,
                                     activeField = sortField,
                                     isAscending = sortAscending,
@@ -190,7 +190,7 @@ fun TeamStatsScreen(
                                     }
                                 )
                                 TableHeaderCell(
-                                    title = stringResource(R.string.spinner_match_result_points),
+                                    title = "PTS",
                                     field = StatSortField.PTS,
                                     activeField = sortField,
                                     isAscending = sortAscending,
@@ -201,7 +201,7 @@ fun TeamStatsScreen(
                                     }
                                 )
                                 TableHeaderCell(
-                                    title = stringResource(R.string.spinner_match_result_rebound),
+                                    title = "REB",
                                     field = StatSortField.REB,
                                     activeField = sortField,
                                     isAscending = sortAscending,
@@ -212,7 +212,7 @@ fun TeamStatsScreen(
                                     }
                                 )
                                 TableHeaderCell(
-                                    title = stringResource(R.string.spinner_match_result_pass),
+                                    title = "AST",
                                     field = StatSortField.AST,
                                     activeField = sortField,
                                     isAscending = sortAscending,
@@ -223,7 +223,7 @@ fun TeamStatsScreen(
                                     }
                                 )
                                 TableHeaderCell(
-                                    title = stringResource(R.string.spinner_match_result_block),
+                                    title = "BLK",
                                     field = StatSortField.BLK,
                                     activeField = sortField,
                                     isAscending = sortAscending,
@@ -234,7 +234,7 @@ fun TeamStatsScreen(
                                     }
                                 )
                                 TableHeaderCell(
-                                    title = stringResource(R.string.spinner_match_result_steal),
+                                    title = "STL",
                                     field = StatSortField.STL,
                                     activeField = sortField,
                                     isAscending = sortAscending,
@@ -245,7 +245,7 @@ fun TeamStatsScreen(
                                     }
                                 )
                                 TableHeaderCell(
-                                    title = stringResource(R.string.spinner_match_result_per),
+                                    title = "PER",
                                     field = StatSortField.PER,
                                     activeField = sortField,
                                     isAscending = sortAscending,
@@ -277,7 +277,7 @@ fun TeamStatsScreen(
                             }
                         }
 
-                        // 3. Highlighted Bottom Sticky Summary Row: Team Total (球隊總計)
+                        // 3. Highlighted Bottom Sticky Summary Row: Team Total
                         Surface(
                             color = RatingGreen.copy(alpha = 0.2f),
                             modifier = Modifier.fillMaxWidth()
@@ -289,7 +289,7 @@ fun TeamStatsScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = stringResource(R.string.spinner_match_result_total_team),
+                                    text = "Team Total",
                                     fontWeight = FontWeight.Black,
                                     fontSize = 12.sp,
                                     color = Color(0xFF1B5E20),
