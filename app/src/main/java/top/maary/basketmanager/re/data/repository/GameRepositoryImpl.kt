@@ -275,15 +275,22 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
     }
 
     override suspend fun getFreeAgents(gameId: Long): List<Player> = withContext(Dispatchers.IO) {
+        val game = getGame(gameId)
+        val currentDay = game?.currentMatchday ?: 1
         val list = mutableListOf<Player>()
         val db = dbHelper.readableDatabase
-        val cursor = db.rawQuery("SELECT * FROM ${DB.TABLE_PLAYER} WHERE gameId = ? AND (teamId IS NULL OR teamId = 0)", arrayOf(gameId.toString()))
+        val query = if (currentDay < 231) {
+            "SELECT * FROM ${DB.TABLE_PLAYER} WHERE gameId = ? AND (teamId IS NULL OR teamId = 0) AND (yearsExperience > 0 OR age > 23)"
+        } else {
+            "SELECT * FROM ${DB.TABLE_PLAYER} WHERE gameId = ? AND (teamId IS NULL OR teamId = 0)"
+        }
+        val cursor = db.rawQuery(query, arrayOf(gameId.toString()))
         cursor.use { c ->
             while (c.moveToNext()) {
                 list.add(cursorToPlayer(c).toDomain())
             }
         }
-        list
+        list.sortedByDescending { it.overallRating }
     }
 
     override suspend fun getPlayer(playerId: Long): Player? = withContext(Dispatchers.IO) {
@@ -575,7 +582,10 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
     override suspend fun getDraftProspects(gameId: Long): List<Player> = withContext(Dispatchers.IO) {
         val list = mutableListOf<Player>()
         val db = dbHelper.readableDatabase
-        val cursor = db.rawQuery("SELECT * FROM ${DB.TABLE_PLAYER} WHERE gameId = ? AND (teamId IS NULL OR teamId = 0) AND yearsContract = 0", arrayOf(gameId.toString()))
+        val cursor = db.rawQuery(
+            "SELECT * FROM ${DB.TABLE_PLAYER} WHERE gameId = ? AND (teamId IS NULL OR teamId = 0) AND yearsContract = 0 AND yearsExperience = 0 AND age <= 23",
+            arrayOf(gameId.toString())
+        )
         cursor.use { c ->
             while (c.moveToNext()) {
                 list.add(cursorToPlayer(c).toDomain())
