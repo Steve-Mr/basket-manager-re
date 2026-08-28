@@ -1019,16 +1019,33 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
                     insertNewsDirect(db, news.toEntity())
                 }
 
-                // Contract Renewals & Salary Cap Performance Adjustments (Matchday 227..229)
+                // Contract Renewals & Authentic BM15 Salary Cap Performance Adjustments (Matchday 227..229)
                 currentDay == 227 -> {
                     val standings = getStandings(gameId)
-                    val topTeams = standings.take(8).map { it.teamId }
-                    topTeams.forEach { tId ->
-                        db.execSQL("UPDATE ${DB.TABLE_TEAM} SET salaryCap = salaryCap + 3000000 WHERE id = ?", arrayOf(tId))
+                    val seriesList = getPlayoffSeries(gameId)
+                    val adjustments = FinanceEngine.calculateSalaryCapAdjustments(standings, seriesList)
+
+                    adjustments.forEach { (tId, adj) ->
+                        db.execSQL(
+                            "UPDATE ${DB.TABLE_TEAM} SET salaryCap = MIN(${FinanceEngine.SALARY_CAP_MAX}, MAX(${FinanceEngine.SALARY_CAP_MIN}, salaryCap + ?)) WHERE id = ?",
+                            arrayOf(adj.deltaSalaryCap, tId)
+                        )
                     }
-                    val botTeams = standings.takeLast(6).map { it.teamId }
-                    botTeams.forEach { tId ->
-                        db.execSQL("UPDATE ${DB.TABLE_TEAM} SET salaryCap = MAX(50000000, salaryCap - 2000000) WHERE id = ?", arrayOf(tId))
+
+                    val userAdj = adjustments[game.userTeamId]
+                    val updatedUserTeam = getTeam(game.userTeamId)
+                    if (userAdj != null && updatedUserTeam != null) {
+                        val sign = if (userAdj.deltaSalaryCap >= 0) "+" else "-"
+                        val absVal = kotlin.math.abs(userAdj.deltaSalaryCap) / 1_000_000.0
+                        val capNews = NewsItem(
+                            gameId = gameId,
+                            matchday = currentDay,
+                            type = NewsType.INFO,
+                            title = "New Salary Cap: $${String.format("%.1f", updatedUserTeam.salaryCap / 1_000_000.0)}M ($sign$${String.format("%.1f", absVal)}M)",
+                            body = "Based on last season's achievements, your franchise salary cap was adjusted by $sign$${String.format("%.1f", absVal)}M.\n\nKey Performance Factors:\n• " + userAdj.breakdownReasons.joinToString("\n• "),
+                            team1Id = game.userTeamId
+                        )
+                        insertNewsDirect(db, capNews.toEntity())
                     }
 
                     // CPU Renewals (0-year expiring) and Extensions (1-year remaining core stars)

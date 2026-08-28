@@ -2,6 +2,7 @@ package top.maary.basketmanager.re.engine
 
 import top.maary.basketmanager.re.domain.engine.ContractEngine
 import top.maary.basketmanager.re.domain.engine.TradeEvaluationEngine
+import top.maary.basketmanager.re.domain.engine.FinanceEngine
 
 import org.junit.Assert.*
 import org.junit.Test
@@ -510,5 +511,44 @@ class SimulationEngineTest {
             targetRoster = rosterB
         )
         assertNotNull(targetInquiry)
+    }
+
+
+    @Test
+    fun testFinanceEngineSalaryCapAdjustments() {
+        val standings = (1..30).map { i ->
+            val conf = if (i <= 15) Conference.EAST else Conference.WEST
+            val div = Division.fromId(((i - 1) % 6) + 1)
+            StandingsItem(
+                teamId = i.toLong(),
+                teamName = "Team $i",
+                conference = conf,
+                division = div,
+                gamesWon = 60 - i,
+                gamesLost = 22 + i,
+                pointsScored = 8000,
+                pointsAllowed = 7500
+            )
+        }
+
+        val championTeamId = 1L
+        val playoffSeries = listOf(
+            PlayoffSeries(id = 1, gameId = 1, conference = Conference.EAST, round = 1, seed1 = 1, seed2 = 8, team1Id = 1, team2Id = 8, team1Wins = 4, team2Wins = 1, winnerTeamId = 1),
+            PlayoffSeries(id = 2, gameId = 1, conference = Conference.EAST, round = 2, seed1 = 1, seed2 = 4, team1Id = 1, team2Id = 4, team1Wins = 4, team2Wins = 2, winnerTeamId = 1),
+            PlayoffSeries(id = 3, gameId = 1, conference = Conference.EAST, round = 3, seed1 = 1, seed2 = 2, team1Id = 1, team2Id = 2, team1Wins = 4, team2Wins = 3, winnerTeamId = 1),
+            PlayoffSeries(id = 4, gameId = 1, conference = null, round = 4, seed1 = 1, seed2 = 16, team1Id = 1, team2Id = 16, team1Wins = 4, team2Wins = 2, winnerTeamId = 1)
+        )
+
+        val adjustments = FinanceEngine.calculateSalaryCapAdjustments(standings, playoffSeries)
+
+        val champAdj = adjustments[championTeamId]
+        assertNotNull(champAdj)
+        assertEquals(7_000_000, champAdj!!.deltaSalaryCap) // +2M playoff +1M div +1M semis +1M confFinals +1M finals +1M champ
+        assertTrue(champAdj.breakdownReasons.any { it.contains("总冠军") })
+
+        val bottomTeamId = 15L // 15th in East, rank 5 in Division
+        val botAdj = adjustments[bottomTeamId]
+        assertNotNull(botAdj)
+        assertTrue(botAdj!!.deltaSalaryCap <= -3_000_000)
     }
 }
