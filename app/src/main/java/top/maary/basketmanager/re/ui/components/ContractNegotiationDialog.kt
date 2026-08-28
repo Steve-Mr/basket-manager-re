@@ -73,7 +73,13 @@ fun ContractNegotiationDialog(
     fun formatMoney(a: Int) = if (a >= 1_000_000) "$${String.format("%.2f", a / 1_000_000.0)}M" else "$${a / 1_000}K"
 
     val isMinContract = currentOfferedSalaryInt < 1_000_000
-    val isAffordable = capAvailable == null || currentOfferedSalaryInt <= capAvailable || isMinContract
+    // In NBA & BM15 rules: Home team renewals/extensions have Bird Rights and CAN exceed the salary cap!
+    // Free Agency market signings must respect available cap room or use the Minimum Contract Exception (< $1.0M).
+    val isAffordable = if (isHomeTeamRenewal) {
+        true
+    } else {
+        capAvailable == null || currentOfferedSalaryInt <= capAvailable || isMinContract
+    }
 
     val loyaltyQuote = if (isHomeTeamRenewal) {
         when (player.loyalty) {
@@ -175,50 +181,71 @@ fun ContractNegotiationDialog(
                     }
                 }
 
-                // Cap Space and Minimum Contract Exception Status
-                if (capAvailable != null) {
-                    if (!isAffordable) {
-                        Surface(shape = RoundedCornerShape(6.dp), color = RatingRed.copy(alpha = 0.15f)) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Text("⚠️", fontSize = 12.sp)
-                                Text(
-                                    text = "Exceeds Cap Space: ${formatMoney(capAvailable)} available. (Must be < $1.0M for Minimum Exception)",
-                                    color = RatingRed,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    } else if (isMinContract) {
+                // Cap Space, Bird Rights, and Minimum Exception Status
+                if (isHomeTeamRenewal) {
+                    if (capAvailable != null && currentOfferedSalaryInt > capAvailable) {
                         Surface(shape = RoundedCornerShape(4.dp), color = RatingGreen.copy(alpha = 0.15f)) {
                             Text(
-                                text = "⚡ Minimum Contract Exception (< $1.0M): Allowed under salary cap rules",
+                                text = "⚡ Bird Rights (Hometown Exception): Allowed to re-sign own players over salary cap",
                                 color = RatingGreen,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
                         }
-                    } else {
+                    } else if (capAvailable != null) {
                         Text(
-                            text = "Team Cap Space: ${formatMoney(capAvailable)} available",
+                            text = "Team Cap Room: ${formatMoney(capAvailable)} available",
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                } else if (isMinContract) {
-                    Surface(shape = RoundedCornerShape(4.dp), color = RatingGreen.copy(alpha = 0.15f)) {
-                        Text(
-                            text = "⚡ Minimum Contract Exception (< $1.0M): Allowed even if over cap",
-                            color = RatingGreen,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
+                } else {
+                    // Free Agency Open Market signing checks
+                    if (capAvailable != null) {
+                        if (!isAffordable) {
+                            Surface(shape = RoundedCornerShape(6.dp), color = RatingRed.copy(alpha = 0.15f)) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text("⚠️", fontSize = 12.sp)
+                                    Text(
+                                        text = "Exceeds Cap Space: ${formatMoney(capAvailable)} available. (Must be < $1.0M for Minimum Exception)",
+                                        color = RatingRed,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        } else if (isMinContract) {
+                            Surface(shape = RoundedCornerShape(4.dp), color = RatingGreen.copy(alpha = 0.15f)) {
+                                Text(
+                                    text = "⚡ Minimum Contract Exception (< $1.0M): Allowed under salary cap rules",
+                                    color = RatingGreen,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        } else {
+                            Text(
+                                text = "Team Cap Space: ${formatMoney(capAvailable)} available",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    } else if (isMinContract) {
+                        Surface(shape = RoundedCornerShape(4.dp), color = RatingGreen.copy(alpha = 0.15f)) {
+                            Text(
+                                text = "⚡ Minimum Contract Exception (< $1.0M): Allowed even if over cap",
+                                color = RatingGreen,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
                     }
                 }
 

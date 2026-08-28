@@ -1148,7 +1148,7 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
                     }
                 }
 
-                // Season Finish & Player Aging / Retirements (Matchday 226)
+                // Season Finish, Retirements, and Salary Cap Performance Adjustments (Matchday 226)
                 currentDay == 226 -> {
                     val (active, retired) = PlayerDevelopmentEngine.handleSeasonRetirements(allPlayers)
                     active.forEach { p ->
@@ -1165,10 +1165,8 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
                         body = "${retired.size} veteran players retired from the league. Contract years decremented."
                     )
                     insertNewsDirect(db, news.toEntity())
-                }
 
-                // Contract Renewals & Authentic BM15 Salary Cap Performance Adjustments (Matchday 227..229)
-                currentDay == 227 -> {
+                    // Calculate & Apply New Season Salary Caps Immediately on Day 226
                     val standings = getStandings(gameId)
                     val seriesList = getPlayoffSeries(gameId)
                     val adjustments = FinanceEngine.calculateSalaryCapAdjustments(standings, seriesList)
@@ -1195,7 +1193,10 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
                         )
                         insertNewsDirect(db, capNews.toEntity())
                     }
+                }
 
+                // Contract Renewals (Matchdays 227..229)
+                currentDay in 227..229 -> {
                     // CPU Renewals (0-year expiring) and Extensions (1-year remaining core stars)
                     val allPlayers = getPlayers(gameId)
                     val cpuTeams = getTeams(gameId).filter { it.id != game.userTeamId }
