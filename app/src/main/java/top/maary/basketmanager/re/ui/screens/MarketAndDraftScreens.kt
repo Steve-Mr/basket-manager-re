@@ -9,6 +9,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -231,5 +233,168 @@ fun FreeAgencyScreen(
 fun DraftScreen(
     viewModel: GameDashboardViewModel
 ) {
-    LiveDraftCeremonyScreen(viewModel = viewModel)
+    val game by viewModel.game.collectAsState()
+    val draftProspects by viewModel.draftProspects.collectAsState()
+    var selectedPlayerForDetail by remember { mutableStateOf<Player?>(null) }
+    var selectedPositionFilter by remember { mutableStateOf<Position?>(null) }
+
+    LaunchedEffect(game?.id) {
+        viewModel.getDraftProspects { /* Loaded */ }
+    }
+
+    val filteredProspects = remember(draftProspects, selectedPositionFilter) {
+        if (selectedPositionFilter == null) draftProspects
+        else draftProspects.filter { it.positionFirst == selectedPositionFilter || it.positionSecond == selectedPositionFilter }
+    }
+
+    val currentSeason = game?.currentSeason ?: 1
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 14.dp, vertical = 8.dp)
+    ) {
+        // TOP SCOUTING HEADER
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Rookie Class Scouting Board",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                    Text(
+                        text = "Season $currentSeason Draft Class • Ceremony will take place on Offseason Day 230.",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Text(
+                        text = "SCOUTING (${draftProspects.size})",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Position Filter Chips
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            FilterChip(
+                selected = selectedPositionFilter == null,
+                onClick = { selectedPositionFilter = null },
+                label = { Text("All (${draftProspects.size})", fontSize = 11.sp) }
+            )
+            Position.entries.filter { it != Position.NONE }.forEach { pos ->
+                val count = draftProspects.count { it.positionFirst == pos || it.positionSecond == pos }
+                FilterChip(
+                    selected = selectedPositionFilter == pos,
+                    onClick = { selectedPositionFilter = if (selectedPositionFilter == pos) null else pos },
+                    label = { Text("${pos.shortName} ($count)", fontSize = 11.sp) }
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        // Prospects List
+        if (filteredProspects.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("No draft prospects matching filter.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                itemsIndexed(filteredProspects) { index, prospect ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { selectedPlayerForDetail = prospect },
+                        shape = RoundedCornerShape(8.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                    modifier = Modifier.width(32.dp)
+                                ) {
+                                    Text(
+                                        text = "#${index + 1}",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                        modifier = Modifier.padding(vertical = 2.dp)
+                                    )
+                                }
+                                RatingBadge(rating = prospect.overallRating, size = 28)
+                                PositionBadge(position = prospect.positionFirst)
+                                Column {
+                                    Text(text = prospect.name, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    Text(
+                                        text = "Age ${prospect.age} • Potential ★${prospect.potential} • ${if (index < 14) "Lottery Projected" else if (index < 30) "1st Round" else "2nd Round"}",
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+
+                            Icon(
+                                Icons.Default.Info,
+                                contentDescription = "Scout Player",
+                                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    selectedPlayerForDetail?.let { player ->
+        PlayerDetailBottomSheet(
+            player = player,
+            stats = viewModel.getPlayerSeasonStats(player.id),
+            playoffStats = viewModel.getPlayerPlayoffStats(player.id),
+            onDismiss = { selectedPlayerForDetail = null }
+        )
+    }
 }

@@ -113,54 +113,7 @@ fun LiveDraftCeremonyScreen(
             .fillMaxSize()
             .padding(horizontal = 12.dp, vertical = 6.dp)
     ) {
-        val isDraftDay = (game?.currentMatchday ?: 1) == 230
-        val isDraftConcluded = (game?.currentMatchday ?: 1) > 230
-
-        if (!isDraftDay) {
-            // SCOUTING BIG BOARD HEADER (During Regular Season & Non-Draft Days)
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(10.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text(
-                                text = "Rookie Class Scouting Board",
-                                fontWeight = FontWeight.ExtraBold,
-                                fontSize = 13.sp
-                            )
-                        }
-                        Text(
-                            text = if (isDraftConcluded) "Draft completed for Season ${game?.currentSeason ?: 1}."
-                            else "Season ${game?.currentSeason ?: 1} Draft Ceremony will take place on Offseason Day 230.",
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = if (isDraftConcluded) RatingGreen.copy(alpha = 0.2f) else MaterialTheme.colorScheme.primaryContainer
-                    ) {
-                        Text(
-                            text = if (isDraftConcluded) "CONCLUDED" else "SCOUTING ONLY",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = if (isDraftConcluded) RatingGreen else MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
-                    }
-                }
-            }
-        } else {
+        // ACTIVE LIVE ON-THE-CLOCK DRAFT CONTROLLER HEADER
             // ACTIVE LIVE ON-THE-CLOCK DRAFT CONTROLLER HEADER (ONLY ON DAY 230)
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -306,7 +259,6 @@ fun LiveDraftCeremonyScreen(
                     }
                 }
             }
-        }
 
         Spacer(modifier = Modifier.height(6.dp))
 
@@ -416,7 +368,7 @@ fun LiveDraftCeremonyScreen(
                                     }
                                 }
 
-                                if (isDraftDay && isUserOnTheClock) {
+                                if (isUserOnTheClock) {
                                     IconButton(
                                         onClick = { confirmDraftPlayer = prospect },
                                         modifier = Modifier.size(32.dp)
