@@ -576,22 +576,16 @@ fun DashboardScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.Top
                 ) {
-                    // News Icon Badge Container (Left Column)
-                    Box(
+                    // News Icon (Left Column, directly clipped with smooth rounded corners)
+                    Image(
+                        painter = painterResource(id = iconRes),
+                        contentDescription = null,
                         modifier = Modifier
-                            .size(50.dp)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(borderColor.copy(alpha = 0.15f))
-                            .border(1.dp, borderColor.copy(alpha = 0.35f), RoundedCornerShape(10.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Image(
-                            painter = painterResource(id = iconRes),
-                            contentDescription = null,
-                            modifier = Modifier.size(38.dp),
-                            contentScale = ContentScale.Fit
-                        )
-                    }
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .border(1.dp, borderColor.copy(alpha = 0.4f), RoundedCornerShape(8.dp)),
+                        contentScale = ContentScale.Crop
+                    )
 
                     // Content (Right Column)
                     Column(
