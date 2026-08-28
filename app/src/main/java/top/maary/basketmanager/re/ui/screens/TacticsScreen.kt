@@ -257,11 +257,7 @@ fun TacticsScreen(
                     )
                     TextButton(
                         onClick = {
-                            val updated = when (starIdx) {
-                                1 -> tactic.copy(starOnePlayerId = null)
-                                2 -> tactic.copy(starTwoPlayerId = null)
-                                else -> tactic.copy(starThreePlayerId = null)
-                            }
+                            val updated = tactic.assignStar(starIdx, null)
                             viewModel.updateTactic(updated)
                             selectedStarIndexForEdit = null
                         }
@@ -283,11 +279,7 @@ fun TacticsScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
-                                    val updated = when (starIdx) {
-                                        1 -> tactic.copy(starOnePlayerId = player.id)
-                                        2 -> tactic.copy(starTwoPlayerId = player.id)
-                                        else -> tactic.copy(starThreePlayerId = player.id)
-                                    }
+                                    val updated = tactic.assignStar(starIdx, player.id)
                                     viewModel.updateTactic(updated)
                                     selectedStarIndexForEdit = null
                                 },

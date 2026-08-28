@@ -345,4 +345,64 @@ class SimulationEngineTest {
         assertTrue(213 in finalsGameDays)
         assertTrue(225 in finalsGameDays)
     }
+
+
+    @Test
+    fun testTacticSlotSwappingNoDuplicates() {
+        val initialTactic = Tactic(
+            starterPgId = 1L,
+            starterSgId = 2L,
+            starterSfId = 3L,
+            starterPfId = 4L,
+            starterCId = 5L,
+            reservePgId = 6L,
+            reserveSgId = 7L,
+            reserveSfId = 8L,
+            reservePfId = 9L,
+            reserveCId = 10L
+        )
+
+        // 1. Swap starter PG (1) with starter SG (2)
+        val swappedStarters = initialTactic.assignPlayerToSlot(LineupSlot.STARTER_SG, 1L)
+        assertEquals(1L, swappedStarters.starterSgId)
+        assertEquals(2L, swappedStarters.starterPgId)
+        assertEquals(3L, swappedStarters.starterSfId)
+        // Ensure no duplicate IDs in rotation
+        assertEquals(10, swappedStarters.rotationIds.distinct().size)
+
+        // 2. Swap starter SF (3) with reserve SF (8)
+        val swappedStarterReserve = swappedStarters.assignPlayerToSlot(LineupSlot.RESERVE_SF, 3L)
+        assertEquals(3L, swappedStarterReserve.reserveSfId)
+        assertEquals(8L, swappedStarterReserve.starterSfId)
+        assertEquals(10, swappedStarterReserve.rotationIds.distinct().size)
+
+        // 3. Assign unassigned bench player (99L) into Starter C (5L)
+        val assignedBench = swappedStarterReserve.assignPlayerToSlot(LineupSlot.STARTER_C, 99L)
+        assertEquals(99L, assignedBench.starterCId)
+        // Player 5 is now replaced and not in rotation
+        assertFalse(assignedBench.rotationIds.contains(5L))
+        assertTrue(assignedBench.rotationIds.contains(99L))
+        assertEquals(10, assignedBench.rotationIds.distinct().size)
+    }
+
+    @Test
+    fun testTacticStarSwappingNoDuplicates() {
+        val tactic = Tactic(
+            starOnePlayerId = 10L,
+            starTwoPlayerId = 20L,
+            starThreePlayerId = 30L
+        )
+
+        // Assign Star 1 (10L) to Star 2
+        val swappedStars = tactic.assignStar(2, 10L)
+        assertEquals(10L, swappedStars.starTwoPlayerId)
+        assertEquals(20L, swappedStars.starOnePlayerId)
+        assertEquals(30L, swappedStars.starThreePlayerId)
+        assertEquals(3, swappedStars.starIds.distinct().size)
+
+        // Clear star 3
+        val clearedStar = swappedStars.assignStar(3, null)
+        assertNull(clearedStar.starThreePlayerId)
+        assertEquals(2, clearedStar.starIds.size)
+    }
 }

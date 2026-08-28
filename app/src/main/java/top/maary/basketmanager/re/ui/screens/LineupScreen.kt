@@ -18,24 +18,14 @@ import androidx.compose.ui.unit.sp
 import top.maary.basketmanager.re.domain.model.Player
 import top.maary.basketmanager.re.domain.model.Position
 import top.maary.basketmanager.re.domain.model.Tactic
+import top.maary.basketmanager.re.domain.model.LineupSlot
 import top.maary.basketmanager.re.ui.components.PlayerDetailBottomSheet
 import top.maary.basketmanager.re.ui.components.PositionBadge
 import top.maary.basketmanager.re.ui.components.RatingBadge
 import top.maary.basketmanager.re.ui.theme.RatingGreen
 import top.maary.basketmanager.re.ui.viewmodel.GameDashboardViewModel
 
-enum class LineupSlot(val title: String, val position: Position, val isStarter: Boolean) {
-    STARTER_PG("Point Guard", Position.PG, true),
-    STARTER_SG("Shooting Guard", Position.SG, true),
-    STARTER_SF("Small Forward", Position.SF, true),
-    STARTER_PF("Power Forward", Position.PF, true),
-    STARTER_C("Center", Position.C, true),
-    RESERVE_PG("Backup PG", Position.PG, false),
-    RESERVE_SG("Backup SG", Position.SG, false),
-    RESERVE_SF("Backup SF", Position.SF, false),
-    RESERVE_PF("Backup PF", Position.PF, false),
-    RESERVE_C("Backup C", Position.C, false)
-}
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -526,17 +516,6 @@ private fun applySlotAssignment(
     viewModel: GameDashboardViewModel
 ) {
     val current = tactic ?: return
-    val updated = when (slot) {
-        LineupSlot.STARTER_PG -> current.copy(starterPgId = playerId)
-        LineupSlot.STARTER_SG -> current.copy(starterSgId = playerId)
-        LineupSlot.STARTER_SF -> current.copy(starterSfId = playerId)
-        LineupSlot.STARTER_PF -> current.copy(starterPfId = playerId)
-        LineupSlot.STARTER_C -> current.copy(starterCId = playerId)
-        LineupSlot.RESERVE_PG -> current.copy(reservePgId = playerId)
-        LineupSlot.RESERVE_SG -> current.copy(reserveSgId = playerId)
-        LineupSlot.RESERVE_SF -> current.copy(reserveSfId = playerId)
-        LineupSlot.RESERVE_PF -> current.copy(reservePfId = playerId)
-        LineupSlot.RESERVE_C -> current.copy(reserveCId = playerId)
-    }
+    val updated = current.assignPlayerToSlot(slot, playerId)
     viewModel.updateTactic(updated)
 }
