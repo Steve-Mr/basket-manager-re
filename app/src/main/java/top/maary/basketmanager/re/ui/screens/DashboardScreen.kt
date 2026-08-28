@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import top.maary.basketmanager.re.R
 import androidx.compose.ui.text.font.FontWeight
@@ -564,77 +565,91 @@ fun DashboardScreen(
                             selectedPlayerForDetail = playerMap[news.playerId]
                         }
                     },
-                shape = RoundedCornerShape(10.dp),
-                border = BorderStroke(1.dp, borderColor),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, borderColor.copy(alpha = 0.5f)),
                 colors = CardDefaults.cardColors(containerColor = bgColor)
             ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    // News Icon Badge Container (Left Column)
+                    Box(
+                        modifier = Modifier
+                            .size(50.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(borderColor.copy(alpha = 0.15f))
+                            .border(1.dp, borderColor.copy(alpha = 0.35f), RoundedCornerShape(10.dp)),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(32.dp)
-                                .clip(CircleShape)
-                                .background(bgColor)
-                                .border(1.dp, borderColor.copy(alpha = 0.5f), CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Image(
-                                painter = painterResource(id = iconRes),
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
+                        Image(
+                            painter = painterResource(id = iconRes),
+                            contentDescription = null,
+                            modifier = Modifier.size(38.dp),
+                            contentScale = ContentScale.Fit
+                        )
+                    }
 
-                        Spacer(modifier = Modifier.width(10.dp))
-
+                    // Content (Right Column)
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        // Header Row: Title & Matchday
                         Row(
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
                                 text = news.title,
                                 fontWeight = FontWeight.Bold,
-                                style = MaterialTheme.typography.bodyMedium,
+                                style = MaterialTheme.typography.titleSmall,
                                 color = titleColor,
                                 modifier = Modifier.weight(1f, fill = false)
                             )
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = "Day ${news.matchday}",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                    }
-                    Spacer(modifier = Modifier.height(6.dp))
 
-                    val rawLines = news.body.replace("\\n", "\n").lines()
-                    rawLines.forEach { line ->
-                        if (line.isNotBlank()) {
-                            if (line.startsWith("⭐ MVP:") || line.startsWith("1.") || line.startsWith("2.") || line.startsWith("3.")) {
-                                Text(
-                                    text = line,
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 12.sp,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.padding(vertical = 1.dp)
-                                )
-                            } else if (line.contains("🏀") || line.contains("🛡️") || line.contains("🎯") || line.contains("⚡") || line.contains("🚫")) {
-                                Text(
-                                    text = line,
-                                    fontSize = 12.sp,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.padding(vertical = 1.dp)
-                                )
-                            } else {
-                                Text(
-                                    text = line,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    lineHeight = 16.sp
-                                )
+                        Spacer(modifier = Modifier.height(2.dp))
+
+                        // Body Lines
+                        val rawLines = news.body.replace("\\n", "\n").lines()
+                        rawLines.forEachIndexed { index, line ->
+                            if (line.isNotBlank()) {
+                                if (index == 0 && (news.type == NewsType.WON || news.type == NewsType.LOST || news.type == NewsType.PLAYOFFS) && (line.contains(" @ ") || line.contains(" vs "))) {
+                                    Text(
+                                        text = line,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.padding(bottom = 2.dp)
+                                    )
+                                } else if (line.startsWith("MVP:") || line.startsWith("1.") || line.startsWith("2.") || line.startsWith("3.")) {
+                                    Text(
+                                        text = line,
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(vertical = 0.5.dp)
+                                    )
+                                } else {
+                                    Text(
+                                        text = line,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontSize = 12.sp,
+                                        lineHeight = 16.sp,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
+                                    )
+                                }
                             }
                         }
                     }

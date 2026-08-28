@@ -37,8 +37,8 @@ object AwardsEngine {
         return NewsItem(
             gameId = topMvp.gameId,
             matchday = 167,
-            type = NewsType.INFO,
-            title = "🏆 Most Valuable Players (MVP)",
+            type = NewsType.TROPHY,
+            title = "Most Valuable Players (MVP)",
             body = bodyBuilder.toString().trimEnd(),
             team1Id = topMvp.teamId,
             playerId = topMvp.id
@@ -78,8 +78,8 @@ object AwardsEngine {
         return NewsItem(
             gameId = topRoy.gameId,
             matchday = 167,
-            type = NewsType.INFO,
-            title = "⭐ Rookies of the Year (ROY)",
+            type = NewsType.TROPHY,
+            title = "Rookies of the Year (ROY)",
             body = bodyBuilder.toString().trimEnd(),
             team1Id = topRoy.teamId,
             playerId = topRoy.id

@@ -241,34 +241,42 @@ object MatchSimulationEngine {
                 if (userWon) "Victory: ${updatedMatch.name}" else "Defeat: ${updatedMatch.name}"
             }
 
-            val localScores = finalBoxScores.filter { bs -> localPlayers.any { it.id == bs.playerId } }
-            val visitorScores = finalBoxScores.filter { bs -> visitorPlayers.any { it.id == bs.playerId } }
+            val topPtsBs = finalBoxScores.maxByOrNull { it.points }
+            val topRebBs = finalBoxScores.maxByOrNull { it.rebounds }
+            val topAstBs = finalBoxScores.maxByOrNull { it.passesOk }
+            val topStlBs = finalBoxScores.maxByOrNull { it.steals }
+            val topBlkBs = finalBoxScores.maxByOrNull { it.blocks }
 
-            val localTopPts = localScores.maxByOrNull { it.points }
-            val visitorTopPts = visitorScores.maxByOrNull { it.points }
+            fun getPlayerInfo(bs: MatchResult?): Pair<String, String> {
+                if (bs == null) return Pair("N/A", "N/A")
+                val p = allSimulatedPlayers.find { it.id == bs.playerId }
+                val tName = if (localPlayers.any { it.id == bs.playerId }) localTeam.name else visitorTeam.name
+                val pName = p?.shortName ?: bs.playerName
+                return Pair(pName, tName)
+            }
 
-            val localTopReb = localScores.maxByOrNull { it.rebounds }
-            val visitorTopReb = visitorScores.maxByOrNull { it.rebounds }
+            val (mvpName, mvpTeam) = if (mvpPlayer != null) {
+                val tName = if (localPlayers.any { it.id == mvpPlayer.id }) localTeam.name else visitorTeam.name
+                Pair(mvpPlayer.shortName, tName)
+            } else {
+                Pair("N/A", "N/A")
+            }
 
-            val localTopAst = localScores.maxByOrNull { it.passesOk }
-            val visitorTopAst = visitorScores.maxByOrNull { it.passesOk }
+            val (ptsName, ptsTeam) = getPlayerInfo(topPtsBs)
+            val (rebName, rebTeam) = getPlayerInfo(topRebBs)
+            val (astName, astTeam) = getPlayerInfo(topAstBs)
+            val (stlName, stlTeam) = getPlayerInfo(topStlBs)
+            val (blkName, blkTeam) = getPlayerInfo(topBlkBs)
 
-            val localTopStl = localScores.maxByOrNull { it.steals }
-            val visitorTopStl = visitorScores.maxByOrNull { it.steals }
+            val matchLine = updatedMatch.name
+            val mvpLine = "MVP: $mvpName ($mvpTeam)  PER: ${String.format(java.util.Locale.US, "%.2f", bestPerResult?.per ?: 0.0)}"
+            val ptsLine = "Points: $ptsName ($ptsTeam), ${topPtsBs?.points ?: 0}"
+            val rebLine = "Rebounds: $rebName ($rebTeam), ${topRebBs?.rebounds ?: 0}"
+            val astLine = "Assists: $astName ($astTeam), ${topAstBs?.passesOk ?: 0}"
+            val stlLine = "Steals: $stlName ($stlTeam), ${topStlBs?.steals ?: 0}"
+            val blkLine = "Blocks: $blkName ($blkTeam), ${topBlkBs?.blocks ?: 0}"
 
-            val localTopBlk = localScores.maxByOrNull { it.blocks }
-            val visitorTopBlk = visitorScores.maxByOrNull { it.blocks }
-
-            val mvpTeamName = if (mvpPlayer != null && localPlayers.any { it.id == mvpPlayer.id }) localTeam.name else visitorTeam.name
-            val mvpLine = "⭐ MVP: ${mvpPlayer?.shortName ?: "N/A"} ($mvpTeamName) • PER ${String.format("%.1f", bestPerResult?.per ?: 0.0)} (${bestPerResult?.points ?: 0} PTS, ${bestPerResult?.rebounds ?: 0} REB, ${bestPerResult?.passesOk ?: 0} AST)"
-
-            val ptsLine = "🏀 PTS: ${localTopPts?.playerName ?: "N/A"} (${localTeam.name}) ${localTopPts?.points ?: 0}  |  ${visitorTopPts?.playerName ?: "N/A"} (${visitorTeam.name}) ${visitorTopPts?.points ?: 0}"
-            val rebLine = "🛡️ REB: ${localTopReb?.playerName ?: "N/A"} (${localTeam.name}) ${localTopReb?.rebounds ?: 0}  |  ${visitorTopReb?.playerName ?: "N/A"} (${visitorTeam.name}) ${visitorTopReb?.rebounds ?: 0}"
-            val astLine = "🎯 AST: ${localTopAst?.playerName ?: "N/A"} (${localTeam.name}) ${localTopAst?.passesOk ?: 0}  |  ${visitorTopAst?.playerName ?: "N/A"} (${visitorTeam.name}) ${visitorTopAst?.passesOk ?: 0}"
-            val stlLine = "⚡ STL: ${localTopStl?.playerName ?: "N/A"} (${localTeam.name}) ${localTopStl?.steals ?: 0}  |  ${visitorTopStl?.playerName ?: "N/A"} (${visitorTeam.name}) ${visitorTopStl?.steals ?: 0}"
-            val blkLine = "🚫 BLK: ${localTopBlk?.playerName ?: "N/A"} (${localTeam.name}) ${localTopBlk?.blocks ?: 0}  |  ${visitorTopBlk?.playerName ?: "N/A"} (${visitorTeam.name}) ${visitorTopBlk?.blocks ?: 0}"
-
-            val body = "$mvpLine\n$ptsLine\n$rebLine\n$astLine\n$stlLine\n$blkLine"
+            val body = "$matchLine\n$mvpLine\n$ptsLine\n$rebLine\n$astLine\n$stlLine\n$blkLine"
 
             newsItems.add(
                 NewsItem(
@@ -294,9 +302,9 @@ object MatchSimulationEngine {
                     NewsItem(
                         gameId = match.gameId,
                         matchday = match.matchday,
-                        type = NewsType.INFO,
-                        title = "Triple Double! 🌟",
-                        body = "${pObj.name} (${pTeam.name}) recorded a Triple-Double with ${bs.points} PTS, ${bs.rebounds} REB, and ${bs.passesOk} AST in ${updatedMatch.name}.",
+                        type = NewsType.MVP,
+                        title = "Triple Double!",
+                        body = "${pObj.shortName} (${pTeam.name}) recorded a Triple-Double with ${bs.points} PTS, ${bs.rebounds} REB, and ${bs.passesOk} AST in ${updatedMatch.name}.",
                         team1Id = pTeam.id,
                         playerId = pObj.id
                     )
@@ -306,9 +314,9 @@ object MatchSimulationEngine {
                     NewsItem(
                         gameId = match.gameId,
                         matchday = match.matchday,
-                        type = NewsType.INFO,
-                        title = "50+ Point Explosion! 🔥",
-                        body = "${pObj.name} (${pTeam.name}) scored ${bs.points} points in ${updatedMatch.name}.",
+                        type = NewsType.MVP,
+                        title = "50+ Point Game!",
+                        body = "${pObj.shortName} (${pTeam.name}) scored ${bs.points} points in ${updatedMatch.name}.",
                         team1Id = pTeam.id,
                         playerId = pObj.id
                     )
@@ -318,9 +326,9 @@ object MatchSimulationEngine {
                     NewsItem(
                         gameId = match.gameId,
                         matchday = match.matchday,
-                        type = NewsType.INFO,
-                        title = "Awesome game! 🚀",
-                        body = "${pObj.name} (${pTeam.name}) had an awesome game with ${bs.points} PTS, ${bs.rebounds} REB, ${bs.passesOk} AST, ${bs.steals} STL, ${bs.blocks} BLK (PER ${String.format("%.1f", bs.per)}) in ${bs.minutesPlayed} mins in ${updatedMatch.name}.",
+                        type = NewsType.MVP,
+                        title = "Awesome Game!",
+                        body = "${pObj.shortName} (${pTeam.name}) had an awesome game with ${bs.points} PTS, ${bs.rebounds} REB, ${bs.passesOk} AST, ${bs.steals} STL, ${bs.blocks} BLK (PER ${String.format(java.util.Locale.US, "%.2f", bs.per)}) in ${bs.minutesPlayed} mins in ${updatedMatch.name}.",
                         team1Id = pTeam.id,
                         playerId = pObj.id
                     )
@@ -330,9 +338,9 @@ object MatchSimulationEngine {
                     NewsItem(
                         gameId = match.gameId,
                         matchday = match.matchday,
-                        type = NewsType.INFO,
-                        title = "Lot of rebounds! 🛡️",
-                        body = "${pObj.name} (${pTeam.name}) grabbed ${bs.rebounds} rebounds in ${updatedMatch.name}.",
+                        type = NewsType.MVP,
+                        title = "Lot of Rebounds!",
+                        body = "${pObj.shortName} (${pTeam.name}) grabbed ${bs.rebounds} rebounds in ${updatedMatch.name}.",
                         team1Id = pTeam.id,
                         playerId = pObj.id
                     )
@@ -342,9 +350,9 @@ object MatchSimulationEngine {
                     NewsItem(
                         gameId = match.gameId,
                         matchday = match.matchday,
-                        type = NewsType.INFO,
-                        title = "Lot of assists! 🎯",
-                        body = "${pObj.name} (${pTeam.name}) dished out ${bs.passesOk} assists in ${updatedMatch.name}.",
+                        type = NewsType.MVP,
+                        title = "Lot of Assists!",
+                        body = "${pObj.shortName} (${pTeam.name}) dished out ${bs.passesOk} assists in ${updatedMatch.name}.",
                         team1Id = pTeam.id,
                         playerId = pObj.id
                     )
