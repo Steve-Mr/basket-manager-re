@@ -59,7 +59,7 @@ fun VerticalPlayoffBracketView(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
         contentPadding = PaddingValues(bottom = 28.dp)
     ) {
         // =========================================================
@@ -69,50 +69,86 @@ fun VerticalPlayoffBracketView(
             ConferenceHeaderCard(
                 conferenceName = "WESTERN CONFERENCE (西部赛区)",
                 color = Color(0xFF1976D2),
-                directionText = "⬇ 向中心总决赛晋级"
+                directionText = "⬇ 向中心总决赛汇聚"
             )
         }
 
-        // WEST ROUND 1 (4 Matchups arranged in 2x2 Grid)
+        // WEST ROUND 1: All 4 matchups aligned in pairs across the single row
         item {
             Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = "WEST FIRST ROUND (首轮 • 4组对决)",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1976D2)
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "WEST FIRST ROUND (首轮 • 4组对决)",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF1976D2)
+                    )
+                    Text(
+                        text = "半区A (1v8, 4v5) | 半区B (2v7, 3v6)",
+                        fontSize = 9.sp,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
                 Spacer(modifier = Modifier.height(4.dp))
-                if (isPlayoffsStarted && westR1.size >= 4) {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Box(modifier = Modifier.weight(1f)) { BracketMatchupBox(westR1[0], teamMap, userTeamId, onSeriesClick) }
-                        Box(modifier = Modifier.weight(1f)) { BracketMatchupBox(westR1[1], teamMap, userTeamId, onSeriesClick) }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    // Branch A (Winner 1v8 vs Winner 4v5 -> Semis 1)
+                    Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .background(Color(0xFF1976D2).copy(alpha = 0.06f), RoundedCornerShape(8.dp))
+                            .padding(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        if (isPlayoffsStarted && westR1.size >= 4) {
+                            Box(modifier = Modifier.weight(1f)) { CompactMatchupBox(westR1[0], teamMap, userTeamId, onSeriesClick) }
+                            Box(modifier = Modifier.weight(1f)) { CompactMatchupBox(westR1[1], teamMap, userTeamId, onSeriesClick) }
+                        } else if (westStandings.size >= 8) {
+                            Box(modifier = Modifier.weight(1f)) { CompactProjectedMatchupBox(westStandings[0], westStandings[7], 1, 8, userTeamId) }
+                            Box(modifier = Modifier.weight(1f)) { CompactProjectedMatchupBox(westStandings[3], westStandings[4], 4, 5, userTeamId) }
+                        }
                     }
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Box(modifier = Modifier.weight(1f)) { BracketMatchupBox(westR1[2], teamMap, userTeamId, onSeriesClick) }
-                        Box(modifier = Modifier.weight(1f)) { BracketMatchupBox(westR1[3], teamMap, userTeamId, onSeriesClick) }
-                    }
-                } else if (westStandings.size >= 8) {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Box(modifier = Modifier.weight(1f)) { ProjectedMatchupBox(westStandings[0], westStandings[7], 1, 8, userTeamId) }
-                        Box(modifier = Modifier.weight(1f)) { ProjectedMatchupBox(westStandings[3], westStandings[4], 4, 5, userTeamId) }
-                    }
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Box(modifier = Modifier.weight(1f)) { ProjectedMatchupBox(westStandings[2], westStandings[5], 3, 6, userTeamId) }
-                        Box(modifier = Modifier.weight(1f)) { ProjectedMatchupBox(westStandings[1], westStandings[6], 2, 7, userTeamId) }
+
+                    // Branch B (Winner 2v7 vs Winner 3v6 -> Semis 2)
+                    Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .background(Color(0xFF1976D2).copy(alpha = 0.06f), RoundedCornerShape(8.dp))
+                            .padding(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        if (isPlayoffsStarted && westR1.size >= 4) {
+                            Box(modifier = Modifier.weight(1f)) { CompactMatchupBox(westR1[2], teamMap, userTeamId, onSeriesClick) }
+                            Box(modifier = Modifier.weight(1f)) { CompactMatchupBox(westR1[3], teamMap, userTeamId, onSeriesClick) }
+                        } else if (westStandings.size >= 8) {
+                            Box(modifier = Modifier.weight(1f)) { CompactProjectedMatchupBox(westStandings[1], westStandings[6], 2, 7, userTeamId) }
+                            Box(modifier = Modifier.weight(1f)) { CompactProjectedMatchupBox(westStandings[2], westStandings[5], 3, 6, userTeamId) }
+                        }
                     }
                 }
             }
         }
 
-        // Arrow Down
+        // Branch Convergence Arrows to Semis
         item {
-            ConvergenceArrow(isDown = true, label = "West Semifinals ⬇")
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    ConvergenceArrow(isDown = true, label = "Semis 1 ⬇")
+                }
+                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    ConvergenceArrow(isDown = true, label = "Semis 2 ⬇")
+                }
+            }
         }
 
-        // WEST SEMIFINALS (2 Matchups side by side)
+        // WEST SEMIFINALS (2 Matchups aligned directly under Branch A and Branch B)
         item {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
@@ -127,14 +163,14 @@ fun VerticalPlayoffBracketView(
                         Box(modifier = Modifier.weight(1f)) { BracketMatchupBox(westR2[0], teamMap, userTeamId, onSeriesClick) }
                         Box(modifier = Modifier.weight(1f)) { BracketMatchupBox(westR2[1], teamMap, userTeamId, onSeriesClick) }
                     } else {
-                        Box(modifier = Modifier.weight(1f)) { EmptyMatchupBox(title = "West Semifinal #1") }
-                        Box(modifier = Modifier.weight(1f)) { EmptyMatchupBox(title = "West Semifinal #2") }
+                        Box(modifier = Modifier.weight(1f)) { EmptyMatchupBox(title = "West Semis #1 (Winner 1/8 vs 4/5)") }
+                        Box(modifier = Modifier.weight(1f)) { EmptyMatchupBox(title = "West Semis #2 (Winner 2/7 vs 3/6)") }
                     }
                 }
             }
         }
 
-        // Arrow Down
+        // Arrow Down to West Finals
         item {
             ConvergenceArrow(isDown = true, label = "West Finals ⬇")
         }
@@ -152,11 +188,11 @@ fun VerticalPlayoffBracketView(
                     color = Color(0xFF1976D2)
                 )
                 Spacer(modifier = Modifier.height(4.dp))
-                Box(modifier = Modifier.fillMaxWidth(0.85f)) {
+                Box(modifier = Modifier.fillMaxWidth(0.88f)) {
                     if (isPlayoffsStarted && westR3 != null) {
                         BracketMatchupBox(westR3, teamMap, userTeamId, onSeriesClick)
                     } else {
-                        EmptyMatchupBox(title = "West Finals Matchup (TBD)")
+                        EmptyMatchupBox(title = "West Finals (Winner Semis 1 vs Semis 2)")
                     }
                 }
             }
@@ -181,20 +217,20 @@ fun VerticalPlayoffBracketView(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(14.dp),
+                        .padding(12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Surface(
                         shape = CircleShape,
                         color = Color(0xFFFFD700),
-                        modifier = Modifier.size(44.dp)
+                        modifier = Modifier.size(42.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 Icons.Default.EmojiEvents,
                                 contentDescription = null,
                                 tint = Color.Black,
-                                modifier = Modifier.size(26.dp)
+                                modifier = Modifier.size(24.dp)
                             )
                         }
                     }
@@ -211,7 +247,7 @@ fun VerticalPlayoffBracketView(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     if (isPlayoffsStarted && finalsSeries != null) {
                         BracketMatchupBox(
@@ -229,7 +265,7 @@ fun VerticalPlayoffBracketView(
                                 color = Color(0xFFFFD700)
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
@@ -271,17 +307,17 @@ fun VerticalPlayoffBracketView(
                     color = Color(0xFFD32F2F)
                 )
                 Spacer(modifier = Modifier.height(4.dp))
-                Box(modifier = Modifier.fillMaxWidth(0.85f)) {
+                Box(modifier = Modifier.fillMaxWidth(0.88f)) {
                     if (isPlayoffsStarted && eastR3 != null) {
                         BracketMatchupBox(eastR3, teamMap, userTeamId, onSeriesClick)
                     } else {
-                        EmptyMatchupBox(title = "East Finals Matchup (TBD)")
+                        EmptyMatchupBox(title = "East Finals (Winner Semis 1 vs Semis 2)")
                     }
                 }
             }
         }
 
-        // Arrow Up
+        // Arrow Up from Semis to East Finals
         item {
             ConvergenceArrow(isDown = false, label = "East Finals ⬆")
         }
@@ -301,47 +337,83 @@ fun VerticalPlayoffBracketView(
                         Box(modifier = Modifier.weight(1f)) { BracketMatchupBox(eastR2[0], teamMap, userTeamId, onSeriesClick) }
                         Box(modifier = Modifier.weight(1f)) { BracketMatchupBox(eastR2[1], teamMap, userTeamId, onSeriesClick) }
                     } else {
-                        Box(modifier = Modifier.weight(1f)) { EmptyMatchupBox(title = "East Semifinal #1") }
-                        Box(modifier = Modifier.weight(1f)) { EmptyMatchupBox(title = "East Semifinal #2") }
+                        Box(modifier = Modifier.weight(1f)) { EmptyMatchupBox(title = "East Semis #1 (Winner 1/8 vs 4/5)") }
+                        Box(modifier = Modifier.weight(1f)) { EmptyMatchupBox(title = "East Semis #2 (Winner 2/7 vs 3/6)") }
                     }
                 }
             }
         }
 
-        // Arrow Up
+        // Arrow Up from Round 1 to Semis
         item {
-            ConvergenceArrow(isDown = false, label = "East Semifinals ⬆")
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    ConvergenceArrow(isDown = false, label = "Semis 1 ⬆")
+                }
+                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    ConvergenceArrow(isDown = false, label = "Semis 2 ⬆")
+                }
+            }
         }
 
-        // EAST ROUND 1 (4 Matchups arranged in 2x2 Grid)
+        // EAST ROUND 1: All 4 matchups aligned in pairs across the single row
         item {
             Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = "EAST FIRST ROUND (首轮 • 4组对决)",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFFD32F2F)
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "EAST FIRST ROUND (首轮 • 4组对决)",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFD32F2F)
+                    )
+                    Text(
+                        text = "半区A (1v8, 4v5) | 半区B (2v7, 3v6)",
+                        fontSize = 9.sp,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
                 Spacer(modifier = Modifier.height(4.dp))
-                if (isPlayoffsStarted && eastR1.size >= 4) {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Box(modifier = Modifier.weight(1f)) { BracketMatchupBox(eastR1[0], teamMap, userTeamId, onSeriesClick) }
-                        Box(modifier = Modifier.weight(1f)) { BracketMatchupBox(eastR1[1], teamMap, userTeamId, onSeriesClick) }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    // Branch A (Winner 1v8 vs Winner 4v5 -> Semis 1)
+                    Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .background(Color(0xFFD32F2F).copy(alpha = 0.06f), RoundedCornerShape(8.dp))
+                            .padding(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        if (isPlayoffsStarted && eastR1.size >= 4) {
+                            Box(modifier = Modifier.weight(1f)) { CompactMatchupBox(eastR1[0], teamMap, userTeamId, onSeriesClick) }
+                            Box(modifier = Modifier.weight(1f)) { CompactMatchupBox(eastR1[1], teamMap, userTeamId, onSeriesClick) }
+                        } else if (eastStandings.size >= 8) {
+                            Box(modifier = Modifier.weight(1f)) { CompactProjectedMatchupBox(eastStandings[0], eastStandings[7], 1, 8, userTeamId) }
+                            Box(modifier = Modifier.weight(1f)) { CompactProjectedMatchupBox(eastStandings[3], eastStandings[4], 4, 5, userTeamId) }
+                        }
                     }
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Box(modifier = Modifier.weight(1f)) { BracketMatchupBox(eastR1[2], teamMap, userTeamId, onSeriesClick) }
-                        Box(modifier = Modifier.weight(1f)) { BracketMatchupBox(eastR1[3], teamMap, userTeamId, onSeriesClick) }
-                    }
-                } else if (eastStandings.size >= 8) {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Box(modifier = Modifier.weight(1f)) { ProjectedMatchupBox(eastStandings[0], eastStandings[7], 1, 8, userTeamId) }
-                        Box(modifier = Modifier.weight(1f)) { ProjectedMatchupBox(eastStandings[3], eastStandings[4], 4, 5, userTeamId) }
-                    }
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Box(modifier = Modifier.weight(1f)) { ProjectedMatchupBox(eastStandings[2], eastStandings[5], 3, 6, userTeamId) }
-                        Box(modifier = Modifier.weight(1f)) { ProjectedMatchupBox(eastStandings[1], eastStandings[6], 2, 7, userTeamId) }
+
+                    // Branch B (Winner 2v7 vs Winner 3v6 -> Semis 2)
+                    Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .background(Color(0xFFD32F2F).copy(alpha = 0.06f), RoundedCornerShape(8.dp))
+                            .padding(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        if (isPlayoffsStarted && eastR1.size >= 4) {
+                            Box(modifier = Modifier.weight(1f)) { CompactMatchupBox(eastR1[2], teamMap, userTeamId, onSeriesClick) }
+                            Box(modifier = Modifier.weight(1f)) { CompactMatchupBox(eastR1[3], teamMap, userTeamId, onSeriesClick) }
+                        } else if (eastStandings.size >= 8) {
+                            Box(modifier = Modifier.weight(1f)) { CompactProjectedMatchupBox(eastStandings[1], eastStandings[6], 2, 7, userTeamId) }
+                            Box(modifier = Modifier.weight(1f)) { CompactProjectedMatchupBox(eastStandings[2], eastStandings[5], 3, 6, userTeamId) }
+                        }
                     }
                 }
             }
@@ -352,7 +424,7 @@ fun VerticalPlayoffBracketView(
             ConferenceHeaderCard(
                 conferenceName = "EASTERN CONFERENCE (东部赛区)",
                 color = Color(0xFFD32F2F),
-                directionText = "⬆ 向上中心总决赛晋级"
+                directionText = "⬆ 向上中心总决赛汇聚"
             )
         }
     }
@@ -409,12 +481,12 @@ fun ConvergenceArrow(
             if (isDown) Icons.Default.ArrowDownward else Icons.Default.ArrowUpward,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.outline,
-            modifier = Modifier.size(14.dp)
+            modifier = Modifier.size(13.dp)
         )
         Spacer(modifier = Modifier.width(4.dp))
         Text(
             text = label,
-            fontSize = 10.sp,
+            fontSize = 9.5.sp,
             color = MaterialTheme.colorScheme.outline,
             fontWeight = FontWeight.Medium
         )
@@ -513,7 +585,98 @@ fun BracketMatchupBox(
 }
 
 @Composable
-fun ProjectedMatchupBox(
+fun CompactMatchupBox(
+    series: PlayoffSeries,
+    teamMap: Map<Long, Team>,
+    userTeamId: Long?,
+    onClick: (PlayoffSeries) -> Unit
+) {
+    val team1 = teamMap[series.team1Id]
+    val team2 = teamMap[series.team2Id]
+    val isUser = series.team1Id == userTeamId || series.team2Id == userTeamId
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(6.dp))
+            .clickable { onClick(series) }
+            .then(
+                if (isUser) Modifier.border(1.2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(6.dp))
+                else Modifier
+            ),
+        shape = RoundedCornerShape(6.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Column {
+            // Team 1 Row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(if (series.winnerTeamId == series.team1Id) RatingGreen.copy(alpha = 0.22f) else Color.Transparent)
+                    .padding(horizontal = 4.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("${series.seed1}", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.outline)
+                    Text(
+                        text = team1?.name ?: "TBD",
+                        fontSize = 10.sp,
+                        fontWeight = if (series.winnerTeamId == series.team1Id) FontWeight.Black else FontWeight.Bold,
+                        color = if (series.team1Id == userTeamId) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1
+                    )
+                }
+                Text(
+                    text = "${series.team1Wins}",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = if (series.winnerTeamId == series.team1Id) RatingGreen else MaterialTheme.colorScheme.onSurface
+                )
+            }
+
+            HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+
+            // Team 2 Row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(if (series.winnerTeamId == series.team2Id) RatingGreen.copy(alpha = 0.22f) else Color.Transparent)
+                    .padding(horizontal = 4.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("${series.seed2}", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.outline)
+                    Text(
+                        text = team2?.name ?: "TBD",
+                        fontSize = 10.sp,
+                        fontWeight = if (series.winnerTeamId == series.team2Id) FontWeight.Black else FontWeight.Bold,
+                        color = if (series.team2Id == userTeamId) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1
+                    )
+                }
+                Text(
+                    text = "${series.team2Wins}",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = if (series.winnerTeamId == series.team2Id) RatingGreen else MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun CompactProjectedMatchupBox(
     t1: StandingsItem,
     t2: StandingsItem,
     seed1: Int,
@@ -522,28 +685,28 @@ fun ProjectedMatchupBox(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(6.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
     ) {
         Column {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 6.dp, vertical = 4.dp),
+                    .padding(horizontal = 4.dp, vertical = 2.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.weight(1f)) {
-                    Text("$seed1", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.outline)
+                Row(horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.weight(1f)) {
+                    Text("$seed1", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.outline)
                     Text(
                         text = t1.teamName,
-                        fontSize = 11.sp,
+                        fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         color = if (t1.teamId == userTeamId) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                         maxLines = 1
                     )
                 }
-                Text("${t1.gamesWon}W", fontSize = 10.sp, color = MaterialTheme.colorScheme.outline)
+                Text("${t1.gamesWon}", fontSize = 9.sp, color = MaterialTheme.colorScheme.outline)
             }
 
             HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
@@ -551,21 +714,21 @@ fun ProjectedMatchupBox(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 6.dp, vertical = 4.dp),
+                    .padding(horizontal = 4.dp, vertical = 2.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.weight(1f)) {
-                    Text("$seed2", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.outline)
+                Row(horizontalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.weight(1f)) {
+                    Text("$seed2", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.outline)
                     Text(
                         text = t2.teamName,
-                        fontSize = 11.sp,
+                        fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         color = if (t2.teamId == userTeamId) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                         maxLines = 1
                     )
                 }
-                Text("${t2.gamesWon}W", fontSize = 10.sp, color = MaterialTheme.colorScheme.outline)
+                Text("${t2.gamesWon}", fontSize = 9.sp, color = MaterialTheme.colorScheme.outline)
             }
         }
     }
@@ -588,7 +751,8 @@ fun EmptyMatchupBox(title: String) {
                 text = title,
                 fontSize = 10.sp,
                 color = MaterialTheme.colorScheme.outline,
-                fontWeight = FontWeight.Medium
+                fontWeight = FontWeight.Medium,
+                textAlign = TextAlign.Center
             )
         }
     }
