@@ -60,7 +60,7 @@ fun OffseasonScreen(
     var negotiationFeedback by remember { mutableStateOf<Pair<Boolean, String>?>(null) }
 
     val expiringPlayers = remember(roster) {
-        roster.filter { it.yearsContract <= 1 }
+        roster.filter { it.yearsContract == 0 }
     }
 
     val totalPayroll = remember(roster) { roster.sumOf { it.salary } }
