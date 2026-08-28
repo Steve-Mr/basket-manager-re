@@ -95,27 +95,28 @@ fun PotentialTierBadge(
     potential: Int,
     modifier: Modifier = Modifier
 ) {
-    val (bgColor, starColor, labelColor, starIcon) = when {
-        potential >= 9 -> listOf(Color(0xFFFFF8E1), Color(0xFFFFB300), Color(0xFFB45309), Icons.Default.Star) // 9-10: Full 5-point star (Superstar Gold)
-        potential >= 7 -> listOf(Color(0xFFFFF3E0), Color(0xFFFB8C00), Color(0xFFC2410C), Icons.AutoMirrored.Filled.StarHalf) // 7-8: Half-corner Star (Amber)
-        potential >= 5 -> listOf(Color(0xFFE0F2F1), Color(0xFF00897B), Color(0xFF0F766E), Icons.Default.StarOutline) // 5-6: Star Outline (Teal)
-        else -> listOf(Color(0xFFECEFF1), Color(0xFF78909C), Color(0xFF475569), Icons.Default.StarBorder) // 1-4: Star Border (Slate)
+    val (bgColor, labelColor, starDrawableId) = when {
+        potential >= 9 -> Triple(Color(0xFFFFF8E1), Color(0xFFB45309), R.drawable.star6)
+        potential >= 7 -> Triple(Color(0xFFFFF3E0), Color(0xFFC2410C), R.drawable.star5)
+        potential >= 5 -> Triple(Color(0xFFE0F2F1), Color(0xFF0F766E), R.drawable.star4)
+        potential >= 3 -> Triple(Color(0xFFE3F2FD), Color(0xFF1D4ED8), R.drawable.star3)
+        potential >= 1 -> Triple(Color(0xFFF3E8FF), Color(0xFF6D28D9), R.drawable.star2)
+        else -> Triple(Color(0xFFECEFF1), Color(0xFF475569), R.drawable.star1)
     }
 
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(10.dp),
-        color = bgColor as Color
+        color = bgColor
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 7.dp, vertical = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Icon(
-                imageVector = starIcon as androidx.compose.ui.graphics.vector.ImageVector,
+            androidx.compose.foundation.Image(
+                painter = androidx.compose.ui.res.painterResource(id = starDrawableId),
                 contentDescription = null,
-                tint = starColor as Color,
                 modifier = Modifier.size(20.dp)
             )
             Spacer(modifier = Modifier.height(2.dp))
@@ -123,7 +124,7 @@ fun PotentialTierBadge(
                 text = "$potential",
                 fontWeight = FontWeight.Black,
                 fontSize = 12.sp,
-                color = labelColor as Color
+                color = labelColor
             )
         }
     }
@@ -205,8 +206,8 @@ fun M3PlayerCard(
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        border = null,
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Row(
             modifier = Modifier
