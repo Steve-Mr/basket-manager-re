@@ -1,6 +1,5 @@
 package top.maary.basketmanager.re.ui.screens
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -21,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import top.maary.basketmanager.re.BasketManagerApplication
 import top.maary.basketmanager.re.domain.engine.DraftEngine
 import top.maary.basketmanager.re.domain.model.DraftPick
 import top.maary.basketmanager.re.domain.model.Player
@@ -45,6 +45,7 @@ data class DraftedLogItem(
 fun LiveDraftCeremonyScreen(
     viewModel: GameDashboardViewModel
 ) {
+    val repository = remember { BasketManagerApplication.instance.gameRepository }
     val game by viewModel.game.collectAsState()
     val allTeams by viewModel.allTeams.collectAsState()
     val userTeam by viewModel.userTeam.collectAsState()
@@ -57,7 +58,7 @@ fun LiveDraftCeremonyScreen(
     var draftLog by remember { mutableStateOf<List<DraftedLogItem>>(emptyList()) }
     var isSimulatingDraft by remember { mutableStateOf(false) }
 
-    var selectedTab by remember { mutableIntStateOf(0) } // 0: Big Board, 1: Draft Log, 2: Remaining Order
+    var viewMode by remember { mutableIntStateOf(0) } // 0: Available Board, 1: Draft Log
     var positionFilter by remember { mutableStateOf<Position?>(null) }
     var confirmDraftPlayer by remember { mutableStateOf<Player?>(null) }
 
@@ -69,8 +70,34 @@ fun LiveDraftCeremonyScreen(
         }
     }
 
+    fun loadDraftHistory() {
+        val g = game ?: return
+        scope.launch {
+            val news = repository.getNews(g.id).filter { it.title.startsWith("Draft Pick:") }
+            val players = repository.getPlayers(g.id).associateBy { it.id }
+            val history = news.mapNotNull { n ->
+                val pl = n.playerId?.let { players[it] } ?: return@mapNotNull null
+                val t = n.team1Id?.let { teamMap[it] }
+                DraftedLogItem(
+                    round = if (n.body.contains("Round 1")) 1 else 2,
+                    pick = Regex("#([0-9]+)").find(n.body)?.groupValues?.get(1)?.toIntOrNull() ?: 1,
+                    teamName = t?.name ?: "Team",
+                    player = pl,
+                    salary = pl.salary,
+                    years = pl.yearsContract
+                )
+            }
+            if (history.isNotEmpty()) {
+                draftLog = history
+            }
+        }
+    }
+
     LaunchedEffect(game?.id) {
-        refreshProspects()
+        viewModel.ensureDraftReady {
+            refreshProspects()
+            loadDraftHistory()
+        }
     }
 
     val currentPick = draftPicks.firstOrNull()
@@ -84,112 +111,54 @@ fun LiveDraftCeremonyScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .padding(horizontal = 12.dp, vertical = 6.dp)
     ) {
-        // Top Header
-        Row(
+        // COMPACT ON-THE-CLOCK DRAFT CONTROLLER HEADER
+        Card(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            shape = RoundedCornerShape(10.dp),
+            border = if (isUserOnTheClock) BorderStroke(1.5.dp, Color(0xFFFFD700)) else null,
+            colors = CardDefaults.cardColors(
+                containerColor = if (isUserOnTheClock) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f)
+                else MaterialTheme.colorScheme.surfaceVariant
+            )
         ) {
-            Column {
-                Text(
-                    text = "Live Rookie Draft Ceremony",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.ExtraBold
-                )
-                Text(
-                    text = "Season ${game?.currentSeason ?: 1} • 60 Total Picks (Round 1 & Round 2)",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = if (draftPicks.isEmpty()) RatingGreen.copy(alpha = 0.2f) else Color(0xFFFFD700).copy(alpha = 0.2f)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = if (draftPicks.isEmpty()) "DRAFT COMPLETED" else "LIVE ON THE CLOCK",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = if (draftPicks.isEmpty()) RatingGreen else Color(0xFFB45309),
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                )
-            }
-        }
+                if (currentPick != null) {
+                    val pickingTeam = teamMap[currentPick.currentTeamId]
+                    val (rookieSalary, rookieYears) = DraftEngine.calculateRookieSalary(currentPick.round, currentPick.position ?: 1)
 
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // On the Clock Hero Banner
-        if (currentPick != null) {
-            val pickingTeam = teamMap[currentPick.currentTeamId]
-            val (rookieSalary, rookieYears) = DraftEngine.calculateRookieSalary(currentPick.round, currentPick.position ?: 1)
-
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                border = if (isUserOnTheClock) BorderStroke(2.dp, Color(0xFFFFD700)) else null,
-                colors = CardDefaults.cardColors(
-                    containerColor = if (isUserOnTheClock) MaterialTheme.colorScheme.primaryContainer
-                    else MaterialTheme.colorScheme.surfaceVariant
-                )
-            ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                if (isUserOnTheClock) {
-                                    Text("👑", fontSize = 16.sp)
-                                    Text(
-                                        text = "YOU ARE ON THE CLOCK!",
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                        fontSize = 15.sp
-                                    )
-                                } else {
-                                    Text(
-                                        text = "ON THE CLOCK: ${pickingTeam?.name ?: "CPU Team"}",
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 15.sp
-                                    )
-                                }
-                            }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(
-                                text = "Round ${currentPick.round} • Pick #${currentPick.position ?: 1} • Contract: $${rookieSalary / 1_000_000.0}M/yr ($rookieYears Years)",
-                                fontSize = 12.sp,
-                                color = if (isUserOnTheClock) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                                else MaterialTheme.colorScheme.onSurfaceVariant
+                                text = "Pick #${currentPick.position ?: 1} (R${currentPick.round})",
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 13.sp,
+                                color = if (isUserOnTheClock) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                             )
-                        }
-
-                        if (isUserOnTheClock) {
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = MaterialTheme.colorScheme.primary
-                            ) {
-                                Text(
-                                    text = "YOUR PICK",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
+                            if (isUserOnTheClock) {
+                                Surface(shape = RoundedCornerShape(4.dp), color = MaterialTheme.colorScheme.primary) {
+                                    Text("YOUR TURN", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp))
+                                }
+                            } else {
+                                Text("• ${pickingTeam?.name ?: "CPU"}", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                             }
                         }
+                        Text(
+                            text = "$${rookieSalary / 1_000_000.0}M/yr (${rookieYears}y) • ${draftPicks.size} picks left",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Action Buttons Row
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
+                    // Action buttons
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         if (isUserOnTheClock) {
                             Button(
                                 onClick = {
@@ -197,15 +166,13 @@ fun LiveDraftCeremonyScreen(
                                     if (target != null) confirmDraftPlayer = target
                                 },
                                 enabled = availableProspects.isNotEmpty() && !isSimulatingDraft,
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.weight(1f)
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                shape = RoundedCornerShape(6.dp)
                             ) {
-                                Icon(Icons.Default.HowToVote, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = if (selectedProspectForDraft != null) "Draft ${selectedProspectForDraft?.name}" else "Draft Selected",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp
+                                    text = if (selectedProspectForDraft != null) "Draft ${selectedProspectForDraft?.shortName}" else "Draft Selected",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
                                 )
                             }
 
@@ -215,9 +182,10 @@ fun LiveDraftCeremonyScreen(
                                     if (best != null) confirmDraftPlayer = best
                                 },
                                 enabled = availableProspects.isNotEmpty() && !isSimulatingDraft,
-                                shape = RoundedCornerShape(8.dp)
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                shape = RoundedCornerShape(6.dp)
                             ) {
-                                Text("Auto Best", fontSize = 12.sp)
+                                Text("Auto Best", fontSize = 11.sp)
                             }
                         } else {
                             Button(
@@ -241,12 +209,14 @@ fun LiveDraftCeremonyScreen(
                                     }
                                 },
                                 enabled = !isSimulatingDraft,
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.weight(1f)
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                shape = RoundedCornerShape(6.dp)
                             ) {
-                                Icon(Icons.Default.FastForward, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Sim to My Pick ⚡", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                if (isSimulatingDraft) {
+                                    CircularProgressIndicator(modifier = Modifier.size(14.dp), color = Color.White, strokeWidth = 2.dp)
+                                } else {
+                                    Text("Sim to My Pick ⚡", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
                             }
 
                             OutlinedButton(
@@ -270,68 +240,81 @@ fun LiveDraftCeremonyScreen(
                                     }
                                 },
                                 enabled = !isSimulatingDraft,
-                                shape = RoundedCornerShape(8.dp)
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                shape = RoundedCornerShape(6.dp)
                             ) {
-                                Text("Next Pick >", fontSize = 12.sp)
+                                Text("Next Pick >", fontSize = 11.sp)
                             }
+                        }
+                    }
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Default.EmojiEvents, contentDescription = null, tint = Color(0xFFFFD700), modifier = Modifier.size(24.dp))
+                        Column {
+                            Text("Draft Concluded 🎉", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text("All 60 draft picks completed. Remaining prospects entered Free Agency.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
             }
-        } else {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        // TOOLBAR: POSITION FILTER CHIPS & VIEW TOGGLE
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Default.EmojiEvents, contentDescription = null, tint = Color(0xFFFFD700), modifier = Modifier.size(40.dp))
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text("Draft Ceremony Concluded!", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                    Text("All 60 draft picks have been signed. Remaining prospects entered Free Agency.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                FilterChip(
+                    selected = viewMode == 0 && positionFilter == null,
+                    onClick = { viewMode = 0; positionFilter = null },
+                    label = { Text("Board (${availableProspects.size})", fontSize = 11.sp) }
+                )
+                Position.entries.filter { it != Position.NONE }.forEach { pos ->
+                    FilterChip(
+                        selected = viewMode == 0 && positionFilter == pos,
+                        onClick = { viewMode = 0; positionFilter = if (positionFilter == pos) null else pos },
+                        label = { Text(pos.shortName, fontSize = 11.sp) }
+                    )
                 }
             }
+
+            Spacer(modifier = Modifier.width(6.dp))
+
+            FilterChip(
+                selected = viewMode == 1,
+                onClick = { viewMode = if (viewMode == 1) 0 else 1 },
+                label = { Text("Log (${draftLog.size})", fontSize = 11.sp, fontWeight = FontWeight.SemiBold) },
+                leadingIcon = { Icon(Icons.Default.History, contentDescription = null, modifier = Modifier.size(14.dp)) }
+            )
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(4.dp))
 
-        // Tabs
-        TabRow(selectedTabIndex = selectedTab) {
-            Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Available Board (${availableProspects.size})") })
-            Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Draft Log (${draftLog.size})") })
-            Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }, text = { Text("Picks Left (${draftPicks.size})") })
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        when (selectedTab) {
-            0 -> {
-                // Tab 0: Big Board
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    FilterChip(
-                        selected = positionFilter == null,
-                        onClick = { positionFilter = null },
-                        label = { Text("All (${availableProspects.size})") }
+        // MAIN CONTENT AREA (Takes remaining full screen)
+        if (viewMode == 0) {
+            // MODE 0: AVAILABLE PROSPECTS LIST
+            if (filteredProspects.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(
+                        text = if (draftPicks.isEmpty()) "No available prospects remaining." else "Loading prospects...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Position.entries.filter { it != Position.NONE }.forEach { pos ->
-                        FilterChip(
-                            selected = positionFilter == pos,
-                            onClick = { positionFilter = if (positionFilter == pos) null else pos },
-                            label = { Text(pos.shortName) }
-                        )
-                    }
                 }
-
-                Spacer(modifier = Modifier.height(6.dp))
-
+            } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    contentPadding = PaddingValues(bottom = 16.dp)
                 ) {
                     itemsIndexed(filteredProspects) { index, prospect ->
                         val isSelected = selectedProspectForDraft?.id == prospect.id
@@ -343,55 +326,58 @@ fun LiveDraftCeremonyScreen(
                                     selectedProspectForDraft = prospect
                                     selectedPlayerForDetail = prospect
                                 },
-                            shape = RoundedCornerShape(10.dp),
-                            border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
+                            shape = RoundedCornerShape(8.dp),
+                            border = if (isSelected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null,
                             colors = CardDefaults.cardColors(
-                                containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-                                else MaterialTheme.colorScheme.surfaceVariant
+                                containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                             )
                         ) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(10.dp),
+                                    .padding(horizontal = 10.dp, vertical = 6.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.weight(1f)
                                 ) {
-                                    Surface(
-                                        shape = RoundedCornerShape(6.dp),
-                                        color = MaterialTheme.colorScheme.surface
-                                    ) {
-                                        Text(
-                                            text = "#${index + 1}",
-                                            fontSize = 11.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
+                                    Text(
+                                        text = "#${index + 1}",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.width(28.dp)
+                                    )
 
-                                    RatingBadge(rating = prospect.overallRating)
+                                    RatingBadge(rating = prospect.overallRating, size = 26)
+
+                                    PositionBadge(position = prospect.positionFirst)
 
                                     Column {
-                                        Text(prospect.name, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                            PositionBadge(position = prospect.positionFirst)
-                                            Text("Age: ${prospect.age}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                            Text("POT: ★${prospect.potential}", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFFD97706))
-                                        }
+                                        Text(prospect.name, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                        Text(
+                                            text = "Age ${prospect.age} • Pot: ${prospect.potential}/10 • Att: ${prospect.attackRating} Def: ${prospect.defenseRating}",
+                                            fontSize = 10.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
                                     }
                                 }
 
                                 if (isUserOnTheClock) {
-                                    Button(
+                                    IconButton(
                                         onClick = { confirmDraftPlayer = prospect },
-                                        shape = RoundedCornerShape(8.dp)
+                                        modifier = Modifier.size(32.dp)
                                     ) {
-                                        Text("Select", fontSize = 12.sp)
+                                        Icon(
+                                            Icons.Default.AddCircle,
+                                            contentDescription = "Draft Player",
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(22.dp)
+                                        )
                                     }
                                 }
                             }
@@ -399,100 +385,66 @@ fun LiveDraftCeremonyScreen(
                     }
                 }
             }
-
-            1 -> {
-                // Tab 1: Draft Log
-                if (draftLog.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("No draft picks executed yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(draftLog.reversed()) { log ->
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(10.dp),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(10.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Surface(
-                                            shape = RoundedCornerShape(4.dp),
-                                            color = MaterialTheme.colorScheme.primary
-                                        ) {
-                                            Text(
-                                                text = "R${log.round} #${log.pick}",
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = Color.White,
-                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                            )
-                                        }
-                                        Column {
-                                            Text("${log.teamName} selected ${log.player.name}", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                            Text("${log.player.positionFirst.shortName} • Rating ${log.player.overallRating} • $${log.salary / 1_000_000.0}M/yr (${log.years}y)", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+        } else {
+            // MODE 1: DRAFT HISTORY LOG
+            if (draftLog.isEmpty()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text(
+                        text = "No picks have been made yet.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
-            }
-
-            2 -> {
-                // Tab 2: Remaining Picks Order
+            } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    contentPadding = PaddingValues(bottom = 16.dp)
                 ) {
-                    items(draftPicks) { pick ->
-                        val team = teamMap[pick.currentTeamId]
-                        val isMyPick = pick.currentTeamId == userTeam?.id
-
+                    items(draftLog) { item ->
                         Card(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { selectedPlayerForDetail = item.player },
                             shape = RoundedCornerShape(8.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (isMyPick) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                                else MaterialTheme.colorScheme.surfaceVariant
-                            )
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
                         ) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(10.dp),
+                                    .padding(horizontal = 10.dp, vertical = 6.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Text("Round ${pick.round} • Pick #${pick.position ?: 1}", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                    Text("Team: ${team?.name ?: "Unknown"}", fontSize = 12.sp)
-                                }
-
-                                if (isMyPick) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
                                     Surface(
                                         shape = RoundedCornerShape(4.dp),
-                                        color = MaterialTheme.colorScheme.primary
+                                        color = MaterialTheme.colorScheme.primaryContainer
                                     ) {
                                         Text(
-                                            text = "USER",
+                                            text = "R${item.round} #${item.pick}",
                                             fontSize = 10.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = Color.White,
-                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                        )
+                                    }
+
+                                    RatingBadge(rating = item.player.overallRating, size = 24)
+
+                                    Column {
+                                        Text(
+                                            text = "${item.player.name} (${item.player.positionFirst.shortName})",
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 12.sp
+                                        )
+                                        Text(
+                                            text = "Drafted by ${item.teamName} • $${item.salary / 1_000_000.0}M (${item.years}y)",
+                                            fontSize = 10.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 }
@@ -504,44 +456,45 @@ fun LiveDraftCeremonyScreen(
         }
     }
 
-    // Confirm Draft Dialog
-    confirmDraftPlayer?.let { player ->
-        val currentP = currentPick
-        val (rookieSalary, rookieYears) = if (currentP != null) {
-            DraftEngine.calculateRookieSalary(currentP.round, currentP.position ?: 1)
-        } else (500_000 to 2)
+    // Confirm Draft Selection Dialog
+    if (confirmDraftPlayer != null && currentPick != null) {
+        val target = confirmDraftPlayer!!
+        val (rookieSalary, rookieYears) = DraftEngine.calculateRookieSalary(currentPick.round, currentPick.position ?: 1)
 
         AlertDialog(
             onDismissRequest = { confirmDraftPlayer = null },
-            title = { Text("Draft ${player.name}?") },
+            title = {
+                Text(
+                    text = "Confirm Draft Pick",
+                    fontWeight = FontWeight.Bold
+                )
+            },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("Are you sure you want to select ${player.name} with Round ${currentP?.round ?: 1} Pick #${currentP?.position ?: 1}?")
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text("• Position: ${player.positionFirst.shortName}")
-                    Text("• Overall Rating: ${player.overallRating}")
-                    Text("• Potential: ★${player.potential}")
-                    Text("• Contract: $${rookieSalary / 1_000_000.0}M/yr for $rookieYears Years (Guaranteed)")
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Select ${target.name} with Round ${currentPick.round}, Pick #${currentPick.position}?")
+                    Text(
+                        text = "• Position: " + target.positionFirst.name + "\n• Rating: " + target.overallRating + " (Potential: " + target.potential + "/10)\n• Contract: $" + (rookieSalary / 1_000_000.0) + "M/yr for " + rookieYears + " seasons",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             },
             confirmButton = {
                 Button(
                     onClick = {
-                        val p = confirmDraftPlayer ?: return@Button
-                        val pick = currentP ?: return@Button
-                        confirmDraftPlayer = null
-                        viewModel.selectDraftPick(p.id, pick.id) { success ->
+                        viewModel.selectDraftPick(target.id, currentPick.id) { success ->
+                            confirmDraftPlayer = null
                             if (success) {
                                 refreshProspects()
-                                val item = DraftedLogItem(
-                                    round = pick.round,
-                                    pick = pick.position ?: 1,
-                                    teamName = userTeam?.name ?: "User Team",
-                                    player = p,
+                                val draftedItem = DraftedLogItem(
+                                    round = currentPick.round,
+                                    pick = currentPick.position ?: 1,
+                                    teamName = userTeam?.name ?: "My Team",
+                                    player = target,
                                     salary = rookieSalary,
                                     years = rookieYears
                                 )
-                                draftLog = draftLog + item
+                                draftLog = draftLog + draftedItem
                                 selectedProspectForDraft = null
                             }
                         }
@@ -558,6 +511,7 @@ fun LiveDraftCeremonyScreen(
         )
     }
 
+    // Player Detail Sheet
     selectedPlayerForDetail?.let { player ->
         PlayerDetailBottomSheet(
             player = player,

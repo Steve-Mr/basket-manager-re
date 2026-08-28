@@ -330,6 +330,15 @@ class GameDashboardViewModel(
         }
     }
 
+    fun ensureDraftReady(onReady: () -> Unit = {}) {
+        viewModelScope.launch {
+            val g = _game.value ?: return@launch
+            repository.ensureDraftInitialized(g.id)
+            refreshGameData(g)
+            onReady()
+        }
+    }
+
     fun getDraftProspects(onLoaded: (List<Player>) -> Unit) {
         viewModelScope.launch {
             val gameId = _game.value?.id ?: return@launch

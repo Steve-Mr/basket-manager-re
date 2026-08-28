@@ -508,13 +508,68 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
     override suspend fun getDraftPicks(gameId: Long): List<DraftPick> = withContext(Dispatchers.IO) {
         val list = mutableListOf<DraftPick>()
         val db = dbHelper.readableDatabase
-        val cursor = db.rawQuery("SELECT * FROM ${DB.TABLE_DRAFT_PICK} WHERE gameId = ? ORDER BY round ASC, id ASC", arrayOf(gameId.toString()))
+        val cursor = db.rawQuery("SELECT * FROM ${DB.TABLE_DRAFT_PICK} WHERE gameId = ? ORDER BY round ASC, CASE WHEN position IS NULL OR position = 0 THEN 999 ELSE position END ASC, id ASC", arrayOf(gameId.toString()))
         cursor.use { c ->
             while (c.moveToNext()) {
                 list.add(cursorToDraftPick(c).toDomain())
             }
         }
         list
+    }
+
+    override suspend fun ensureDraftInitialized(gameId: Long): Unit = withContext(Dispatchers.IO) {
+        val db = dbHelper.writableDatabase
+        val existingPicks = getDraftPicks(gameId)
+        val standings = getStandings(gameId)
+        val draftOrder = DraftEngine.calculateDraftOrder(standings)
+
+        val countCursor = db.rawQuery("SELECT COUNT(*) FROM ${DB.TABLE_NEWS} WHERE gameId = ? AND title LIKE 'Draft Pick:%'", arrayOf(gameId.toString()))
+        val alreadyDraftedCount = countCursor.use { if (it.moveToFirst()) it.getInt(0) else 0 }
+
+        if (existingPicks.isEmpty() && alreadyDraftedCount == 0) {
+            // First time draft setup: Insert Round 1 & Round 2 picks
+            draftOrder.forEachIndexed { index, teamId ->
+                val pos = index + 1
+                val dp1 = ContentValues().apply {
+                    put("gameId", gameId)
+                    put("originalTeamId", teamId)
+                    put("currentTeamId", teamId)
+                    put("round", 1)
+                    put("position", pos)
+                    put("marketValue", 25.0)
+                }
+                db.insert(DB.TABLE_DRAFT_PICK, null, dp1)
+
+                val dp2 = ContentValues().apply {
+                    put("gameId", gameId)
+                    put("originalTeamId", teamId)
+                    put("currentTeamId", teamId)
+                    put("round", 2)
+                    put("position", pos)
+                    put("marketValue", 8.0)
+                }
+                db.insert(DB.TABLE_DRAFT_PICK, null, dp2)
+            }
+        } else if (existingPicks.any { it.position == null || it.position == 0 }) {
+            // Assign positions according to draft order
+            draftOrder.forEachIndexed { index, teamId ->
+                val pickPos = index + 1
+                db.execSQL(
+                    "UPDATE ${DB.TABLE_DRAFT_PICK} SET position = ? WHERE gameId = ? AND round = 1 AND originalTeamId = ?",
+                    arrayOf(pickPos, gameId, teamId)
+                )
+                db.execSQL(
+                    "UPDATE ${DB.TABLE_DRAFT_PICK} SET position = ? WHERE gameId = ? AND round = 2 AND originalTeamId = ?",
+                    arrayOf(pickPos, gameId, teamId)
+                )
+            }
+        }
+
+        val prospects = getDraftProspects(gameId)
+        if (prospects.isEmpty()) {
+            val newProspects = DraftEngine.generateDraftProspects(gameId, 90)
+            newProspects.forEach { p -> insertPlayerDirect(db, p.toEntity()) }
+        }
     }
 
     override suspend fun getDraftProspects(gameId: Long): List<Player> = withContext(Dispatchers.IO) {
