@@ -29,8 +29,7 @@ enum class PrimaryTab(val title: String, val icon: ImageVector) {
     HOME("Home", Icons.Default.Home),
     SQUAD("Squad", Icons.Default.People),
     LEAGUE("League", Icons.Default.FormatListNumbered),
-    OFFICE("Office", Icons.Default.BusinessCenter),
-    OFFSEASON("Offseason", Icons.Default.Celebration)
+    OFFICE("Office", Icons.Default.BusinessCenter)
 }
 
 @Composable
@@ -308,9 +307,9 @@ fun DashboardScaffold(
                     NavigationDrawerItem(
                         icon = { Icon(Icons.Default.Celebration, contentDescription = null) },
                         label = { Text("Offseason Hub 🏆") },
-                        selected = primaryTab == PrimaryTab.OFFSEASON,
+                        selected = primaryTab == PrimaryTab.HOME,
                         onClick = {
-                            primaryTab = PrimaryTab.OFFSEASON
+                            primaryTab = PrimaryTab.HOME
                             scope.launch { drawerState.close() }
                         }
                     )
@@ -365,13 +364,18 @@ fun DashboardScaffold(
             },
             bottomBar = {
                 val isOffseason = (game?.currentMatchday ?: 1) in 226..234
-                val visibleTabs = if (isOffseason) PrimaryTab.entries else PrimaryTab.entries.filter { it != PrimaryTab.OFFSEASON }
 
                 NavigationBar {
-                    visibleTabs.forEach { tab ->
+                    PrimaryTab.entries.forEach { tab ->
+                        val (tabTitle, tabIcon) = if (tab == PrimaryTab.HOME && isOffseason) {
+                            Pair("Offseason", Icons.Default.Celebration)
+                        } else {
+                            Pair(tab.title, tab.icon)
+                        }
+
                         NavigationBarItem(
-                            icon = { Icon(tab.icon, contentDescription = tab.title) },
-                            label = { Text(tab.title) },
+                            icon = { Icon(tabIcon, contentDescription = tabTitle) },
+                            label = { Text(tabTitle) },
                             selected = primaryTab == tab,
                             onClick = { primaryTab = tab }
                         )
@@ -380,34 +384,35 @@ fun DashboardScaffold(
             }
         ) { innerPadding ->
             Box(modifier = Modifier.padding(innerPadding)) {
+                val isOffseason = (game?.currentMatchday ?: 1) in 226..234
                 when (primaryTab) {
                     PrimaryTab.HOME -> {
-                        DashboardScreen(
-                            viewModel = viewModel,
-                            onNavigateToRoster = {
-                                primaryTab = PrimaryTab.SQUAD
-                                squadSubTab = 0
-                            },
-                            onNavigateToStandings = {
-                                primaryTab = PrimaryTab.LEAGUE
-                                leagueSubTab = 0
-                            },
-                            onNavigateToTeamDetail = { teamId ->
-                                viewingTeamDetailId = teamId
-                            },
-                            onNavigateToOffseason = {
-                                primaryTab = PrimaryTab.OFFSEASON
-                            }
-                        )
-                    }
-
-                    PrimaryTab.OFFSEASON -> {
-                        OffseasonScreen(
-                            viewModel = viewModel,
-                            onNavigateToNewSeason = {
-                                primaryTab = PrimaryTab.HOME
-                            }
-                        )
+                        if (isOffseason) {
+                            OffseasonScreen(
+                                viewModel = viewModel,
+                                onNavigateToNewSeason = {
+                                    primaryTab = PrimaryTab.HOME
+                                }
+                            )
+                        } else {
+                            DashboardScreen(
+                                viewModel = viewModel,
+                                onNavigateToRoster = {
+                                    primaryTab = PrimaryTab.SQUAD
+                                    squadSubTab = 0
+                                },
+                                onNavigateToStandings = {
+                                    primaryTab = PrimaryTab.LEAGUE
+                                    leagueSubTab = 0
+                                },
+                                onNavigateToTeamDetail = { teamId ->
+                                    viewingTeamDetailId = teamId
+                                },
+                                onNavigateToOffseason = {
+                                    primaryTab = PrimaryTab.HOME
+                                }
+                            )
+                        }
                     }
 
                     PrimaryTab.SQUAD -> {

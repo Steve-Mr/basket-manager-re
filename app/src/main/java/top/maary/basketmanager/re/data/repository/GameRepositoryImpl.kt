@@ -524,6 +524,37 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
         list
     }
 
+    override suspend fun releaseUnrenewedPlayers(gameId: Long): Int = withContext(Dispatchers.IO) {
+        val db = dbHelper.writableDatabase
+        val unrenewed = getPlayers(gameId).filter { it.yearsContract == 0 && it.teamId != null }
+        if (unrenewed.isEmpty()) return@withContext 0
+
+        unrenewed.forEach { p ->
+            db.execSQL("UPDATE ${DB.TABLE_PLAYER} SET teamId = NULL, salary = 0 WHERE id = ?", arrayOf(p.id))
+        }
+
+        val releasedIds = unrenewed.map { it.id }.toSet()
+        val tacticCursor = db.rawQuery("SELECT * FROM ${DB.TABLE_TACTIC} WHERE gameId = ?", arrayOf(gameId.toString()))
+        while (tacticCursor.moveToNext()) {
+            val t = cursorToTactic(tacticCursor).toDomain()
+            var updated = t
+            if (t.starterPgId in releasedIds) updated = updated.copy(starterPgId = null)
+            if (t.starterSgId in releasedIds) updated = updated.copy(starterSgId = null)
+            if (t.starterSfId in releasedIds) updated = updated.copy(starterSfId = null)
+            if (t.starterPfId in releasedIds) updated = updated.copy(starterPfId = null)
+            if (t.starterCId in releasedIds) updated = updated.copy(starterCId = null)
+            if (t.reservePgId in releasedIds) updated = updated.copy(reservePgId = null)
+            if (t.reserveSgId in releasedIds) updated = updated.copy(reserveSgId = null)
+            if (t.reserveSfId in releasedIds) updated = updated.copy(reserveSfId = null)
+            if (t.reservePfId in releasedIds) updated = updated.copy(reservePfId = null)
+            if (t.reserveCId in releasedIds) updated = updated.copy(reserveCId = null)
+            if (updated != t) {
+                db.update(DB.TABLE_TACTIC, tacticToContentValues(updated.toEntity()), "id = ?", arrayOf(updated.id.toString()))
+            }
+        }
+        unrenewed.size
+    }
+
     override suspend fun ensureDraftInitialized(gameId: Long): Unit = withContext(Dispatchers.IO) {
         val db = dbHelper.writableDatabase
         val existingPicks = getDraftPicks(gameId)

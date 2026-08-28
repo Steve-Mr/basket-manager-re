@@ -330,6 +330,17 @@ class GameDashboardViewModel(
         }
     }
 
+    fun finalizeContractPhaseAndProceedToDraft(onComplete: () -> Unit) {
+        viewModelScope.launch {
+            val g = _game.value ?: return@launch
+            repository.releaseUnrenewedPlayers(g.id)
+            repository.ensureDraftInitialized(g.id)
+            val updated = repository.autoSimulateTo(g.id, 230) { _, _ -> }
+            refreshGameData(updated)
+            onComplete()
+        }
+    }
+
     fun ensureDraftReady(onReady: () -> Unit = {}) {
         viewModelScope.launch {
             val g = _game.value ?: return@launch

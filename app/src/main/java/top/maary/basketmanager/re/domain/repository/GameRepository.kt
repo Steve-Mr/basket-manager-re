@@ -54,6 +54,7 @@ interface GameRepository {
     suspend fun getDraftPicks(gameId: Long): List<DraftPick>
     suspend fun getDraftProspects(gameId: Long): List<Player>
     suspend fun ensureDraftInitialized(gameId: Long)
+    suspend fun releaseUnrenewedPlayers(gameId: Long): Int
     suspend fun executeTrade(proposal: TradeProposal): TradeEvaluationResult
     suspend fun signFreeAgent(playerId: Long, teamId: Long, salary: Int, years: Int): Boolean
     suspend fun selectDraftPick(prospectId: Long, pickId: Long): Boolean
