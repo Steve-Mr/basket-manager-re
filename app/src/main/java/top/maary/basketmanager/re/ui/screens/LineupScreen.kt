@@ -9,15 +9,19 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import top.maary.basketmanager.re.R
 import top.maary.basketmanager.re.domain.model.LineupSlot
 import top.maary.basketmanager.re.domain.model.Player
 import top.maary.basketmanager.re.domain.model.Position
@@ -36,6 +40,7 @@ fun LineupScreen(
     val roster by viewModel.userRoster.collectAsState()
     val tactic by viewModel.userTactic.collectAsState()
 
+    var showTacticsSheet by remember { mutableStateOf(false) }
     var selectedSlotForEdit by remember { mutableStateOf<LineupSlot?>(null) }
     var selectedPlayerForDetail by remember { mutableStateOf<Player?>(null) }
 
@@ -103,11 +108,11 @@ fun LineupScreen(
                 Button(
                     onClick = { viewModel.optimizeUserLineup() },
                     shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
                 ) {
                     Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Auto Optimize", fontSize = 12.sp)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Auto Optimize", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -125,7 +130,12 @@ fun LineupScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Text("⚠️", fontSize = 20.sp)
+                        Icon(
+                            Icons.Default.Warning,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.size(22.dp)
+                        )
                         Column {
                             Text(
                                 text = "Rotation Injury Alert",
@@ -152,7 +162,7 @@ fun LineupScreen(
                 // Left Header: Starters
                 Surface(
                     shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                    color = MaterialTheme.colorScheme.primaryContainer,
                     modifier = Modifier.weight(1f)
                 ) {
                     Row(
@@ -161,7 +171,7 @@ fun LineupScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "🌟 STARTERS",
+                            text = "Starters",
                             fontWeight = FontWeight.Black,
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -178,7 +188,7 @@ fun LineupScreen(
                 // Right Header: Reserves
                 Surface(
                     shape = RoundedCornerShape(8.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    color = MaterialTheme.colorScheme.secondaryContainer,
                     modifier = Modifier.weight(1f)
                 ) {
                     Row(
@@ -187,16 +197,16 @@ fun LineupScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "🔄 RESERVES",
+                            text = "Reserves",
                             fontWeight = FontWeight.Black,
                             fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
                         Text(
                             text = "Avg $reserveAvgOvr",
                             fontWeight = FontWeight.Bold,
                             fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.outline
+                            color = MaterialTheme.colorScheme.secondary
                         )
                     }
                 }
@@ -236,6 +246,36 @@ fun LineupScreen(
                         onDetail = { if (reserveP != null) selectedPlayerForDetail = reserveP }
                     )
                 }
+            }
+        }
+
+        // Dedicated Bottom Full-Width Tactics & Strategy Button
+        item {
+            Spacer(modifier = Modifier.height(4.dp))
+            OutlinedButton(
+                onClick = { showTacticsSheet = true },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                ),
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
+            ) {
+                Icon(
+                    Icons.Default.Tune,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Tactics & Strategy",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.primary
+                )
             }
         }
     }
@@ -367,13 +407,22 @@ fun LineupScreen(
         }
     }
 
-    // Player Detail Modal
+    // Player Detail Modal with position swap support
     selectedPlayerForDetail?.let { player ->
         PlayerDetailBottomSheet(
             player = player,
             stats = viewModel.getPlayerSeasonStats(player.id),
             playoffStats = viewModel.getPlayerPlayoffStats(player.id),
+            onSwapPosition = { viewModel.swapPlayerPositions(it) },
             onDismiss = { selectedPlayerForDetail = null }
+        )
+    }
+
+    // Tactics Bottom Sheet
+    if (showTacticsSheet) {
+        TacticsBottomSheet(
+            viewModel = viewModel,
+            onDismiss = { showTacticsSheet = false }
         )
     }
 }
@@ -394,15 +443,11 @@ fun CompactLineupSlotCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
-            .clickable(onClick = onClick)
-            .then(
-                if (isStarter) Modifier.border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f), RoundedCornerShape(10.dp))
-                else Modifier.border(0.5.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(10.dp))
-            ),
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(10.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isStarter) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.25f)
-            else MaterialTheme.colorScheme.surfaceVariant
+            containerColor = if (isStarter) MaterialTheme.colorScheme.surfaceContainerHighest
+            else MaterialTheme.colorScheme.surfaceContainerLow
         )
     ) {
         Row(

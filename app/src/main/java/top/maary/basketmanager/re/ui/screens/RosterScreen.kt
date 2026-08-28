@@ -17,13 +17,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import top.maary.basketmanager.re.R
 import top.maary.basketmanager.re.domain.model.Player
 import top.maary.basketmanager.re.domain.model.Position
 import top.maary.basketmanager.re.domain.model.Tactic
+import top.maary.basketmanager.re.ui.components.M3PlayerCard
 import top.maary.basketmanager.re.ui.components.PlayerDetailBottomSheet
-import top.maary.basketmanager.re.ui.components.PositionBadge
-import top.maary.basketmanager.re.ui.components.RatingBadge
-import top.maary.basketmanager.re.ui.theme.RatingGreen
 import top.maary.basketmanager.re.ui.viewmodel.GameDashboardViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -164,43 +164,43 @@ fun RosterScreen(
             // ALL POS: Grouped by Lineup (Starters, Reserves, Bench Depth)
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(bottom = 16.dp)
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+                contentPadding = PaddingValues(bottom = 20.dp)
             ) {
-                // Card 1: 🌟 Starters Group
+                // Card 1: Starters Group
                 item {
                     RosterGroupCard(
-                        title = "🌟 STARTERS",
+                        title = "Starters",
                         badgeText = "5 Players • Avg ${if (startersList.isNotEmpty()) startersList.map { it.overallRating }.average().toInt() else 0}",
                         headerColor = MaterialTheme.colorScheme.primaryContainer,
+                        headerTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
                         players = startersList,
-                        onPlayerClick = { selectedPlayerForDetail = it },
-                        onSwapPos = { viewModel.swapPlayerPositions(it) }
+                        onPlayerClick = { selectedPlayerForDetail = it }
                     )
                 }
 
-                // Card 2: 🔄 Reserves Group
+                // Card 2: Reserves Group
                 item {
                     RosterGroupCard(
-                        title = "🔄 RESERVES",
+                        title = "Reserves",
                         badgeText = "5 Players • Avg ${if (reservesList.isNotEmpty()) reservesList.map { it.overallRating }.average().toInt() else 0}",
-                        headerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        headerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        headerTextColor = MaterialTheme.colorScheme.onSecondaryContainer,
                         players = reservesList,
-                        onPlayerClick = { selectedPlayerForDetail = it },
-                        onSwapPos = { viewModel.swapPlayerPositions(it) }
+                        onPlayerClick = { selectedPlayerForDetail = it }
                     )
                 }
 
-                // Card 3: 🪑 Bench Depth Group (if any)
+                // Card 3: Bench Depth Group (if any)
                 if (benchList.isNotEmpty()) {
                     item {
                         RosterGroupCard(
-                            title = "🪑 BENCH DEPTH",
+                            title = "Bench Depth",
                             badgeText = "${benchList.size} Players",
-                            headerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            headerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                            headerTextColor = MaterialTheme.colorScheme.onTertiaryContainer,
                             players = benchList,
-                            onPlayerClick = { selectedPlayerForDetail = it },
-                            onSwapPos = { viewModel.swapPlayerPositions(it) }
+                            onPlayerClick = { selectedPlayerForDetail = it }
                         )
                     }
                 }
@@ -213,22 +213,22 @@ fun RosterScreen(
                 contentPadding = PaddingValues(bottom = 16.dp)
             ) {
                 items(filteredList) { player ->
-                    RosterPlayerRowCard(
+                    M3PlayerCard(
                         player = player,
-                        onClick = { selectedPlayerForDetail = player },
-                        onSwapPos = { viewModel.swapPlayerPositions(player) }
+                        onClick = { selectedPlayerForDetail = player }
                     )
                 }
             }
         }
     }
 
-    // Player Detail Modal
+    // Player Detail Modal with Position Swapping support
     selectedPlayerForDetail?.let { player ->
         PlayerDetailBottomSheet(
             player = player,
             stats = viewModel.getPlayerSeasonStats(player.id),
             playoffStats = viewModel.getPlayerPlayoffStats(player.id),
+            onSwapPosition = { viewModel.swapPlayerPositions(it) },
             onDismiss = { selectedPlayerForDetail = null }
         )
     }
@@ -239,14 +239,15 @@ fun RosterGroupCard(
     title: String,
     badgeText: String,
     headerColor: Color,
+    headerTextColor: Color,
     players: List<Player>,
-    onPlayerClick: (Player) -> Unit,
-    onSwapPos: (Player) -> Unit
+    onPlayerClick: (Player) -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        border = null
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(10.dp)) {
             // Section Header
@@ -257,7 +258,7 @@ fun RosterGroupCard(
             ) {
                 Text(
                     text = title,
-                    fontWeight = FontWeight.Black,
+                    fontWeight = FontWeight.ExtraBold,
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -269,6 +270,7 @@ fun RosterGroupCard(
                         text = badgeText,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
+                        color = headerTextColor,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                     )
                 }
@@ -277,113 +279,10 @@ fun RosterGroupCard(
             // List of Players inside this card
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 players.forEach { player ->
-                    RosterPlayerRowCard(
+                    M3PlayerCard(
                         player = player,
-                        onClick = { onPlayerClick(player) },
-                        onSwapPos = { onSwapPos(player) }
+                        onClick = { onPlayerClick(player) }
                     )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun RosterPlayerRowCard(
-    player: Player,
-    onClick: () -> Unit,
-    onSwapPos: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                RatingBadge(rating = player.overallRating, size = 28)
-
-                Column {
-                    Text(
-                        text = player.name,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp
-                    )
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        PositionBadge(position = player.positionFirst)
-                        if (player.positionSecond != Position.NONE) {
-                            PositionBadge(position = player.positionSecond)
-                        }
-                        Text(
-                            text = "${player.age} yrs",
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                // Potential Badge
-                Surface(
-                    shape = RoundedCornerShape(4.dp),
-                    color = Color(0xFFFFD700).copy(alpha = 0.2f)
-                ) {
-                    Text(
-                        text = "★ ${player.potential}",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color(0xFFB8860B),
-                        modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
-                    )
-                }
-
-                // Dual-position swap button
-                if (player.positionSecond != Position.NONE && player.positionSecond != player.positionFirst) {
-                    IconButton(
-                        onClick = onSwapPos,
-                        modifier = Modifier.size(28.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.SwapHoriz,
-                            contentDescription = "Swap Positions",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                }
-
-                // Injury Status
-                if (player.stateInjury > 0) {
-                    Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = MaterialTheme.colorScheme.errorContainer
-                    ) {
-                        Text(
-                            text = "INJ (${player.stateInjury}d)",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                        )
-                    }
                 }
             }
         }

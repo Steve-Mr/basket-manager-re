@@ -131,12 +131,12 @@ fun ScheduleScreen(
             Tab(
                 selected = selectedViewTab == 0,
                 onClick = { selectedViewTab = 0 },
-                text = { Text("🗓️ Match Calendar", fontSize = 13.sp, fontWeight = FontWeight.Bold) }
+                text = { Text("Match Calendar", fontSize = 13.sp, fontWeight = FontWeight.Bold) }
             )
             Tab(
                 selected = selectedViewTab == 1,
                 onClick = { selectedViewTab = 1 },
-                text = { Text("🌲 Playoff Bracket 🏆", fontSize = 13.sp, fontWeight = FontWeight.Bold) }
+                text = { Text("Playoff Bracket", fontSize = 13.sp, fontWeight = FontWeight.Bold) }
             )
         }
 

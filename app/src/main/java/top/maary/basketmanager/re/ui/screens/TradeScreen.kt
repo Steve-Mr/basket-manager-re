@@ -406,7 +406,7 @@ fun TradeScreen(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text("🔄 Evaluate & Propose Trade (${userSelectedCount} for ${partnerSelectedCount})", fontWeight = FontWeight.Bold)
+                        Text("Evaluate & Propose Trade (${userSelectedCount} for ${partnerSelectedCount})", fontWeight = FontWeight.Bold)
                     }
                 }
 
@@ -436,7 +436,7 @@ fun TradeScreen(
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Searching All 29 Teams...")
                         } else {
-                            Text("📢 Shop My Assets (Find All League Offers)", fontWeight = FontWeight.Bold)
+                            Text("Shop My Assets (Find All League Offers)", fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -469,7 +469,7 @@ fun TradeScreen(
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Inquiring Price...")
                         } else {
-                            Text("🎯 Inquire What ${partnerTeamObj?.name ?: "They"} Want (Ask Counter-Offer)", fontWeight = FontWeight.Bold)
+                            Text("Inquire What ${partnerTeamObj?.name ?: "They"} Want (Ask Counter-Offer)", fontWeight = FontWeight.Bold)
                         }
                     }
                 }

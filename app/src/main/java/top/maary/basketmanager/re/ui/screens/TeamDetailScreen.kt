@@ -178,71 +178,10 @@ fun TeamDetailScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(roster.sortedByDescending { it.overallRating }) { player ->
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { selectedPlayerForDetail = player },
-                                shape = RoundedCornerShape(10.dp),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(12.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                    ) {
-                                        RatingBadge(rating = player.overallRating)
-                                        Column {
-                                            Text(player.name, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                            ) {
-                                                PositionBadge(position = player.positionFirst)
-                                                if (player.positionSecond != Position.NONE) {
-                                                    PositionBadge(position = player.positionSecond)
-                                                }
-                                                Text(
-                                                    text = "Age: ${player.age} • Pot: ★${player.potential}",
-                                                    fontSize = 11.sp,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                )
-                                            }
-                                        }
-                                    }
-
-                                    if (player.stateInjury > 0) {
-                                        Surface(
-                                            shape = RoundedCornerShape(4.dp),
-                                            color = MaterialTheme.colorScheme.errorContainer
-                                        ) {
-                                            Text(
-                                                text = "INJ (${player.stateInjury}d)",
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.onErrorContainer,
-                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                            )
-                                        }
-                                    } else {
-                                        Surface(
-                                            shape = RoundedCornerShape(4.dp),
-                                            color = MaterialTheme.colorScheme.surface
-                                        ) {
-                                            Text(
-                                                text = "Form: ${player.stateForm}%",
-                                                fontSize = 11.sp,
-                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
+                            top.maary.basketmanager.re.ui.components.M3PlayerCard(
+                                player = player,
+                                onClick = { selectedPlayerForDetail = player }
+                            )
                         }
                     }
                 }
@@ -435,9 +374,12 @@ fun TeamDetailScreen(
     }
 
     selectedPlayerForDetail?.let { player ->
+        val userTeam by viewModel.userTeam.collectAsState()
         PlayerDetailBottomSheet(
             player = player,
-            stats = viewModel.getPlayerSeasonStats(player.id), playoffStats = viewModel.getPlayerPlayoffStats(player.id),
+            stats = viewModel.getPlayerSeasonStats(player.id),
+            playoffStats = viewModel.getPlayerPlayoffStats(player.id),
+            onSwapPosition = if (player.teamId == userTeam?.id) { { viewModel.swapPlayerPositions(it) } } else null,
             onDismiss = { selectedPlayerForDetail = null }
         )
     }
