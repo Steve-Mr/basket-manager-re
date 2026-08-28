@@ -978,25 +978,54 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
                             val updatedSeries = PlayoffsEngine.updateSeriesAfterMatch(series, winnerTeamId)
                             db.update(DB.TABLE_PLAYOFF_SERIES, playoffSeriesToContentValues(updatedSeries), "id = ?", arrayOf(series.id.toString()))
 
-                            if (updatedSeries.round == 4 && updatedSeries.winnerTeamId != null) {
-                                val champTeam = teamMap[updatedSeries.winnerTeamId]
-                                val countCursor = db.rawQuery(
-                                    "SELECT COUNT(*) FROM " + DB.TABLE_NEWS + " WHERE gameId = ? AND title LIKE '%WORLD CHAMPIONS%'",
-                                    arrayOf(gameId.toString())
-                                )
-                                val alreadyAnnounced = countCursor.use { if (it.moveToFirst()) it.getInt(0) > 0 else false }
-                                if (!alreadyAnnounced) {
-                                    if (champTeam != null) {
-                                        db.execSQL("UPDATE ${DB.TABLE_CHALLENGE} SET completed = 1, completedSeason = ${game.currentSeason} WHERE teamName = ?", arrayOf(champTeam.name))
-                                    }
-                                    val champNews = NewsItem(
+                            // Announcement for all playoff series conclusions across the league
+                            if (updatedSeries.winnerTeamId != null && series.winnerTeamId == null) {
+                                val winnerTeam = teamMap[updatedSeries.winnerTeamId]
+                                val loserTeamId = if (updatedSeries.winnerTeamId == updatedSeries.team1Id) updatedSeries.team2Id else updatedSeries.team1Id
+                                val loserTeam = teamMap[loserTeamId]
+                                val winCount = if (updatedSeries.winnerTeamId == updatedSeries.team1Id) updatedSeries.team1Wins else updatedSeries.team2Wins
+                                val lossCount = if (updatedSeries.winnerTeamId == updatedSeries.team1Id) updatedSeries.team2Wins else updatedSeries.team1Wins
+
+                                val (roundName, nextStage) = when (updatedSeries.round) {
+                                    1 -> Pair("First Round", "Conference Semifinals")
+                                    2 -> Pair("Conference Semifinals", "Conference Finals")
+                                    3 -> Pair("Conference Finals", "World Finals")
+                                    else -> Pair("World Finals", "World Championship")
+                                }
+
+                                if (updatedSeries.round < 4) {
+                                    val seriesNews = NewsItem(
                                         gameId = gameId,
                                         matchday = currentDay,
                                         type = NewsType.PLAYOFFS,
-                                        title = "🏆 WORLD CHAMPIONS: ${champTeam?.name}!",
-                                        body = "${champTeam?.name} has won the World Championship in Season ${game.currentSeason}!"
+                                        title = "Playoffs: ${winnerTeam?.name} Advances! 👑",
+                                        body = "${winnerTeam?.name} eliminates ${loserTeam?.name} ($winCount-$lossCount) in the $roundName and advances to the $nextStage.",
+                                        team1Id = winnerTeam?.id,
+                                        team2Id = loserTeam?.id
                                     )
-                                    insertNewsDirect(db, champNews.toEntity())
+                                    insertNewsDirect(db, seriesNews.toEntity())
+                                } else {
+                                    val champTeam = winnerTeam
+                                    val countCursor = db.rawQuery(
+                                        "SELECT COUNT(*) FROM " + DB.TABLE_NEWS + " WHERE gameId = ? AND title LIKE '%WORLD CHAMPIONS%'",
+                                        arrayOf(gameId.toString())
+                                    )
+                                    val alreadyAnnounced = countCursor.use { if (it.moveToFirst()) it.getInt(0) > 0 else false }
+                                    if (!alreadyAnnounced) {
+                                        if (champTeam != null) {
+                                            db.execSQL("UPDATE ${DB.TABLE_CHALLENGE} SET completed = 1, completedSeason = ${game.currentSeason} WHERE teamName = ?", arrayOf(champTeam.name))
+                                        }
+                                        val champNews = NewsItem(
+                                            gameId = gameId,
+                                            matchday = currentDay,
+                                            type = NewsType.TROPHY,
+                                            title = "🏆 WORLD CHAMPIONS: ${champTeam?.name}!",
+                                            body = "${champTeam?.name} defeats ${loserTeam?.name} ($winCount-$lossCount) to capture the World Championship in Season ${game.currentSeason}!",
+                                            team1Id = champTeam?.id,
+                                            team2Id = loserTeam?.id
+                                        )
+                                        insertNewsDirect(db, champNews.toEntity())
+                                    }
                                 }
                             }
                         }
