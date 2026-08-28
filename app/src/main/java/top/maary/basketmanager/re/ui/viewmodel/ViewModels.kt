@@ -261,6 +261,19 @@ class GameDashboardViewModel(
         }
     }
 
+    fun launchNewSeason(onComplete: () -> Unit = {}) {
+        val currentGame = _game.value ?: return
+        viewModelScope.launch {
+            _isSimulating.value = true
+            _simulationProgressText.value = "Generating Season ${currentGame.currentSeason + 1} fixtures & starting campaign..."
+            val updated = repository.advanceMatchday(currentGame.id)
+            _game.value = updated
+            refreshGameData(updated)
+            _isSimulating.value = false
+            onComplete()
+        }
+    }
+
     fun autoSimulateToMatchday(
         targetDay: Int,
         autoLineup: Boolean = false,

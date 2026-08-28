@@ -580,7 +580,7 @@ fun OffseasonScreen(
                     Button(
                         onClick = {
                             isAdvancingPhase = true
-                            viewModel.autoSimulateToMatchday(234) {
+                            viewModel.launchNewSeason {
                                 isAdvancingPhase = false
                                 onNavigateToNewSeason()
                             }

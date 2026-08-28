@@ -1381,7 +1381,7 @@ class GameRepositoryImpl(private val context: Context) : GameRepository {
 
     override suspend fun autoSimulateTo(gameId: Long, targetMatchday: Int, onProgress: (Int, String) -> Unit): GameSession = withContext(Dispatchers.IO) {
         var current = getGame(gameId) ?: throw IllegalStateException("Game not found")
-        while (current.currentMatchday < targetMatchday && current.currentMatchday < 234) {
+        while (current.currentMatchday < targetMatchday) {
             val prevUserPlayers = getTeamPlayers(current.userTeamId).associateBy { it.id }
             onProgress(current.currentMatchday, "Simulating Day ${current.currentMatchday}...")
             current = advanceMatchday(gameId)
