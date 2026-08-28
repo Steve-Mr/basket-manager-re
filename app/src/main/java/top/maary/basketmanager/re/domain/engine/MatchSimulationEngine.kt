@@ -102,6 +102,7 @@ object MatchSimulationEngine {
         )
 
         val injuryMap = mutableMapOf<Long, Int>()
+        val preMatchInjuryMap = (localPlayers + visitorPlayers).associate { it.id to it.stateInjury }
         localPlayers.forEach { injuryMap[it.id] = it.stateInjury }
         visitorPlayers.forEach { injuryMap[it.id] = it.stateInjury }
 
@@ -360,7 +361,8 @@ object MatchSimulationEngine {
             }
         }
 
-        updatedPlayers.filter { it.teamId == userTeamId && it.stateInjury > 0 && (injuryMap[it.id] ?: 0) > 0 }.forEach { injP ->
+        // Only report if player was NOT injured before the match (initial stateInjury <= 0), and became injured during this match
+        updatedPlayers.filter { it.teamId == userTeamId && it.stateInjury > 0 && (preMatchInjuryMap[it.id] ?: 0) <= 0 }.forEach { injP ->
             newsItems.add(
                 NewsItem(
                     gameId = match.gameId,
