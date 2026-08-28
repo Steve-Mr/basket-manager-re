@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import top.maary.basketmanager.re.domain.model.*
+import top.maary.basketmanager.re.domain.engine.PlayoffsEngine
 import top.maary.basketmanager.re.ui.components.MatchBoxScoreDialog
 import top.maary.basketmanager.re.ui.components.PlayerDetailBottomSheet
 import top.maary.basketmanager.re.ui.theme.RatingGreen
@@ -53,6 +54,7 @@ fun DashboardScreen(
     val allPlayers by viewModel.allPlayers.collectAsState()
     val isSimulating by viewModel.isSimulating.collectAsState()
     val simProgressText by viewModel.simulationProgressText.collectAsState()
+    val playoffSeries by viewModel.playoffSeries.collectAsState()
     val scope = rememberCoroutineScope()
 
     var showAutoSimDialog by remember { mutableStateOf(false) }
@@ -174,7 +176,17 @@ fun DashboardScreen(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // Next Match Spotlight Card
+                    // Next Match Spotlight Card (Regular Season & Playoffs)
+                    val currentDay = game?.currentMatchday ?: 1
+                    val isPlayoffs = currentDay in 167..225
+
+                    val userActivePlayoffSeries = remember(playoffSeries, userTeam) {
+                        playoffSeries.find { it.winnerTeamId == null && (it.team1Id == userTeam?.id || it.team2Id == userTeam?.id) }
+                    }
+                    val userEliminatedSeries = remember(playoffSeries, userTeam) {
+                        playoffSeries.find { it.winnerTeamId != null && it.winnerTeamId != userTeam?.id && (it.team1Id == userTeam?.id || it.team2Id == userTeam?.id) }
+                    }
+
                     if (userMatch != null) {
                         val isLocal = (userMatch.teamLocalId == userTeam?.id)
                         val opponentTeam = if (isLocal) teamMap[userMatch.teamVisitorId] else teamMap[userMatch.teamLocalId]
@@ -240,6 +252,136 @@ fun DashboardScreen(
                                         )
                                     }
                                 }
+                            }
+                        }
+                    } else if (isPlayoffs && userActivePlayoffSeries != null) {
+                        val isTeam1 = (userActivePlayoffSeries.team1Id == userTeam?.id)
+                        val opponentId = if (isTeam1) userActivePlayoffSeries.team2Id else userActivePlayoffSeries.team1Id
+                        val opponentTeam = teamMap[opponentId]
+                        val oppStandings = standingsMap[opponentTeam?.id]
+                        val userWins = if (isTeam1) userActivePlayoffSeries.team1Wins else userActivePlayoffSeries.team2Wins
+                        val oppWins = if (isTeam1) userActivePlayoffSeries.team2Wins else userActivePlayoffSeries.team1Wins
+                        val gamesPlayed = userActivePlayoffSeries.team1Wins + userActivePlayoffSeries.team2Wins
+                        val nextGameNumber = gamesPlayed + 1
+
+                        val (nextHomeId, _) = PlayoffsEngine.determinePlayoffHomeTeam(userActivePlayoffSeries, gamesPlayed)
+                        val isUserHomeNext = (nextHomeId == userTeam?.id)
+
+                        val roundName = when (userActivePlayoffSeries.round) {
+                            1 -> "First Round"
+                            2 -> "Conference Semifinals"
+                            3 -> "Conference Finals"
+                            else -> "World Championship Finals"
+                        }
+
+                        val roundGameDays = when (userActivePlayoffSeries.round) {
+                            1 -> setOf(168, 170, 172, 174, 176, 178, 180)
+                            2 -> setOf(183, 185, 187, 189, 191, 193, 195)
+                            3 -> setOf(198, 200, 202, 204, 206, 208, 210)
+                            else -> setOf(213, 215, 217, 219, 221, 223, 225)
+                        }
+
+                        val isGameToday = currentDay in roundGameDays
+                        val nextGameDay = roundGameDays.filter { it >= currentDay }.minOrNull() ?: (currentDay + 1)
+
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    if (opponentTeam != null) {
+                                        onNavigateToTeamDetail(opponentTeam.id)
+                                    }
+                                }
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Text("🏆", fontSize = 14.sp)
+                                        Text(
+                                            text = "$roundName • Game $nextGameNumber (Best of 7)",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = when {
+                                            userWins > oppWins -> RatingGreen.copy(alpha = 0.18f)
+                                            userWins < oppWins -> RatingRed.copy(alpha = 0.18f)
+                                            else -> Color(0xFFD97706).copy(alpha = 0.18f)
+                                        }
+                                    ) {
+                                        Text(
+                                            text = when {
+                                                userWins > oppWins -> "Leading $userWins - $oppWins"
+                                                userWins < oppWins -> "Trailing $userWins - $oppWins"
+                                                else -> "Tied $userWins - $oppWins"
+                                            },
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = when {
+                                                userWins > oppWins -> RatingGreen
+                                                userWins < oppWins -> RatingRed
+                                                else -> Color(0xFFD97706)
+                                            },
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text(
+                                            text = if (isUserHomeNext) "VS ${opponentTeam?.name ?: "Opponent"}" else "@ ${opponentTeam?.name ?: "Opponent"}",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.ExtraBold
+                                        )
+                                        Text(
+                                            text = "${if (isUserHomeNext) "Home Court 🏟️" else "Away Game ✈️"} • ${oppStandings?.gamesWon ?: 0}W - ${oppStandings?.gamesLost ?: 0}L Reg • Tap for Team Info",
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+
+                                    Surface(
+                                        shape = RoundedCornerShape(6.dp),
+                                        color = if (isGameToday) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+                                    ) {
+                                        Text(
+                                            text = if (isGameToday) "⚔️ GAME TODAY" else "✈️ TRAVEL/REST (Day $nextGameDay)",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                            color = if (isGameToday) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    } else if (isPlayoffs && userEliminatedSeries != null) {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Text("Postseason Concluded for Your Team", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                Text(
+                                    text = "Eliminated in Playoffs (${userEliminatedSeries.team1Wins}-${userEliminatedSeries.team2Wins}) • Advance simulation to proceed through league playoffs.",
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
                         }
                     } else {
