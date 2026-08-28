@@ -68,11 +68,9 @@ fun LeagueStatsScreen(
 
     val statLeaders = remember(activeStatsList, selectedLeaderCategory, selectedStatsScope, currentMatchday) {
         val qualified = if (selectedStatsScope == 0) {
-            // Authentic BM15 Qualification: MPG >= 15.0 and gamesPlayed >= max(3, currentMatchday / 10)
             val minGames = (currentMatchday / 10).coerceAtLeast(3)
-            activeStatsList.filter { it.gamesPlayed >= minGames && it.mpg >= 15.0 }
+            activeStatsList.filter { it.gamesPlayed >= minGames && it.mpg >= 14.0 }
         } else {
-            // Playoff Qualification: at least 1 playoff game
             activeStatsList.filter { it.gamesPlayed >= 1 }
         }
         when (selectedLeaderCategory) {
@@ -81,6 +79,10 @@ fun LeagueStatsScreen(
             "AST" -> qualified.sortedByDescending { it.apg }.take(50)
             "STL" -> qualified.sortedByDescending { it.spg }.take(50)
             "BLK" -> qualified.sortedByDescending { it.bpg }.take(50)
+            "TOV" -> qualified.sortedByDescending { it.topg }.take(50)
+            "FG%" -> qualified.filter { it.fgAttPerGame >= 4.0 }.sortedByDescending { it.fgPercentage }.take(50)
+            "3P%" -> qualified.filter { it.threePtAttPerGame >= 1.5 }.sortedByDescending { it.threePtPercentage }.take(50)
+            "FT%" -> qualified.filter { it.ftAttPerGame >= 1.5 }.sortedByDescending { it.ftPercentage }.take(50)
             "PER" -> qualified.sortedByDescending { it.avgPer }.take(50)
             else -> qualified.sortedByDescending { it.ppg }.take(50)
         }
@@ -235,6 +237,10 @@ fun LeagueStatsScreen(
                             "AST" to "Assists (APG)",
                             "STL" to "Steals (SPG)",
                             "BLK" to "Blocks (BPG)",
+                            "TOV" to "Turnovers (TOPG)",
+                            "FG%" to "Field Goal (FG%)",
+                            "3P%" to "3-Point (3P%)",
+                            "FT%" to "Free Throw (FT%)",
                             "PER" to "PER Efficiency"
                         ).forEach { (cat, label) ->
                             FilterChip(
@@ -255,19 +261,23 @@ fun LeagueStatsScreen(
                             itemsIndexed(statLeaders) { index, stat ->
                                 val team = teamMap[stat.player.teamId]
                                 val statVal = when (selectedLeaderCategory) {
-                                    "PTS" -> String.format("%.1f PPG", stat.ppg)
-                                    "REB" -> String.format("%.1f RPG", stat.rpg)
-                                    "AST" -> String.format("%.1f APG", stat.apg)
-                                    "STL" -> String.format("%.1f SPG", stat.spg)
-                                    "BLK" -> String.format("%.1f BPG", stat.bpg)
-                                    "PER" -> String.format("%.1f PER", stat.avgPer)
-                                    else -> String.format("%.1f", stat.ppg)
+                                    "PTS" -> String.format(java.util.Locale.US, "%.1f PPG • %.1f%% FG", stat.ppg, stat.fgPercentage)
+                                    "REB" -> String.format(java.util.Locale.US, "%.1f RPG • %.1f PPG", stat.rpg, stat.ppg)
+                                    "AST" -> String.format(java.util.Locale.US, "%.1f APG • %.1f TOV", stat.apg, stat.topg)
+                                    "STL" -> String.format(java.util.Locale.US, "%.1f SPG • %.1f APG", stat.spg, stat.apg)
+                                    "BLK" -> String.format(java.util.Locale.US, "%.1f BPG • %.1f RPG", stat.bpg, stat.rpg)
+                                    "TOV" -> String.format(java.util.Locale.US, "%.1f TOPG • %.1f APG", stat.topg, stat.apg)
+                                    "FG%" -> String.format(java.util.Locale.US, "%.1f%% FG (%.1f/%.1f)", stat.fgPercentage, stat.fgMadePerGame, stat.fgAttPerGame)
+                                    "3P%" -> String.format(java.util.Locale.US, "%.1f%% 3P (%.1f/%.1f)", stat.threePtPercentage, stat.threePtMadePerGame, stat.threePtAttPerGame)
+                                    "FT%" -> String.format(java.util.Locale.US, "%.1f%% FT (%.1f/%.1f)", stat.ftPercentage, stat.ftMadePerGame, stat.ftAttPerGame)
+                                    "PER" -> String.format(java.util.Locale.US, "%.1f PER • %.1f PPG", stat.avgPer, stat.ppg)
+                                    else -> String.format(java.util.Locale.US, "%.1f", stat.ppg)
                                 }
                                 LeaguePlayerRankRow(
                                     rank = index + 1,
                                     player = stat.player,
                                     teamName = team?.name ?: "FA",
-                                    trailingText = "$statVal (${stat.gamesPlayed} GP)",
+                                    trailingText = statVal,
                                     onClick = { selectedPlayerForDetail = stat.player }
                                 )
                             }

@@ -422,12 +422,14 @@ fun DashboardScaffold(
                                 Tab(selected = squadSubTab == 1, onClick = { squadSubTab = 1 }, text = { Text("Lineup") })
                                 Tab(selected = squadSubTab == 2, onClick = { squadSubTab = 2 }, text = { Text("Tactics") })
                                 Tab(selected = squadSubTab == 3, onClick = { squadSubTab = 3 }, text = { Text("Finances") })
+                                Tab(selected = squadSubTab == 4, onClick = { squadSubTab = 4 }, text = { Text("Stats") })
                             }
                             when (squadSubTab) {
                                 0 -> RosterScreen(viewModel = viewModel)
                                 1 -> LineupScreen(viewModel = viewModel)
                                 2 -> TacticsScreen(viewModel = viewModel)
                                 3 -> FinancesScreen(viewModel = viewModel)
+                                4 -> TeamStatsScreen(viewModel = viewModel)
                             }
                         }
                     }

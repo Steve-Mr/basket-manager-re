@@ -97,24 +97,27 @@ fun PlayerDetailBottomSheet(
 ) {
     if (player == null) return
 
-    var statsTab by remember { mutableStateOf(0) } // 0: Regular Season, 1: Playoffs
-    val activeStats = if (statsTab == 0) stats else playoffStats
+    var selectedMainTab by remember { mutableStateOf(0) } // 0: Stats & Splits, 1: Attributes & Scouting
+    var statsScopeTab by remember { mutableStateOf(0) } // 0: Regular Season, 1: Playoffs
+    val activeStats = if (statsScopeTab == 0) stats else playoffStats
 
     val formattedSalary = if (player.salary >= 1_000_000) {
-        "$${player.salary / 1_000_000}M"
+        "$${String.format(java.util.Locale.US, "%.2f", player.salary / 1_000_000.0)}M"
     } else {
         "$${player.salary / 1_000}K"
     }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = MaterialTheme.colorScheme.surface
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 10.dp)
+                .padding(horizontal = 16.dp, vertical = 6.dp)
         ) {
+            // 1. TOP HEADER (PLAYER PROFILE)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -124,12 +127,12 @@ fun PlayerDetailBottomSheet(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    RatingBadge(rating = player.overallRating, size = 44)
+                    RatingBadge(rating = player.overallRating, size = 46)
                     Column {
                         Text(
                             text = player.name,
                             style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.ExtraBold
                         )
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -140,7 +143,7 @@ fun PlayerDetailBottomSheet(
                                 PositionBadge(position = player.positionSecond)
                             }
                             Text(
-                                text = "Age: ${player.age} • Pot: ★${player.potential}",
+                                text = "Age ${player.age} • Pot ★${player.potential}",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -152,159 +155,296 @@ fun PlayerDetailBottomSheet(
                     Text(
                         text = formattedSalary,
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.ExtraBold,
                         color = MaterialTheme.colorScheme.primary
                     )
                     Text(
-                        text = "${player.yearsContract} yrs left",
+                        text = "${player.yearsContract} yrs left • Loyalty ★${player.loyalty}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // Season Statistics Section (Unified Card Grid with Scope Tabs)
-            Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth()
+            // 2. MAIN TWO TABS: STATS VS ATTRIBUTES
+            TabRow(
+                selectedTabIndex = selectedMainTab,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
             ) {
-                Column(modifier = Modifier.padding(12.dp)) {
+                Tab(
+                    selected = selectedMainTab == 0,
+                    onClick = { selectedMainTab = 0 },
+                    text = { Text("📊 Stats & Shooting Splits", fontWeight = FontWeight.Bold, fontSize = 13.sp) }
+                )
+                Tab(
+                    selected = selectedMainTab == 1,
+                    onClick = { selectedMainTab = 1 },
+                    text = { Text("⚡ Attributes & Scouting", fontWeight = FontWeight.Bold, fontSize = 13.sp) }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // 3. TAB CONTENT
+            if (selectedMainTab == 0) {
+                // TAB 0: STATS & SHOOTING SPLITS
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Regular vs Playoff Toggle
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Performance Stats",
+                            text = if (statsScopeTab == 0) "Regular Season Averages" else "Playoff Averages",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
                         )
-
-                        TabRow(
-                            selectedTabIndex = statsTab,
-                            modifier = Modifier.width(200.dp).clip(RoundedCornerShape(6.dp))
-                        ) {
-                            Tab(selected = statsTab == 0, onClick = { statsTab = 0 }, text = { Text("Regular", fontSize = 11.sp) })
-                            Tab(selected = statsTab == 1, onClick = { statsTab = 1 }, text = { Text("Playoffs", fontSize = 11.sp) })
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    if (activeStats != null && activeStats.gamesPlayed > 0) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceAround
-                        ) {
-                            StatItem(label = "GP", value = "${activeStats.gamesPlayed}")
-                            StatItem(label = "PPG", value = String.format("%.1f", activeStats.ppg))
-                            StatItem(label = "RPG", value = String.format("%.1f", activeStats.rpg))
-                            StatItem(label = "APG", value = String.format("%.1f", activeStats.apg))
-                            StatItem(label = "SPG", value = String.format("%.1f", activeStats.spg))
-                            StatItem(label = "BPG", value = String.format("%.1f", activeStats.bpg))
-                            StatItem(label = "PER", value = String.format("%.1f", activeStats.avgPer))
-                        }
-                    } else {
-                        Box(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = if (statsTab == 0) "No regular season games recorded" else "No playoff appearances recorded",
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            FilterChip(
+                                selected = statsScopeTab == 0,
+                                onClick = { statsScopeTab = 0 },
+                                label = { Text("Regular", fontSize = 11.sp) }
+                            )
+                            FilterChip(
+                                selected = statsScopeTab == 1,
+                                onClick = { statsScopeTab = 1 },
+                                label = { Text("Playoffs", fontSize = 11.sp) }
                             )
                         }
                     }
-                }
-            }
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
+                    if (activeStats != null && activeStats.gamesPlayed > 0) {
+                        // 6-Metric Stat Cards Grid (PTS, REB, AST, STL, BLK, TOV)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            ModernMetricCard(label = "PPG", value = String.format(java.util.Locale.US, "%.1f", activeStats.ppg), modifier = Modifier.weight(1f), highlight = true)
+                            ModernMetricCard(label = "RPG", value = String.format(java.util.Locale.US, "%.1f", activeStats.rpg), modifier = Modifier.weight(1f))
+                            ModernMetricCard(label = "APG", value = String.format(java.util.Locale.US, "%.1f", activeStats.apg), modifier = Modifier.weight(1f))
+                            ModernMetricCard(label = "SPG", value = String.format(java.util.Locale.US, "%.1f", activeStats.spg), modifier = Modifier.weight(1f))
+                            ModernMetricCard(label = "BPG", value = String.format(java.util.Locale.US, "%.1f", activeStats.bpg), modifier = Modifier.weight(1f))
+                            ModernMetricCard(label = "TOPG", value = String.format(java.util.Locale.US, "%.1f", activeStats.topg), modifier = Modifier.weight(1f), isTurnover = true)
+                        }
 
-            Text(
-                text = "Player Attributes",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
+                        // Shooting Efficiency Splits Card
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text("🎯 Shooting Efficiency & Percentages", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
 
-            Spacer(modifier = Modifier.height(6.dp))
+                                ShootingSplitRow(
+                                    label = "Field Goal (FG%)",
+                                    percentage = activeStats.fgPercentage,
+                                    made = activeStats.fgMadePerGame,
+                                    attempted = activeStats.fgAttPerGame
+                                )
+                                ShootingSplitRow(
+                                    label = "3-Point (3P%)",
+                                    percentage = activeStats.threePtPercentage,
+                                    made = activeStats.threePtMadePerGame,
+                                    attempted = activeStats.threePtAttPerGame
+                                )
+                                ShootingSplitRow(
+                                    label = "Free Throw (FT%)",
+                                    percentage = activeStats.ftPercentage,
+                                    made = activeStats.ftMadePerGame,
+                                    attempted = activeStats.ftAttPerGame
+                                )
+                            }
+                        }
 
-            SkillProgressBar(label = "Physique / Energy", value = player.skillPhysique)
-            SkillProgressBar(label = "Interior Shooting (2PT)", value = player.skillShotInterior)
-            SkillProgressBar(label = "Exterior Shooting (2PT/3PT)", value = player.skillShotExterior)
-            SkillProgressBar(label = "Free Throw", value = player.skillShotFree)
-            SkillProgressBar(label = "Passing / Vision", value = player.skillPass)
-            SkillProgressBar(label = "Rebounding", value = player.skillRebound)
-            SkillProgressBar(label = "Stealing", value = player.skillSteal)
-            SkillProgressBar(label = "Shot Blocking", value = player.skillBlock)
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column {
-                    Text("Form", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("${player.stateForm}%", fontWeight = FontWeight.Bold)
-                }
-                Column {
-                    Text("Energy", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("${player.stateEnergy}%", fontWeight = FontWeight.Bold)
-                }
-                Column {
-                    Text("Injury Status", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    if (player.stateInjury > 0) {
-                        Text("${player.stateInjury} days", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                        // Advanced & Playing Time Metrics
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                horizontalArrangement = Arrangement.SpaceAround,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                StatItem(label = "GP", value = "${activeStats.gamesPlayed}")
+                                StatItem(label = "MIN", value = String.format(java.util.Locale.US, "%.1f", activeStats.mpg))
+                                StatItem(label = "PF/G", value = String.format(java.util.Locale.US, "%.1f", activeStats.pfpg))
+                                StatItem(label = "PER", value = String.format(java.util.Locale.US, "%.1f", activeStats.avgPer))
+                            }
+                        }
                     } else {
-                        Text("Healthy", color = RatingGreen, fontWeight = FontWeight.Bold)
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(24.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = if (statsScopeTab == 0) "No regular season game statistics recorded." else "No playoff appearances recorded.",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                     }
                 }
-                Column {
-                    Text("Loyalty", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("★".repeat(player.loyalty), color = MaterialTheme.colorScheme.primary)
+            } else {
+                // TAB 1: ATTRIBUTES & SCOUTING REPORT
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("⚡ Athleticism & Physical Condition", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+                            SkillProgressBar(label = "Physique & Conditioning", value = player.skillPhysique)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Current Energy: ${player.stateEnergy}%", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("Match Form: ${player.stateForm}%", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("🏀 Offensive Skills", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+                            SkillProgressBar(label = "Interior Scoring (2PT Paint & Mid)", value = player.skillShotInterior)
+                            SkillProgressBar(label = "Exterior Shooting (2PT/3PT Range)", value = player.skillShotExterior)
+                            SkillProgressBar(label = "Free Throw Accuracy", value = player.skillShotFree)
+                            SkillProgressBar(label = "Playmaking & Court Vision", value = player.skillPass)
+                        }
+                    }
+
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("🛡️ Defensive Skills", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+                            SkillProgressBar(label = "Stealing & Perimeter Defense", value = player.skillSteal)
+                            SkillProgressBar(label = "Shot Blocking & Rim Protection", value = player.skillBlock)
+                            SkillProgressBar(label = "Rebounding Dominance", value = player.skillRebound)
+                        }
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
 
 @Composable
-fun StatItem(label: String, value: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold)
-        Text(value, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+fun ModernMetricCard(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    highlight: Boolean = false,
+    isTurnover: Boolean = false
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = when {
+                highlight -> MaterialTheme.colorScheme.primaryContainer
+                isTurnover -> RatingRed.copy(alpha = 0.12f)
+                else -> MaterialTheme.colorScheme.surfaceVariant
+            }
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp, horizontal = 2.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = value,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = when {
+                    highlight -> MaterialTheme.colorScheme.primary
+                    isTurnover -> RatingRed
+                    else -> MaterialTheme.colorScheme.onSurface
+                }
+            )
+            Text(
+                text = label,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (isTurnover) RatingRed.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 
 @Composable
-fun SkillProgressBar(
+fun ShootingSplitRow(
     label: String,
-    value: Int
+    percentage: Double,
+    made: Double,
+    attempted: Double
 ) {
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+    val pctColor = when {
+        percentage >= 50.0 -> RatingGreen
+        percentage >= 40.0 -> Color(0xFFD97706)
+        else -> RatingRed
+    }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(text = label, fontSize = 11.sp)
-            Text(text = value.toString(), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Text(label, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                text = "${String.format(java.util.Locale.US, "%.1f", percentage)}%  (${String.format(java.util.Locale.US, "%.1f", made)}/${String.format(java.util.Locale.US, "%.1f", attempted)})",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = pctColor
+            )
         }
+        Spacer(modifier = Modifier.height(2.dp))
         LinearProgressIndicator(
-            progress = { (value / 100f).coerceIn(0f, 1f) },
-            modifier = Modifier.fillMaxWidth().height(5.dp).clip(RoundedCornerShape(3.dp)),
-            color = when {
-                value >= 80 -> RatingGreen
-                value >= 65 -> RatingBlue
-                value >= 50 -> RatingYellow
-                else -> RatingOrange
-            }
+            progress = { (percentage / 100.0).toFloat().coerceIn(0f, 1f) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(5.dp)
+                .clip(RoundedCornerShape(3.dp)),
+            color = pctColor,
+            trackColor = MaterialTheme.colorScheme.surface
         )
     }
 }
@@ -329,6 +469,46 @@ fun MatchBoxScoreDialog(
         boxScores.filter { it.teamId == lId }
     }
 
+    // Team Totals & Shooting Comparison
+    val vFgM = visitorResults.sumOf { it.totalFgMade }
+    val vFgA = visitorResults.sumOf { it.totalFgAttempted }
+    val vFgPct = if (vFgA > 0) (vFgM.toDouble() / vFgA) * 100.0 else 0.0
+
+    val lFgM = localResults.sumOf { it.totalFgMade }
+    val lFgA = localResults.sumOf { it.totalFgAttempted }
+    val lFgPct = if (lFgA > 0) (lFgM.toDouble() / lFgA) * 100.0 else 0.0
+
+    val v3PM = visitorResults.sumOf { it.shotsExteriorTripleOk }
+    val v3PA = visitorResults.sumOf { it.total3PtAttempted }
+    val v3PPct = if (v3PA > 0) (v3PM.toDouble() / v3PA) * 100.0 else 0.0
+
+    val l3PM = localResults.sumOf { it.shotsExteriorTripleOk }
+    val l3PA = localResults.sumOf { it.total3PtAttempted }
+    val l3PPct = if (l3PA > 0) (l3PM.toDouble() / l3PA) * 100.0 else 0.0
+
+    val vFtM = visitorResults.sumOf { it.shotsFreeOk }
+    val vFtA = visitorResults.sumOf { it.totalFtAttempted }
+    val vFtPct = if (vFtA > 0) (vFtM.toDouble() / vFtA) * 100.0 else 0.0
+
+    val lFtM = localResults.sumOf { it.shotsFreeOk }
+    val lFtA = localResults.sumOf { it.totalFtAttempted }
+    val lFtPct = if (lFtA > 0) (lFtM.toDouble() / lFtA) * 100.0 else 0.0
+
+    val vReb = visitorResults.sumOf { it.rebounds }
+    val lReb = localResults.sumOf { it.rebounds }
+
+    val vAst = visitorResults.sumOf { it.passesOk }
+    val lAst = localResults.sumOf { it.passesOk }
+
+    val vStl = visitorResults.sumOf { it.steals }
+    val lStl = localResults.sumOf { it.steals }
+
+    val vBlk = visitorResults.sumOf { it.blocks }
+    val lBlk = localResults.sumOf { it.blocks }
+
+    val vTov = visitorResults.sumOf { it.passesKo }
+    val lTov = localResults.sumOf { it.passesKo }
+
     // Starters vs Reserves breakdown (starters are top 5 by minutes played)
     val visitorStarters = remember(visitorResults) { visitorResults.sortedByDescending { it.minutesPlayed }.take(5) }
     val visitorReserves = remember(visitorResults) { visitorResults.sortedByDescending { it.minutesPlayed }.drop(5) }
@@ -337,79 +517,125 @@ fun MatchBoxScoreDialog(
     val localReserves = remember(localResults) { localResults.sortedByDescending { it.minutesPlayed }.drop(5) }
 
     var selectedTeamTab by remember { mutableStateOf(0) } // 0: Visitor, 1: Local
+    var showTeamComparison by remember { mutableStateOf(false) }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.90f),
-            shape = RoundedCornerShape(16.dp)
+                .fillMaxHeight(0.92f),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
         ) {
-            Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+            Column(modifier = Modifier.fillMaxSize().padding(14.dp)) {
+                // Header Bar
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = match.name ?: "Box Score",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Column {
+                        Text(
+                            text = match.name ?: "NBA Box Score",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.ExtraBold
+                        )
+                        Text(
+                            text = "Matchday ${match.matchday} • Final",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     IconButton(onClick = onDismiss) {
                         Icon(Icons.Default.Close, contentDescription = "Close")
                     }
                 }
 
-                // Quarter breakdown table
+                // Quarter breakdown line score
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(8.dp),
-                        horizontalArrangement = Arrangement.SpaceAround
-                    ) {
-                        Text("Team", fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                        Text("Q1", fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                        Text("Q2", fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                        Text("Q3", fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                        Text("Q4", fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                        if ((match.localOt ?: 0) > 0 || (match.visitorOt ?: 0) > 0) {
-                            Text("OT", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceAround
+                        ) {
+                            Text("Team", fontWeight = FontWeight.Bold, fontSize = 11.sp, modifier = Modifier.weight(1.5f))
+                            Text("Q1", fontWeight = FontWeight.Bold, fontSize = 11.sp, modifier = Modifier.weight(1f))
+                            Text("Q2", fontWeight = FontWeight.Bold, fontSize = 11.sp, modifier = Modifier.weight(1f))
+                            Text("Q3", fontWeight = FontWeight.Bold, fontSize = 11.sp, modifier = Modifier.weight(1f))
+                            Text("Q4", fontWeight = FontWeight.Bold, fontSize = 11.sp, modifier = Modifier.weight(1f))
+                            if ((match.localOt ?: 0) > 0 || (match.visitorOt ?: 0) > 0) {
+                                Text("OT", fontWeight = FontWeight.Bold, fontSize = 11.sp, modifier = Modifier.weight(1f))
+                            }
+                            Text("FINAL", fontWeight = FontWeight.ExtraBold, fontSize = 11.sp, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1.2f))
                         }
-                        Text("TOT", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
-                    }
-                    HorizontalDivider()
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(8.dp),
-                        horizontalArrangement = Arrangement.SpaceAround
-                    ) {
-                        Text(visitorTeam?.name ?: "VIS", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        Text("${match.visitorQuarter1 ?: 0}", fontSize = 11.sp)
-                        Text("${match.visitorQuarter2 ?: 0}", fontSize = 11.sp)
-                        Text("${match.visitorQuarter3 ?: 0}", fontSize = 11.sp)
-                        Text("${match.visitorQuarter4 ?: 0}", fontSize = 11.sp)
-                        if ((match.localOt ?: 0) > 0 || (match.visitorOt ?: 0) > 0) {
-                            Text("${match.visitorOt ?: 0}", fontSize = 11.sp)
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceAround
+                        ) {
+                            Text(visitorTeam?.name ?: "VIS", fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1.5f))
+                            Text("${match.visitorQuarter1 ?: 0}", fontSize = 11.sp, modifier = Modifier.weight(1f))
+                            Text("${match.visitorQuarter2 ?: 0}", fontSize = 11.sp, modifier = Modifier.weight(1f))
+                            Text("${match.visitorQuarter3 ?: 0}", fontSize = 11.sp, modifier = Modifier.weight(1f))
+                            Text("${match.visitorQuarter4 ?: 0}", fontSize = 11.sp, modifier = Modifier.weight(1f))
+                            if ((match.localOt ?: 0) > 0 || (match.visitorOt ?: 0) > 0) {
+                                Text("${match.visitorOt ?: 0}", fontSize = 11.sp, modifier = Modifier.weight(1f))
+                            }
+                            Text("${match.visitorScore ?: 0}", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = if ((match.visitorScore ?: 0) > (match.localScore ?: 0)) RatingGreen else MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1.2f))
                         }
-                        Text("${match.visitorScore ?: 0}", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(8.dp),
-                        horizontalArrangement = Arrangement.SpaceAround
-                    ) {
-                        Text(localTeam?.name ?: "LOC", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        Text("${match.localQuarter1 ?: 0}", fontSize = 11.sp)
-                        Text("${match.localQuarter2 ?: 0}", fontSize = 11.sp)
-                        Text("${match.localQuarter3 ?: 0}", fontSize = 11.sp)
-                        Text("${match.localQuarter4 ?: 0}", fontSize = 11.sp)
-                        if ((match.localOt ?: 0) > 0 || (match.visitorOt ?: 0) > 0) {
-                            Text("${match.localOt ?: 0}", fontSize = 11.sp)
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                            horizontalArrangement = Arrangement.SpaceAround
+                        ) {
+                            Text(localTeam?.name ?: "LOC", fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1.5f))
+                            Text("${match.localQuarter1 ?: 0}", fontSize = 11.sp, modifier = Modifier.weight(1f))
+                            Text("${match.localQuarter2 ?: 0}", fontSize = 11.sp, modifier = Modifier.weight(1f))
+                            Text("${match.localQuarter3 ?: 0}", fontSize = 11.sp, modifier = Modifier.weight(1f))
+                            Text("${match.localQuarter4 ?: 0}", fontSize = 11.sp, modifier = Modifier.weight(1f))
+                            if ((match.localOt ?: 0) > 0 || (match.visitorOt ?: 0) > 0) {
+                                Text("${match.localOt ?: 0}", fontSize = 11.sp, modifier = Modifier.weight(1f))
+                            }
+                            Text("${match.localScore ?: 0}", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = if ((match.localScore ?: 0) > (match.visitorScore ?: 0)) RatingGreen else MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1.2f))
                         }
-                        Text("${match.localScore ?: 0}", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     }
                 }
+
+                // Team Comparison Toggle Bar
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth().clickable { showTeamComparison = !showTeamComparison }.padding(vertical = 2.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (showTeamComparison) "▼ Hide Team Stats Comparison" else "▶ View Team Stats Comparison (FG%, 3P%, TOV, REB...)",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    if (showTeamComparison) {
+                        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            TeamStatCompareRow(label = "Field Goal (FG%)", vVal = "${String.format(java.util.Locale.US, "%.1f", vFgPct)}% ($vFgM/$vFgA)", lVal = "${String.format(java.util.Locale.US, "%.1f", lFgPct)}% ($lFgM/$lFgA)")
+                            TeamStatCompareRow(label = "3-Point (3P%)", vVal = "${String.format(java.util.Locale.US, "%.1f", v3PPct)}% ($v3PM/$v3PA)", lVal = "${String.format(java.util.Locale.US, "%.1f", l3PPct)}% ($l3PM/$l3PA)")
+                            TeamStatCompareRow(label = "Free Throw (FT%)", vVal = "${String.format(java.util.Locale.US, "%.1f", vFtPct)}% ($vFtM/$vFtA)", lVal = "${String.format(java.util.Locale.US, "%.1f", lFtPct)}% ($lFtM/$lFtA)")
+                            TeamStatCompareRow(label = "Total Rebounds", vVal = "$vReb", lVal = "$lReb")
+                            TeamStatCompareRow(label = "Total Assists", vVal = "$vAst", lVal = "$lAst")
+                            TeamStatCompareRow(label = "Steals / Blocks", vVal = "$vStl / $vBlk", lVal = "$lStl / $lBlk")
+                            TeamStatCompareRow(label = "Turnovers (TOV)", vVal = "$vTov", lVal = "$lTov", isTurnover = true)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
 
                 // Team Tab Switch
                 SingleChoiceSegmentedButtonRow(
@@ -420,14 +646,14 @@ fun MatchBoxScoreDialog(
                         onClick = { selectedTeamTab = 0 },
                         shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
                     ) {
-                        Text("${visitorTeam?.name ?: "VIS"} (${match.visitorScore ?: 0})", fontWeight = FontWeight.Bold)
+                        Text("${visitorTeam?.name ?: "VIS"} (${match.visitorScore ?: 0})", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
                     SegmentedButton(
                         selected = selectedTeamTab == 1,
                         onClick = { selectedTeamTab = 1 },
                         shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
                     ) {
-                        Text("${localTeam?.name ?: "LOC"} (${match.localScore ?: 0})", fontWeight = FontWeight.Bold)
+                        Text("${localTeam?.name ?: "LOC"} (${match.localScore ?: 0})", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
                 }
 
@@ -442,7 +668,7 @@ fun MatchBoxScoreDialog(
                         Text(
                             text = "STARTERS",
                             style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.ExtraBold,
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
                         )
@@ -457,7 +683,7 @@ fun MatchBoxScoreDialog(
                             Text(
                                 text = "BENCH RESERVES",
                                 style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.ExtraBold,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
                             )
@@ -474,30 +700,46 @@ fun MatchBoxScoreDialog(
 }
 
 @Composable
+fun TeamStatCompareRow(label: String, vVal: String, lVal: String, isTurnover: Boolean = false) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(vVal, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+        Text(label, fontSize = 10.sp, color = if (isTurnover) RatingRed else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1.5f), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        Text(lVal, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.End)
+    }
+}
+
+@Composable
 fun BoxScorePlayerRow(stat: MatchResult) {
     val fgTotal = stat.totalFgAttempted
     val fgMade = stat.totalFgMade
-    val fgPct = kotlin.math.round(stat.fgPercentage).toInt()
+    val fgPct = String.format(java.util.Locale.US, "%.1f", stat.fgPercentage)
 
     val tpTotal = stat.total3PtAttempted
     val tpMade = stat.shotsExteriorTripleOk
+    val tpPct = String.format(java.util.Locale.US, "%.1f", stat.threePtPercentage)
 
     val ftTotal = stat.totalFtAttempted
     val ftMade = stat.shotsFreeOk
+    val ftPct = String.format(java.util.Locale.US, "%.1f", stat.ftPercentage)
 
     val perFormatted = String.format(java.util.Locale.US, "%.1f", stat.per)
 
     Card(
         shape = RoundedCornerShape(8.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 10.dp, vertical = 6.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
+            verticalArrangement = Arrangement.spacedBy(3.dp)
         ) {
+            // Row 1: Player Name, Minutes, Primary Core Stats (PTS, REB, AST)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -507,7 +749,7 @@ fun BoxScorePlayerRow(stat: MatchResult) {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text(stat.playerName, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    Text(stat.playerName, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp)
                     Surface(
                         shape = RoundedCornerShape(4.dp),
                         color = MaterialTheme.colorScheme.surface
@@ -515,6 +757,7 @@ fun BoxScorePlayerRow(stat: MatchResult) {
                         Text(
                             text = "${stat.minutesPlayed}m",
                             fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -544,23 +787,92 @@ fun BoxScorePlayerRow(stat: MatchResult) {
                 }
             }
 
+            // Row 2: Shooting Splits (FG%, 3P%, FT%)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "FG: $fgMade/$fgTotal ($fgPct%) • 3PT: $tpMade/$tpTotal • FT: $ftMade/$ftTotal",
+                    text = "FG: $fgMade/$fgTotal ($fgPct%) • 3PT: $tpMade/$tpTotal ($tpPct%) • FT: $ftMade/$ftTotal ($ftPct%)",
                     fontSize = 10.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+
+            // Row 3: Defense & Discipline (STL, BLK, TOV/Turnovers, PF/Fouls, PER)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("STL: ${stat.steals}", fontSize = 10.sp, fontWeight = FontWeight.Medium)
+                    Text("•", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("BLK: ${stat.blocks}", fontSize = 10.sp, fontWeight = FontWeight.Medium)
+                    Text("•", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        text = "TOV: ${stat.passesKo}",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (stat.passesKo >= 3) RatingRed else MaterialTheme.colorScheme.onSurface
+                    )
+                    Text("•", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("PF: ${stat.fouls}", fontSize = 10.sp, color = if (stat.fouls >= 5) RatingRed else MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 Text(
-                    text = "STL: ${stat.steals} • BLK: ${stat.blocks} • PER: $perFormatted",
+                    text = "PER: $perFormatted",
                     fontSize = 10.sp,
                     color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Bold
                 )
             }
         }
+    }
+}
+
+@Composable
+fun StatItem(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.ExtraBold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+fun SkillProgressBar(label: String, value: Int) {
+    val color = when {
+        value >= 85 -> RatingGreen
+        value >= 70 -> Color(0xFFD97706)
+        else -> RatingRed
+    }
+
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(text = label, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+            Text(text = value.toString(), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = color)
+        }
+        LinearProgressIndicator(
+            progress = { (value / 100f).coerceIn(0f, 1f) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .clip(RoundedCornerShape(3.dp)),
+            color = color,
+            trackColor = MaterialTheme.colorScheme.surface
+        )
     }
 }

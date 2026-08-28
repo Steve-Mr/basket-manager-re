@@ -13,14 +13,25 @@ import java.io.InputStream
 
 data class PlayerSeasonStats(
     val player: Player,
-    val gamesPlayed: Int,
+    val gamesPlayed: Int = 0,
     val mpg: Double = 0.0,
-    val ppg: Double,
-    val rpg: Double,
-    val apg: Double,
-    val spg: Double,
-    val bpg: Double,
-    val avgPer: Double,
+    val ppg: Double = 0.0,
+    val rpg: Double = 0.0,
+    val apg: Double = 0.0,
+    val spg: Double = 0.0,
+    val bpg: Double = 0.0,
+    val topg: Double = 0.0,
+    val pfpg: Double = 0.0,
+    val fgPercentage: Double = 0.0,
+    val fgMadePerGame: Double = 0.0,
+    val fgAttPerGame: Double = 0.0,
+    val threePtPercentage: Double = 0.0,
+    val threePtMadePerGame: Double = 0.0,
+    val threePtAttPerGame: Double = 0.0,
+    val ftPercentage: Double = 0.0,
+    val ftMadePerGame: Double = 0.0,
+    val ftAttPerGame: Double = 0.0,
+    val avgPer: Double = 0.0,
     val isPlayoffs: Boolean = false
 )
 
@@ -148,36 +159,72 @@ class GameDashboardViewModel(
         val players = repository.getPlayers(g.id)
         _allPlayers.value = players
 
+        // Helper function for full statistical aggregation
+        fun aggregateStats(player: Player, pStats: List<MatchResult>, isPlayoffs: Boolean): PlayerSeasonStats {
+            val gp = pStats.size
+            if (gp == 0) return PlayerSeasonStats(player = player, gamesPlayed = 0, isPlayoffs = isPlayoffs)
+            val mpg = pStats.sumOf { it.minutesPlayed }.toDouble() / gp
+            val ppg = pStats.sumOf { it.points }.toDouble() / gp
+            val rpg = pStats.sumOf { it.rebounds }.toDouble() / gp
+            val apg = pStats.sumOf { it.passesOk }.toDouble() / gp
+            val spg = pStats.sumOf { it.steals }.toDouble() / gp
+            val bpg = pStats.sumOf { it.blocks }.toDouble() / gp
+            val topg = pStats.sumOf { it.passesKo }.toDouble() / gp
+            val pfpg = pStats.sumOf { it.fouls }.toDouble() / gp
+
+            val totalFgM = pStats.sumOf { it.totalFgMade }
+            val totalFgA = pStats.sumOf { it.totalFgAttempted }
+            val fgPct = if (totalFgA > 0) (totalFgM.toDouble() / totalFgA) * 100.0 else 0.0
+            val fgMPerGame = totalFgM.toDouble() / gp
+            val fgAPerGame = totalFgA.toDouble() / gp
+
+            val total3PM = pStats.sumOf { it.shotsExteriorTripleOk }
+            val total3PA = pStats.sumOf { it.total3PtAttempted }
+            val threePtPct = if (total3PA > 0) (total3PM.toDouble() / total3PA) * 100.0 else 0.0
+            val threePtMPerGame = total3PM.toDouble() / gp
+            val threePtAPerGame = total3PA.toDouble() / gp
+
+            val totalFtM = pStats.sumOf { it.shotsFreeOk }
+            val totalFtA = pStats.sumOf { it.totalFtAttempted }
+            val ftPct = if (totalFtA > 0) (totalFtM.toDouble() / totalFtA) * 100.0 else 0.0
+            val ftMPerGame = totalFtM.toDouble() / gp
+            val ftAPerGame = totalFtA.toDouble() / gp
+
+            val avgPer = pStats.sumOf { it.per }.toDouble() / gp
+
+            return PlayerSeasonStats(
+                player = player,
+                gamesPlayed = gp,
+                mpg = mpg,
+                ppg = ppg,
+                rpg = rpg,
+                apg = apg,
+                spg = spg,
+                bpg = bpg,
+                topg = topg,
+                pfpg = pfpg,
+                fgPercentage = fgPct,
+                fgMadePerGame = fgMPerGame,
+                fgAttPerGame = fgAPerGame,
+                threePtPercentage = threePtPct,
+                threePtMadePerGame = threePtMPerGame,
+                threePtAttPerGame = threePtAPerGame,
+                ftPercentage = ftPct,
+                ftMadePerGame = ftMPerGame,
+                ftAttPerGame = ftAPerGame,
+                avgPer = avgPer,
+                isPlayoffs = isPlayoffs
+            )
+        }
+
         // 1. Regular Season Statistics (matchday <= 166)
         val regularMap = repository.getAllPlayerRegularStats(g.id)
-        val regularList = players.map { p ->
-            val pStats = regularMap[p.id] ?: emptyList()
-            val gp = pStats.size
-            val mpg = if (gp > 0) pStats.sumOf { it.minutesPlayed }.toDouble() / gp else 0.0
-            val ppg = if (gp > 0) pStats.sumOf { it.points }.toDouble() / gp else 0.0
-            val rpg = if (gp > 0) pStats.sumOf { it.rebounds }.toDouble() / gp else 0.0
-            val apg = if (gp > 0) pStats.sumOf { it.passesOk }.toDouble() / gp else 0.0
-            val spg = if (gp > 0) pStats.sumOf { it.steals }.toDouble() / gp else 0.0
-            val bpg = if (gp > 0) pStats.sumOf { it.blocks }.toDouble() / gp else 0.0
-            val avgPer = if (gp > 0) pStats.sumOf { it.per }.toDouble() / gp else 0.0
-            PlayerSeasonStats(p, gp, mpg, ppg, rpg, apg, spg, bpg, avgPer, isPlayoffs = false)
-        }
+        val regularList = players.map { p -> aggregateStats(p, regularMap[p.id] ?: emptyList(), isPlayoffs = false) }
         _playerStatsList.value = regularList
 
         // 2. Playoff Statistics (matchday > 166)
         val playoffMap = repository.getAllPlayerPlayoffStats(g.id)
-        val playoffList = players.map { p ->
-            val pStats = playoffMap[p.id] ?: emptyList()
-            val gp = pStats.size
-            val mpg = if (gp > 0) pStats.sumOf { it.minutesPlayed }.toDouble() / gp else 0.0
-            val ppg = if (gp > 0) pStats.sumOf { it.points }.toDouble() / gp else 0.0
-            val rpg = if (gp > 0) pStats.sumOf { it.rebounds }.toDouble() / gp else 0.0
-            val apg = if (gp > 0) pStats.sumOf { it.passesOk }.toDouble() / gp else 0.0
-            val spg = if (gp > 0) pStats.sumOf { it.steals }.toDouble() / gp else 0.0
-            val bpg = if (gp > 0) pStats.sumOf { it.blocks }.toDouble() / gp else 0.0
-            val avgPer = if (gp > 0) pStats.sumOf { it.per }.toDouble() / gp else 0.0
-            PlayerSeasonStats(p, gp, mpg, ppg, rpg, apg, spg, bpg, avgPer, isPlayoffs = true)
-        }
+        val playoffList = players.map { p -> aggregateStats(p, playoffMap[p.id] ?: emptyList(), isPlayoffs = true) }
         _playerPlayoffStatsList.value = playoffList
     }
 
@@ -187,6 +234,11 @@ class GameDashboardViewModel(
 
     fun getPlayerPlayoffStats(playerId: Long): PlayerSeasonStats? {
         return _playerPlayoffStatsList.value.find { it.player.id == playerId }
+    }
+
+    fun getTeamPlayerStats(teamId: Long, isPlayoffs: Boolean): List<PlayerSeasonStats> {
+        val statsList = if (isPlayoffs) _playerPlayoffStatsList.value else _playerStatsList.value
+        return statsList.filter { it.player.teamId == teamId }
     }
 
     fun swapPlayerPositions(player: Player) {

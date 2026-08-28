@@ -155,6 +155,11 @@ fun TeamDetailScreen(
                 Tab(
                     selected = selectedTab == 2,
                     onClick = { selectedTab = 2 },
+                    text = { Text("Stats") }
+                )
+                Tab(
+                    selected = selectedTab == 3,
+                    onClick = { selectedTab = 3 },
                     text = { Text("Schedule (${schedule.size})") }
                 )
             }
@@ -162,6 +167,10 @@ fun TeamDetailScreen(
             Spacer(modifier = Modifier.height(10.dp))
 
             when (selectedTab) {
+                2 -> {
+                    // Team Statistics Tab
+                    TeamStatsScreen(viewModel = viewModel, targetTeamId = teamId)
+                }
                 0 -> {
                     // Squad Roster List
                     LazyColumn(
@@ -345,7 +354,7 @@ fun TeamDetailScreen(
                     }
                 }
 
-                2 -> {
+                3 -> {
                     // Team 82-Game Schedule & Results
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
