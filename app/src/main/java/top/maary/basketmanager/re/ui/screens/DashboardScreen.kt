@@ -1,6 +1,11 @@
 package top.maary.basketmanager.re.ui.screens
 
+import androidx.compose.foundation.shape.CircleShape
+
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -14,6 +19,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import top.maary.basketmanager.re.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -24,6 +31,8 @@ import top.maary.basketmanager.re.ui.components.PlayerDetailBottomSheet
 import top.maary.basketmanager.re.ui.theme.RatingGreen
 import top.maary.basketmanager.re.ui.theme.RatingRed
 import top.maary.basketmanager.re.ui.viewmodel.GameDashboardViewModel
+
+private data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -321,29 +330,79 @@ fun DashboardScreen(
             }
         }
 
-        // News Feed with Visual Color Coding (Full Season Retention & Beautiful Formatting)
+        // News Feed with Visual Color Coding, Authentic Icons & Beautiful Formatting
         items(newsList) { news ->
             val isWin = news.type == NewsType.WON || (news.type == NewsType.PLAYOFFS && news.title.contains("Victory"))
             val isLoss = news.type == NewsType.LOST || (news.type == NewsType.PLAYOFFS && news.title.contains("Defeat"))
+            val isImprove = news.type == NewsType.IMPROVE || news.title.contains("Improved")
+            val isDecline = news.type == NewsType.DECLINE || news.title.contains("Declined")
             val isInj = news.type == NewsType.INJURED
+            val isRecovery = news.type == NewsType.RECOVERY
             val isPlayoff = news.type == NewsType.PLAYOFFS && !news.title.contains("Victory") && !news.title.contains("Defeat")
-            val isAward = news.title.contains("MVP") || news.title.contains("ROY") || news.title.contains("Award") || news.title.contains("Triple Double") || news.title.contains("Explosion") || news.title.contains("Awesome")
+            val isAward = news.type == NewsType.TROPHY || news.type == NewsType.MVP || news.title.contains("MVP") || news.title.contains("ROY") || news.title.contains("Award") || news.title.contains("Triple Double") || news.title.contains("Explosion") || news.title.contains("Awesome")
+            val isTrade = news.type == NewsType.TRADE
 
-            val borderColor = when {
-                isWin -> RatingGreen
-                isLoss -> RatingRed
-                isInj -> MaterialTheme.colorScheme.error
-                isPlayoff -> Color(0xFFFFD700)
-                isAward -> Color(0xFFFFA000)
-                else -> MaterialTheme.colorScheme.outlineVariant
-            }
-
-            val bgColor = when {
-                isWin -> RatingGreen.copy(alpha = 0.08f)
-                isLoss -> RatingRed.copy(alpha = 0.08f)
-                isInj -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f)
-                isAward -> Color(0xFFFFA000).copy(alpha = 0.08f)
-                else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            val (borderColor, bgColor, titleColor, iconRes) = when {
+                isImprove -> Quadruple(
+                    Color(0xFF00C853),
+                    Color(0xFF00C853).copy(alpha = 0.12f),
+                    Color(0xFF007E33),
+                    R.drawable.news_improve
+                )
+                isDecline -> Quadruple(
+                    Color(0xFFE53935),
+                    Color(0xFFE53935).copy(alpha = 0.10f),
+                    Color(0xFFCC0000),
+                    R.drawable.news_decline
+                )
+                isWin -> Quadruple(
+                    RatingGreen,
+                    RatingGreen.copy(alpha = 0.10f),
+                    RatingGreen,
+                    R.drawable.news_won
+                )
+                isLoss -> Quadruple(
+                    RatingRed,
+                    RatingRed.copy(alpha = 0.08f),
+                    RatingRed,
+                    R.drawable.news_lost
+                )
+                isInj -> Quadruple(
+                    MaterialTheme.colorScheme.error,
+                    MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f),
+                    MaterialTheme.colorScheme.error,
+                    R.drawable.news_injured
+                )
+                isRecovery -> Quadruple(
+                    Color(0xFF00B0FF),
+                    Color(0xFF00B0FF).copy(alpha = 0.10f),
+                    Color(0xFF0091EA),
+                    R.drawable.news_recovery
+                )
+                isAward -> Quadruple(
+                    Color(0xFFFFA000),
+                    Color(0xFFFFA000).copy(alpha = 0.12f),
+                    Color(0xFFE65100),
+                    R.drawable.news_trophy
+                )
+                isPlayoff -> Quadruple(
+                    Color(0xFFFFD700),
+                    Color(0xFFFFD700).copy(alpha = 0.10f),
+                    Color(0xFFB78103),
+                    R.drawable.news_playoffs
+                )
+                isTrade -> Quadruple(
+                    Color(0xFF7C4DFF),
+                    Color(0xFF7C4DFF).copy(alpha = 0.08f),
+                    Color(0xFF651FFF),
+                    R.drawable.news_trade
+                )
+                else -> Quadruple(
+                    MaterialTheme.colorScheme.outlineVariant,
+                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    MaterialTheme.colorScheme.onSurface,
+                    R.drawable.news_info
+                )
             }
 
             Card(
@@ -370,25 +429,43 @@ fun DashboardScreen(
                 Column(modifier = Modifier.padding(12.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = news.title,
-                            fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = when {
-                                isWin -> RatingGreen
-                                isLoss -> RatingRed
-                                isAward -> Color(0xFFE65100)
-                                else -> MaterialTheme.colorScheme.onSurface
-                            }
-                        )
-                        Text(
-                            text = "Day ${news.matchday}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(bgColor)
+                                .border(1.dp, borderColor.copy(alpha = 0.5f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Image(
+                                painter = painterResource(id = iconRes),
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(10.dp))
+
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = news.title,
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = titleColor,
+                                modifier = Modifier.weight(1f, fill = false)
+                            )
+                            Text(
+                                text = "Day ${news.matchday}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                     Spacer(modifier = Modifier.height(6.dp))
 

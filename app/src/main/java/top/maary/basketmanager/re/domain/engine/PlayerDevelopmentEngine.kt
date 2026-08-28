@@ -90,8 +90,10 @@ object PlayerDevelopmentEngine {
         if (curPlayer.teamId == userTeamId) {
             if (curPlayer.potential != oldPotential) {
                 val isImproved = curPlayer.potential > oldPotential
-                val title = if (isImproved) "Potential Improved" else "Potential Declined"
-                val body = "${curPlayer.shortName} potential changed to ${curPlayer.potential}/10."
+                val title = if (isImproved) "Potential Improved 📈" else "Potential Declined 📉"
+                val sign = if (isImproved) "+" else ""
+                val delta = curPlayer.potential - oldPotential
+                val body = "${curPlayer.name} potential changed from $oldPotential/10 to ${curPlayer.potential}/10 ($sign$delta)."
                 news.add(
                     NewsItem(
                         gameId = curPlayer.gameId,
@@ -107,8 +109,10 @@ object PlayerDevelopmentEngine {
             val newRating = curPlayer.overallRating.toInt()
             if (newRating != oldRating) {
                 val isImproved = newRating > oldRating
-                val title = if (isImproved) "Player Improved" else "Player Declined"
-                val body = "${curPlayer.shortName} overall rating changed from $oldRating to $newRating."
+                val title = if (isImproved) "Player Improved 📈" else "Player Declined 📉"
+                val sign = if (isImproved) "+" else ""
+                val delta = newRating - oldRating
+                val body = "${curPlayer.name} overall rating changed from $oldRating to $newRating ($sign$delta)."
                 news.add(
                     NewsItem(
                         gameId = curPlayer.gameId,
